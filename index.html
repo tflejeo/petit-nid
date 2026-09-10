@@ -242,11 +242,42 @@
   .link-input-wrap input{padding-left:34px;}
   .link-open{position:absolute; right:8px; top:50%; transform:translateY(-50%); color:var(--sage-dark); text-decoration:none; font-size:12px; font-weight:800;}
 
-  .photo-row{display:flex; align-items:center; gap:10px;}
-  .photo-thumb{width:56px; height:56px; border-radius:var(--r-sm); object-fit:cover; border:1px solid var(--border); flex-shrink:0;}
-  .photo-upload-btn{
-    display:flex; align-items:center; gap:6px; border:1px dashed var(--muted-2); border-radius:var(--r-sm);
-    padding:9px 12px; font-size:13px; font-weight:700; color:var(--muted); cursor:pointer; background:#fff;
+  .photo-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .photo-item{position:relative; width:64px; height:64px; flex-shrink:0;}
+  .photo-item img{width:100%; height:100%; object-fit:cover; border-radius:var(--r-sm); border:1px solid var(--border); cursor:zoom-in; display:block;}
+  .photo-item .photo-del{
+    position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%;
+    background:var(--terracotta-dark); color:#fff; border:2px solid #fff;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .photo-add-tile{
+    width:64px; height:64px; border-radius:var(--r-sm); border:1.5px dashed var(--muted-2);
+    display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff; flex-shrink:0;
+  }
+  .item-thumb-wrap{position:relative; flex-shrink:0;}
+  .item-thumb-count{
+    position:absolute; bottom:-4px; right:-4px; background:var(--ink); color:#fff;
+    font-size:9px; font-weight:800; border-radius:999px; padding:1px 4px; line-height:1.4; min-width:14px; text-align:center;
+  }
+  .lightbox-overlay{
+    position:fixed; inset:0; background:rgba(20,17,13,0.94); z-index:300;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .lightbox-img{max-width:92vw; max-height:80vh; border-radius:12px; object-fit:contain;}
+  .lightbox-close{
+    position:absolute; top:18px; right:18px; width:40px; height:40px; border-radius:50%;
+    background:rgba(255,255,255,0.15); border:none; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .lightbox-nav{
+    position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:50%;
+    background:rgba(255,255,255,0.15); border:none; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .lightbox-prev{left:12px;}
+  .lightbox-next{right:12px;}
+  .lightbox-next .icon{transform:rotate(180deg);}
+  .lightbox-count{
+    position:absolute; bottom:22px; left:50%; transform:translateX(-50%); color:#fff; font-size:13px; font-weight:700;
+    background:rgba(0,0,0,0.35); padding:4px 12px; border-radius:999px;
   }
   .expand-actions{display:flex; justify-content:space-between; align-items:center; margin-top:2px;}
   .text-btn{background:none; border:none; font-weight:800; font-size:13px; cursor:pointer; padding:6px 4px;}
@@ -328,6 +359,59 @@
     display:block; text-align:center; font-size:12px; color:var(--muted-2); font-weight:700;
     margin:26px 0 10px; background:none; border:none; cursor:pointer; width:100%;
   }
+
+  /* Search */
+  .search-wrap{margin-bottom:14px;}
+  .search-input-wrap{
+    position:relative; display:flex; align-items:center;
+    background:var(--card); border:1px solid var(--border); border-radius:999px;
+    padding:0 14px; box-shadow:var(--shadow);
+  }
+  .search-input-wrap .icon{color:var(--muted-2); flex-shrink:0;}
+  .search-input-wrap input{
+    border:none; background:transparent; padding:11px 8px; font-size:14px; flex:1; min-width:0;
+  }
+  .search-input-wrap input:focus{outline:none;}
+  .search-input-wrap input::-webkit-search-cancel-button{display:none;}
+  .search-clear{background:none; border:none; color:var(--muted); cursor:pointer; padding:6px; display:flex; flex-shrink:0;}
+  .search-result-row{
+    width:100%; display:flex; align-items:center; gap:10px; padding:12px 10px;
+    background:var(--card); border:1px solid var(--border); border-radius:var(--r-sm);
+    margin-bottom:8px; cursor:pointer; text-align:left;
+  }
+  .search-result-row:active{background:var(--sage-tint);}
+  .search-result-main{flex:1; min-width:0;}
+  .search-result-breadcrumb{font-size:12px; color:var(--muted); font-weight:600; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .search-result-count{font-size:12px; font-weight:800; color:var(--muted); flex-shrink:0;}
+
+  /* Daily quote */
+  .quote-card{
+    display:flex; gap:10px; align-items:flex-start;
+    background:var(--sage-tint); border-radius:var(--r-md);
+    padding:16px 18px; margin-bottom:16px; color:var(--sage-dark);
+  }
+  .quote-card .icon{flex-shrink:0; margin-top:2px;}
+  .quote-text{
+    font-family:var(--font-display); font-style:italic; font-weight:500;
+    font-size:15px; line-height:1.5; margin:0;
+  }
+
+  /* Prono */
+  .choice-row{display:flex; gap:8px;}
+  .choice-btn{
+    flex:1; padding:11px; border-radius:var(--r-sm); border:1px solid var(--border);
+    background:#fff; font-weight:700; font-size:14px; color:var(--ink); cursor:pointer;
+  }
+  .choice-btn.selected{background:var(--sage-dark); color:#fff; border-color:var(--sage-dark);}
+  .prono-row{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);
+    padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow);
+  }
+  .prono-row-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .prono-name{font-weight:800; font-size:14.5px;}
+  .prono-meta{font-size:12.5px; color:var(--muted); font-weight:600; margin-top:2px;}
+  .prono-details{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--muted); margin-top:10px;}
+  .prono-details strong{color:var(--ink);}
 </style>
 </head>
 <body>
@@ -348,9 +432,14 @@
     <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
     Mes listes
   </button>
+  <button class="nav-btn" data-nav="prono">
+    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 8h18M12 8v13M7.5 8a2.5 2.5 0 010-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 010 5"/></svg>
+    Prono
+  </button>
 </nav>
 
 <div id="modalRoot"></div>
+<div id="lightboxRoot"></div>
 <div id="toast" class="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -376,7 +465,8 @@ const ICONS = {
   bed:'<path d="M3 18v-6a2 2 0 012-2h14a2 2 0 012 2v6"/><path d="M3 18h18M7 10V7a2 2 0 012-2h6a2 2 0 012 2v3"/>',
   suitcase:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 13h18"/>',
   sparkle:'<path d="M12 3l1.8 4.6L18 9.2l-4.2 1.7L12 15l-1.8-4.1L6 9.2l4.2-1.6L12 3z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>',
-  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/>'
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'
 };
 function icon(name, cls){ return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
 
@@ -392,7 +482,7 @@ function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0];
 /* ---------- Default data ---------- */
 function buildDefaultData(){
   function items(list){
-    return list.map(([name, target]) => ({ id: newId(), name, target, acquired: 0, note:'', link:'', photo:'' }));
+    return list.map(([name, target]) => ({ id: newId(), name, target, acquired: 0, note:'', link:'', photos: [] }));
   }
   function section(label, period, list){
     return { id: newId(), label, period, items: items(list) };
@@ -477,6 +567,7 @@ function newId(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().t
 let data = loadLocalData();
 // `ui` is per-device navigation state (current screen, open sections) — never synced.
 let ui = loadUi();
+let searchQuery = '';
 let uiIsFresh = !localStorage.getItem(UI_STORAGE_KEY);
 if(uiIsFresh && data.categories[0] && data.categories[0].sections[0]){
   ui.collapsedSections[data.categories[0].sections[0].id] = false;
@@ -493,6 +584,10 @@ function normalizeData(d){
     if(!Array.isArray(cat.sections)) cat.sections = [];
     cat.sections.forEach(sec => {
       if(!Array.isArray(sec.items)) sec.items = [];
+      sec.items.forEach(it => {
+        if(!Array.isArray(it.photos)) it.photos = it.photo ? [it.photo] : [];
+        delete it.photo;
+      });
     });
   });
   if(!d.dueDate) d.dueDate = '2027-03-25';
@@ -538,9 +633,24 @@ let bootstrapped = false;
 let lastSentJson = null;
 let remoteDebounceTimer = null;
 
+let pronosRef = null;
+let adminRef = null;
+let pronosList = [];
+const ADMIN_UNLOCKED_KEY = 'petitNidAdminUnlocked_v1';
+let isAdminUnlocked = (function(){ try{ return localStorage.getItem(ADMIN_UNLOCKED_KEY) === '1'; }catch(e){ return false; } })();
+function setAdminUnlocked(v){
+  isAdminUnlocked = v;
+  try{ localStorage.setItem(ADMIN_UNLOCKED_KEY, v ? '1' : '0'); }catch(e){}
+}
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
 function isTypingInTextField(){
   const el = document.activeElement;
-  return !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'url')));
+  return !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'url' || el.type === 'search')));
 }
 
 function updateConnectionBadge(state){
@@ -556,12 +666,23 @@ function initFirebase(){
     firebase.initializeApp(firebaseConfig);
     dbRef = firebase.database().ref('petitNidData');
     dbRef.on('value', handleRemoteValue, handleRemoteError);
+    pronosRef = firebase.database().ref('petitNidPronos');
+    pronosRef.on('value', handlePronosValue);
+    adminRef = firebase.database().ref('petitNidAdmin');
     firebase.database().ref('.info/connected').on('value', snap => {
       updateConnectionBadge(snap.val() === true ? 'online' : 'offline');
     });
   }catch(e){
     updateConnectionBadge('error');
   }
+}
+
+function handlePronosValue(snapshot){
+  const val = snapshot.val() || {};
+  pronosList = Object.keys(val)
+    .map(key => Object.assign({ __key:key }, val[key]))
+    .sort((a,b) => (b.submittedAt||0) - (a.submittedAt||0));
+  if(ui.view === 'prono' && isAdminUnlocked) render();
 }
 
 function handleRemoteValue(snapshot){
@@ -658,6 +779,64 @@ function formatDate(dateStr){
   return d.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
 }
 
+/* Pensées originales sur la maternité/la parentalité — non attribuées à qui que ce soit,
+   pour éviter d'attribuer à tort une citation à une personne réelle. Une par jour, en boucle. */
+const QUOTES = [
+  "Un enfant n’a pas besoin de parents parfaits, juste de parents présents.",
+  "Chaque petit geste répété façonne, sans bruit, la sécurité de demain.",
+  "La patience d’aujourd’hui devient la confiance de votre enfant plus tard.",
+  "On n’apprend pas à être parent, on le devient un jour à la fois.",
+  "Le calme que vous montrez, votre enfant apprendra à le retrouver en lui.",
+  "Un câlin ne résout rien, et pourtant il répare presque tout.",
+  "Vos doutes sont le signe que vous prenez ce rôle au sérieux.",
+  "L’amour d’un parent ne se mesure pas, il se sent dans les détails.",
+  "Chaque nuit courte se paiera un jour en souvenirs immenses.",
+  "Un enfant grandit dans le regard qui croit en lui.",
+  "Il n’y a pas de bonne méthode, seulement la vôtre, ajustée chaque jour.",
+  "Le temps que vous donnez vaut plus que le temps que vous planifiez.",
+  "Accueillir un bébé, c’est accepter de tout réapprendre en même temps que lui.",
+  "La tendresse répétée construit, brique après brique, un adulte apaisé.",
+  "Vous n’avez pas à tout savoir, seulement à rester là.",
+  "Un sourire de bébé efface d’un coup la nuit la plus longue.",
+  "Le désordre d’aujourd’hui est souvent le décor des plus beaux souvenirs.",
+  "Être parent, c’est apprendre à aimer sans attendre de retour immédiat.",
+  "Chaque question sans réponse d’un enfant est une porte vers sa curiosité.",
+  "Le premier cadeau d’un parent, c’est simplement d’être là.",
+  "On ne devient pas parfait en devenant parent, on devient plus vrai.",
+  "La sécurité d’un enfant tient dans la constance, pas dans la perfection.",
+  "Un jour difficile n’efface jamais tous les bons qui l’ont précédé.",
+  "Le lien se tisse dans les gestes simples répétés sans compter.",
+  "Vous apprenez votre enfant en même temps qu’il vous apprend à vous.",
+  "La confiance d’un enfant se construit dans les petites promesses tenues.",
+  "Ce que vous donnez sans le voir, votre enfant le rend un jour, transformé.",
+  "Un parent fatigué qui reste doux fait un travail immense et invisible.",
+  "Le rire d’un enfant est la preuve que tout va, malgré tout, dans le bon sens.",
+  "Grandir ensemble veut dire accepter de changer, vous aussi.",
+  "Il n’y a pas d’instant trop petit pour marquer un enfant durablement.",
+  "Un parent qui doute est souvent un parent qui aime avec attention.",
+  "La routine du soir compte plus qu’on ne le pense pour un tout-petit.",
+  "Ce que vous nommez calmement, l’enfant apprend à l’apprivoiser aussi.",
+  "L’attente de la naissance est déjà, en soi, un apprentissage de patience.",
+  "Un couple qui se soutient construit le premier port d’attache de l’enfant.",
+  "Le silence partagé avec un bébé vaut parfois tous les discours.",
+  "Chaque étape franchie aujourd’hui semblait impossible il y a un mois.",
+  "Votre présence compte plus que votre performance.",
+  "Un enfant retient moins vos mots que la manière dont vous les dites.",
+  "Se préparer à devenir parent, c’est déjà commencer à aimer.",
+  "La tendresse ne s’épuise pas, elle se transforme avec la fatigue.",
+  "Ce petit être ne demande pas la perfection, il demande votre attention.",
+  "Un foyer paisible se construit avant même l’arrivée de l’enfant.",
+  "Le plus grand cadeau que vous ferez à votre enfant, c’est de bien vous entourer."
+];
+
+function dayOfYear(d){
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+function todaysQuote(){
+  return QUOTES[dayOfYear(new Date()) % QUOTES.length];
+}
+
 let toastTimer = null;
 function showToast(msg){
   const el = document.getElementById('toast');
@@ -672,9 +851,11 @@ function render(){
   renderHeader();
   if(ui.view === 'dashboard') renderDashboard();
   else if(ui.view === 'lists') renderListsView();
+  else if(ui.view === 'prono') renderProno();
   else renderCategory();
   document.querySelectorAll('.nav-btn').forEach(b=>{
-    const active = (ui.view === 'category' || ui.view === 'lists') ? 'lists' : 'dashboard';
+    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', prono:'prono' };
+    const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
 }
@@ -685,6 +866,8 @@ function renderHeader(){
     h.innerHTML = `<div class="brand"><h1>Petit Nid</h1><span class="dot">·</span><span style="font-size:12.5px;color:var(--muted);font-weight:700;">votre liste de naissance</span></div>`;
   } else if(ui.view === 'lists'){
     h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
+  } else if(ui.view === 'prono'){
+    h.innerHTML = `<div class="brand"><h1>Mon petit prono</h1></div>`;
   } else {
     const cat = data.categories.find(c=>c.id===ui.activeCategoryId);
     h.innerHTML = `<div class="view-title">
@@ -734,6 +917,11 @@ function renderDashboard(){
       </div>
     </div>
 
+    <div class="quote-card">
+      ${icon('sparkle','icon-sm')}
+      <p class="quote-text">${escapeHtml(todaysQuote())}</p>
+    </div>
+
     <div class="section-heading">Vos listes</div>
     <div class="cat-grid" id="catGrid"></div>
   `;
@@ -765,8 +953,297 @@ function renderCatGrid(container){
 
 function renderListsView(){
   const main = document.getElementById('mainContent');
-  main.innerHTML = `<div class="section-heading" style="margin-top:6px;">Toutes vos listes</div><div class="cat-grid" id="catGrid"></div>`;
+  main.innerHTML = `
+    <div class="search-wrap">
+      <div class="search-input-wrap">
+        ${icon('search','icon-sm')}
+        <input type="search" id="searchInput" placeholder="Rechercher un article dans toutes les listes…" value="${escapeAttr(searchQuery)}">
+        ${searchQuery ? `<button class="search-clear" id="btnClearSearch">${icon('x','icon-sm')}</button>` : ''}
+      </div>
+    </div>
+    <div id="searchResults"></div>
+    <div id="listsGridWrap">
+      <div class="section-heading" style="margin-top:6px;">Toutes vos listes</div>
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+  `;
+  const input = document.getElementById('searchInput');
+  input.addEventListener('input', () => { searchQuery = input.value; renderSearchState(); });
+  const clearBtn = document.getElementById('btnClearSearch');
+  if(clearBtn) clearBtn.onclick = () => { searchQuery = ''; render(); };
   renderCatGrid(document.getElementById('catGrid'));
+  renderSearchState();
+}
+
+function normalizeSearch(s){
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function searchItems(query){
+  const q = normalizeSearch(query);
+  if(!q) return [];
+  const results = [];
+  data.categories.forEach(cat => {
+    cat.sections.forEach(sec => {
+      sec.items.forEach(it => {
+        if(normalizeSearch(it.name).includes(q)) results.push({ cat, sec, it });
+      });
+    });
+  });
+  return results;
+}
+
+function renderSearchState(){
+  const resultsEl = document.getElementById('searchResults');
+  const gridWrap = document.getElementById('listsGridWrap');
+  if(!resultsEl || !gridWrap) return;
+  const q = searchQuery.trim();
+  if(!q){ resultsEl.innerHTML = ''; gridWrap.style.display = ''; return; }
+  gridWrap.style.display = 'none';
+  const results = searchItems(q);
+  if(results.length === 0){
+    resultsEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun article ne correspond à « ${escapeHtml(q)} ».</div></div>`;
+    return;
+  }
+  resultsEl.innerHTML =
+    `<div class="section-heading" style="margin-top:6px;">${results.length} résultat${results.length>1?'s':''}</div>` +
+    results.map(({cat, sec, it}) => {
+      const status = itemStatus(it.target, it.acquired);
+      return `<button class="search-result-row" data-goto-item data-cat-id="${cat.id}" data-sec-id="${sec.id}" data-item-id="${it.id}">
+        <span class="status-dot status-${status}"></span>
+        ${it.photos && it.photos.length ? `<img class="item-thumb" src="${it.photos[0]}" alt="">` : ''}
+        <div class="search-result-main">
+          <div class="item-name">${escapeHtml(it.name)}</div>
+          <div class="search-result-breadcrumb">${escapeHtml(cat.name)} · ${escapeHtml(sec.label)}</div>
+        </div>
+        <span class="search-result-count">${it.acquired}/${it.target}</span>
+      </button>`;
+    }).join('');
+  resultsEl.querySelectorAll('[data-goto-item]').forEach(btn => {
+    btn.onclick = () => {
+      const { catId, secId, itemId } = btn.dataset;
+      ui.view = 'category';
+      ui.activeCategoryId = catId;
+      ui.collapsedSections[secId] = false;
+      ui.expandedItems[itemId] = true;
+      searchQuery = '';
+      saveUi();
+      render();
+      const row = document.querySelector(`[data-item-row="${itemId}"]`);
+      if(row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+    };
+  });
+}
+
+/* ---------- Mon petit prono ---------- */
+function renderProno(){
+  const main = document.getElementById('mainContent');
+  if(isAdminUnlocked) renderPronoAdmin(main);
+  else renderPronoForm(main);
+}
+
+function findProno(firstName, lastName){
+  const nf = normalizeSearch(firstName), nl = normalizeSearch(lastName);
+  if(!nf || !nl) return null;
+  return pronosList.find(p => normalizeSearch(p.firstName) === nf && normalizeSearch(p.lastName) === nl) || null;
+}
+
+function renderPronoForm(main){
+  let editingKey = null;
+  let chosenSex = null;
+
+  main.innerHTML = `
+    <p style="color:var(--muted); font-size:13.5px; margin:2px 0 16px;">
+      Tentez votre chance : devinez la date, l’heure, le sexe, le prénom, le poids et la taille du bébé !
+    </p>
+    <form id="pronoForm" class="prono-form">
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label class="field-label">Votre prénom</label><input type="text" id="pFirst" required></div>
+        <div class="field" style="flex:1;"><label class="field-label">Votre nom</label><input type="text" id="pLast" required></div>
+      </div>
+      <button type="button" class="chip-btn" id="btnFindProno" style="margin-bottom:14px;">${icon('search','icon-sm')} Retrouver mon pronostic</button>
+      <div id="pronoStatus"></div>
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label class="field-label">Date de naissance</label><input type="date" id="pDate"></div>
+        <div class="field" style="flex:1;"><label class="field-label">Heure</label><input type="time" id="pTime"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Sexe</label>
+        <div class="choice-row">
+          <button type="button" class="choice-btn" data-sex="fille">Fille</button>
+          <button type="button" class="choice-btn" data-sex="garcon">Garçon</button>
+        </div>
+      </div>
+      <div class="field"><label class="field-label">Prénom du bébé</label><input type="text" id="pName" placeholder="Votre pronostic"></div>
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label class="field-label">Poids (kg)</label><input type="number" step="0.1" min="0" id="pWeight" placeholder="ex. 3.3"></div>
+        <div class="field" style="flex:1;"><label class="field-label">Taille (cm)</label><input type="number" step="0.5" min="0" id="pHeight" placeholder="ex. 50"></div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; margin-top:6px;" id="pronoSubmitBtn">Envoyer mon pronostic</button>
+    </form>
+    <button class="footer-link" id="btnAdminAccess">Espace admin</button>
+  `;
+
+  function selectSex(sex){
+    chosenSex = sex;
+    main.querySelectorAll('[data-sex]').forEach(b => b.classList.toggle('selected', b.dataset.sex === sex));
+  }
+  main.querySelectorAll('[data-sex]').forEach(b => b.onclick = () => selectSex(b.dataset.sex));
+
+  function setEditing(match){
+    editingKey = match ? match.__key : null;
+    document.getElementById('pronoSubmitBtn').textContent = editingKey ? 'Mettre à jour mon pronostic' : 'Envoyer mon pronostic';
+    const statusEl = document.getElementById('pronoStatus');
+    statusEl.innerHTML = editingKey
+      ? `<p style="color:var(--sage-dark); font-size:13px; font-weight:700; margin:-6px 0 14px;">${icon('check','icon-sm')} Pronostic retrouvé — modifiez-le puis validez.</p>`
+      : '';
+  }
+
+  document.getElementById('btnFindProno').onclick = () => {
+    const firstName = document.getElementById('pFirst').value.trim();
+    const lastName = document.getElementById('pLast').value.trim();
+    if(!firstName || !lastName){ showToast('Indiquez votre prénom et votre nom pour le retrouver'); return; }
+    const match = findProno(firstName, lastName);
+    if(!match){
+      setEditing(null);
+      showToast('Aucun pronostic trouvé à ce nom — vous pouvez en créer un');
+      return;
+    }
+    document.getElementById('pDate').value = match.guessDate || '';
+    document.getElementById('pTime').value = match.guessTime || '';
+    document.getElementById('pName').value = match.firstNameGuess || '';
+    document.getElementById('pWeight').value = match.weightKg || '';
+    document.getElementById('pHeight').value = match.heightCm || '';
+    selectSex(match.sex || null);
+    setEditing(match);
+  };
+
+  document.getElementById('pronoForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const firstName = document.getElementById('pFirst').value.trim();
+    const lastName = document.getElementById('pLast').value.trim();
+    if(!firstName || !lastName){ showToast('Indiquez votre prénom et votre nom'); return; }
+    if(!pronosRef){ showToast('Connexion indisponible, réessayez plus tard.'); return; }
+    const fields = {
+      firstName, lastName,
+      guessDate: document.getElementById('pDate').value || '',
+      guessTime: document.getElementById('pTime').value || '',
+      sex: chosenSex || '',
+      firstNameGuess: document.getElementById('pName').value.trim(),
+      weightKg: document.getElementById('pWeight').value || '',
+      heightCm: document.getElementById('pHeight').value || ''
+    };
+    if(editingKey){
+      pronosRef.child(editingKey).update(Object.assign({}, fields, { updatedAt: Date.now() }))
+        .then(() => showToast('Pronostic mis à jour !'))
+        .catch(err => showToast('Échec de la mise à jour : ' + err.message));
+    } else {
+      const newRef = pronosRef.push();
+      newRef.set(Object.assign({}, fields, { submittedAt: Date.now() }))
+        .then(() => { editingKey = newRef.key; setEditing({ __key: editingKey }); showToast('Pronostic envoyé, merci !'); })
+        .catch(err => showToast('Échec de l’envoi : ' + err.message));
+    }
+  });
+
+  document.getElementById('btnAdminAccess').onclick = openAdminAccessModal;
+}
+
+function renderPronoAdmin(main){
+  const list = pronosList;
+  main.innerHTML = `
+    <div class="cat-actions-row" style="margin-top:2px;">
+      <button class="chip-btn" id="btnLockAdmin">${icon('x','icon-sm')} Quitter l’espace admin</button>
+      <button class="chip-btn" id="btnChangePin">${icon('gear','icon-sm')} Changer le code</button>
+    </div>
+    <div class="section-heading">Pronostics reçus (${list.length})</div>
+    <div id="pronoList"></div>
+  `;
+  const listEl = document.getElementById('pronoList');
+  if(list.length === 0){
+    listEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun pronostic pour le moment.<br>Partagez le site pour en recevoir !</div></div>`;
+  } else {
+    listEl.innerHTML = list.map(p => renderPronoRow(p)).join('');
+    listEl.querySelectorAll('[data-del-prono]').forEach(btn => {
+      btn.onclick = () => openConfirmModal(
+        'Supprimer ce pronostic ?',
+        `Le pronostic de ${btn.dataset.name} sera définitivement supprimé.`,
+        () => {
+          pronosRef.child(btn.dataset.key).remove();
+          closeModal(); showToast('Pronostic supprimé');
+        }
+      );
+    });
+  }
+  document.getElementById('btnLockAdmin').onclick = () => { setAdminUnlocked(false); render(); };
+  document.getElementById('btnChangePin').onclick = openSetPinModal;
+}
+
+function renderPronoRow(p){
+  const sexLabel = p.sex === 'garcon' ? 'Garçon' : p.sex === 'fille' ? 'Fille' : '—';
+  const dateLabel = p.guessDate ? formatDate(p.guessDate) : 'Date non renseignée';
+  return `<div class="prono-row">
+    <div class="prono-row-top">
+      <div>
+        <div class="prono-name">${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</div>
+        <div class="prono-meta">${dateLabel}${p.guessTime ? ' à ' + escapeHtml(p.guessTime) : ''} · ${sexLabel}</div>
+      </div>
+      <button class="text-btn danger" data-del-prono data-key="${p.__key}" data-name="${escapeAttr(p.firstName + ' ' + p.lastName)}">${icon('trash','icon-sm')}</button>
+    </div>
+    <div class="prono-details">
+      ${p.firstNameGuess ? `<span>Prénom : <strong>${escapeHtml(p.firstNameGuess)}</strong></span>` : ''}
+      ${p.weightKg ? `<span>Poids : <strong>${escapeHtml(p.weightKg)} kg</strong></span>` : ''}
+      ${p.heightCm ? `<span>Taille : <strong>${escapeHtml(p.heightCm)} cm</strong></span>` : ''}
+    </div>
+  </div>`;
+}
+
+function openAdminAccessModal(){
+  if(!adminRef){ showToast('Connexion indisponible, réessayez plus tard.'); return; }
+  adminRef.child('pinHash').once('value')
+    .then(snap => { const hash = snap.val(); hash ? openEnterPinModal(hash) : openSetPinModal(); })
+    .catch(() => showToast('Connexion indisponible, réessayez plus tard.'));
+}
+
+function openSetPinModal(){
+  openModal(`
+    <h2>Créer le code admin</h2>
+    <p style="color:var(--muted); font-size:13.5px;">Ce code sera demandé pour consulter les pronostics. Choisissez 4 à 6 chiffres.</p>
+    <div class="field"><label class="field-label">Code PIN</label><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pinNew"></div>
+    <div class="field"><label class="field-label">Confirmer le code</label><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pinNewConfirm"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = async () => {
+    const a = document.getElementById('pinNew').value.trim();
+    const b = document.getElementById('pinNewConfirm').value.trim();
+    if(!/^\d{4,6}$/.test(a)){ showToast('Le code doit contenir 4 à 6 chiffres'); return; }
+    if(a !== b){ showToast('Les deux codes ne correspondent pas'); return; }
+    const hash = await sha256Hex(a);
+    adminRef.child('pinHash').set(hash)
+      .then(() => { setAdminUnlocked(true); closeModal(); render(); showToast('Code enregistré'); })
+      .catch(err => showToast('Échec : ' + err.message));
+  };
+}
+
+function openEnterPinModal(existingHash){
+  openModal(`
+    <h2>Espace admin</h2>
+    <div class="field"><label class="field-label">Code PIN</label><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pinEnter"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Valider</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = async () => {
+    const v = document.getElementById('pinEnter').value.trim();
+    const hash = await sha256Hex(v);
+    if(hash === existingHash){ setAdminUnlocked(true); closeModal(); render(); }
+    else showToast('Code incorrect');
+  };
 }
 
 function renderCategory(){
@@ -854,7 +1331,7 @@ function renderItemHtml(cat, sec, it){
   const expanded = !!ui.expandedItems[it.id];
   let html = `<div class="item-row ${done ? 'done' : ''}" data-item-row="${it.id}">
     <span class="status-dot status-${status}"></span>
-    ${it.photo ? `<img class="item-thumb" src="${it.photo}" alt="">` : ''}
+    ${it.photos && it.photos.length ? `<span class="item-thumb-wrap"><img class="item-thumb" src="${it.photos[0]}" alt="">${it.photos.length > 1 ? `<span class="item-thumb-count">${it.photos.length}</span>` : ''}</span>` : ''}
     <div class="item-main" data-item-toggle="${it.id}">
       <div class="item-name-row">
         <span class="item-name">${escapeHtml(it.name)}</span>
@@ -902,14 +1379,18 @@ function renderItemHtml(cat, sec, it){
         <textarea data-field="note" data-item="${it.id}" placeholder="Taille, couleur, magasin…">${escapeHtml(it.note)}</textarea>
       </div>
       <div class="field">
-        <label class="field-label">Photo</label>
-        <div class="photo-row">
-          ${it.photo ? `<img class="photo-thumb" src="${it.photo}">` : ''}
-          <label class="photo-upload-btn">
-            ${icon('camera','icon-sm')} ${it.photo ? 'Changer' : 'Ajouter une photo'}
-            <input type="file" accept="image/*" data-photo="${it.id}" style="display:none;">
+        <label class="field-label">Photos${it.photos.length ? ' (' + it.photos.length + ')' : ''}</label>
+        <div class="photo-grid">
+          ${it.photos.map((p, i) => `
+            <div class="photo-item">
+              <img src="${p}" data-zoom-photo="${it.id}" data-index="${i}">
+              <button class="photo-del" data-del-photo="${it.id}" data-index="${i}" aria-label="Supprimer cette photo">${icon('x','icon-sm')}</button>
+            </div>
+          `).join('')}
+          <label class="photo-add-tile">
+            ${icon('camera','icon-sm')}
+            <input type="file" accept="image/*" multiple data-photo="${it.id}" style="display:none;">
           </label>
-          ${it.photo ? `<button class="text-btn danger" data-remove-photo="${it.id}">${icon('x','icon-sm')}</button>` : ''}
         </div>
       </div>
       <div class="expand-actions">
@@ -980,8 +1461,17 @@ function bindItemEvents(cat, sec, it){
   const photoInput = expand.querySelector(`[data-photo="${it.id}"]`);
   if(photoInput) photoInput.onchange = (e) => handlePhotoUpload(e, it);
 
-  const removePhoto = expand.querySelector(`[data-remove-photo="${it.id}"]`);
-  if(removePhoto) removePhoto.onclick = () => { it.photo=''; save(); render(); };
+  expand.querySelectorAll('[data-del-photo]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.index, 10);
+      it.photos.splice(idx, 1);
+      save(); render();
+    };
+  });
+
+  expand.querySelectorAll('[data-zoom-photo]').forEach(imgEl => {
+    imgEl.onclick = () => openLightbox(it.photos, parseInt(imgEl.dataset.index, 10));
+  });
 
   const delItem = expand.querySelector(`[data-del-item="${it.id}"]`);
   if(delItem) delItem.onclick = () => openConfirmModal('Supprimer cet article ?', `« ${it.name} » sera retiré de la liste.`, () => {
@@ -993,44 +1483,69 @@ function bindItemEvents(cat, sec, it){
   if(closeItem) closeItem.onclick = () => { ui.expandedItems[it.id] = false; render(); };
 }
 
+function compressImageFile(file){
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try{
+        const maxW = 480;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      }catch(err){ reject(err); }
+      finally{ URL.revokeObjectURL(objectUrl); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('load-failed')); };
+    img.src = objectUrl;
+  });
+}
+
 function handlePhotoUpload(e, it){
-  const file = e.target.files && e.target.files[0];
-  e.target.value = ''; // permet de reselectionner le meme fichier plus tard
-  if(!file) return;
-  if(!file.type || !file.type.startsWith('image/')){
-    showToast('Ce fichier n’est pas une image.');
-    return;
-  }
-  const objectUrl = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = () => {
-    try{
-      const maxW = 480;
-      const scale = Math.min(1, maxW / img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(img.width * scale));
-      canvas.height = Math.max(1, Math.round(img.height * scale));
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      it.photo = canvas.toDataURL('image/jpeg', 0.72);
-      save();
-      render();
-      showToast('Photo ajoutée');
-    }catch(err){
-      showToast('Impossible de traiter cette photo.');
-    }finally{
-      URL.revokeObjectURL(objectUrl);
-    }
-  };
-  img.onerror = () => {
-    showToast('Impossible de lire cette photo.');
-    URL.revokeObjectURL(objectUrl);
-  };
-  img.src = objectUrl;
+  const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
+  e.target.value = ''; // permet de reselectionner les memes fichiers plus tard
+  if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
+  Promise.allSettled(files.map(compressImageFile)).then(results => {
+    let added = 0;
+    results.forEach(r => { if(r.status === 'fulfilled'){ it.photos.push(r.value); added++; } });
+    if(added > 0){ save(); render(); }
+    if(added === files.length) showToast(added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée');
+    else if(added > 0) showToast(added + ' photo(s) ajoutée(s), certaines ont échoué');
+    else showToast('Impossible de traiter ces photos.');
+  });
 }
 
 /* ---------- Modals ---------- */
 function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
+
+function openLightbox(photos, startIndex){
+  const root = document.getElementById('lightboxRoot');
+  let idx = clamp(startIndex, 0, photos.length - 1);
+  function close(){ root.innerHTML = ''; }
+  function draw(){
+    root.innerHTML = `
+      <div class="lightbox-overlay" id="lbOverlay">
+        <button class="lightbox-close" id="lbClose" aria-label="Fermer">${icon('x')}</button>
+        ${photos.length > 1 ? `<button class="lightbox-nav lightbox-prev" id="lbPrev" aria-label="Photo précédente">${icon('chevronLeft')}</button>` : ''}
+        <img class="lightbox-img" src="${photos[idx]}">
+        ${photos.length > 1 ? `<button class="lightbox-nav lightbox-next" id="lbNext" aria-label="Photo suivante">${icon('chevronLeft')}</button>` : ''}
+        ${photos.length > 1 ? `<div class="lightbox-count">${idx + 1} / ${photos.length}</div>` : ''}
+      </div>
+    `;
+    document.getElementById('lbClose').onclick = close;
+    document.getElementById('lbOverlay').addEventListener('mousedown', (e) => { if(e.target.id === 'lbOverlay') close(); });
+    if(photos.length > 1){
+      document.getElementById('lbPrev').onclick = () => { idx = (idx - 1 + photos.length) % photos.length; draw(); };
+      document.getElementById('lbNext').onclick = () => { idx = (idx + 1) % photos.length; draw(); };
+    }
+  }
+  draw();
+}
+
 function openModal(innerHtml){
   document.getElementById('modalRoot').innerHTML = `<div class="overlay" id="overlayEl"><div class="modal">${innerHtml}</div></div>`;
   document.getElementById('overlayEl').addEventListener('mousedown', (e) => { if(e.target.id === 'overlayEl') closeModal(); });
@@ -1192,7 +1707,7 @@ function openAddItemModal(cat, sec){
     if(!name){ showToast('Donnez un nom à l’article'); return; }
     const target = clamp(parseInt(document.getElementById('itTarget').value||'0',10), 0, 9999);
     const acquired = clamp(parseInt(document.getElementById('itAcquired').value||'0',10), 0, 9999);
-    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', photo:'' });
+    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', photos:[] });
     ui.collapsedSections[sec.id] = false; saveUi();
     save(); closeModal(); render(); showToast('Article ajouté');
   };
