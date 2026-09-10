@@ -155,9 +155,14 @@
     font-size:13px; color:var(--ink);
   }
   .budget-summary strong{color:var(--sage-dark);}
-  .progress-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
-  .progress-head .label{font-size:13px; font-weight:700; color:var(--ink);}
-  .progress-head .pct{font-size:13px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .price-list{display:flex; flex-direction:column; gap:7px;}
+  .price-list-row{display:flex; align-items:center; gap:8px;}
+  .price-list-label{font-size:12px; font-weight:700; color:var(--muted); width:54px; flex-shrink:0;}
+  .price-list-row input{flex:1;}
+  .price-list-total{font-size:12.5px; font-weight:700; color:var(--sage-dark); margin-top:2px;}
+  .progress-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; flex-wrap:nowrap;}
+  .progress-head .label{font-size:13px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .progress-head .pct{font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; flex-shrink:0;}
   .track{height:10px; background:#EFE8D6; border-radius:999px; overflow:hidden;}
   .track.thin{height:7px;}
   .fill{height:100%; border-radius:999px; transition:width 0.5s ease;}
@@ -253,7 +258,7 @@
     background:#FBF8EF; border:1px solid var(--border); border-radius:var(--r-sm);
     padding:12px; margin:6px 0 12px; display:flex; flex-direction:column; gap:10px;
   }
-  .field-label{font-size:11.5px; font-weight:800; color:var(--muted); text-transform:none; margin-bottom:4px; display:block;}
+  .field-label{font-size:11.5px; font-weight:800; color:var(--muted); text-transform:none; margin-bottom:4px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   textarea, input[type=text], input[type=url], input[type=number], input[type=date]{
     width:100%; border:1px solid var(--border); border-radius:var(--r-sm); padding:9px 11px;
     font-family:var(--font-body); font-size:14px; color:var(--ink); background:#fff;
@@ -503,10 +508,6 @@
     <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
     Mes listes
   </button>
-  <button class="nav-btn" data-nav="prono">
-    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 8h18M12 8v13M7.5 8a2.5 2.5 0 010-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 010 5"/></svg>
-    Prono
-  </button>
   <button class="nav-btn" data-nav="echo">
     <svg class="icon" viewBox="0 0 24 24"><path d="M3 12h3l2-7 4 14 2-7h3"/><circle cx="19" cy="12" r="2"/></svg>
     Écho
@@ -514,6 +515,10 @@
   <button class="nav-btn" data-nav="todo">
     <svg class="icon" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>
     À faire
+  </button>
+  <button class="nav-btn" data-nav="prono">
+    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 8h18M12 8v13M7.5 8a2.5 2.5 0 010-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 010 5"/></svg>
+    Prono
   </button>
 </nav>
 
@@ -564,7 +569,7 @@ function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0];
 function makeSection(label, period, list){
   return {
     id: newId(), label, period,
-    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', price: 0, photos: [] }))
+    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', prices: [], photos: [] }))
   };
 }
 
@@ -798,7 +803,11 @@ function normalizeData(d){
       sec.items.forEach(it => {
         if(!Array.isArray(it.photos)) it.photos = it.photo ? [it.photo] : [];
         delete it.photo;
-        it.price = Number(it.price) || 0;
+        if(!Array.isArray(it.prices)){
+          const legacy = Number(it.price) || 0;
+          it.prices = legacy > 0 ? new Array(it.acquired || 0).fill(legacy) : [];
+        }
+        delete it.price;
       });
     });
   });
@@ -995,12 +1004,18 @@ function formatPrice(n){
   return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR', maximumFractionDigits:2 }).format(n || 0);
 }
 
+function itemSpent(it){
+  const prices = Array.isArray(it.prices) ? it.prices : [];
+  return prices.slice(0, it.acquired).reduce((sum, p) => sum + (Number(p) || 0), 0);
+}
+
 function budgetTotals(){
   let spent = 0, projected = 0;
   data.categories.forEach(cat => cat.sections.forEach(sec => sec.items.forEach(it => {
-    const price = Number(it.price) || 0;
-    spent += price * it.acquired;
-    projected += price * it.target;
+    const prices = (Array.isArray(it.prices) ? it.prices : []).map(Number).filter(p => p > 0);
+    spent += itemSpent(it);
+    const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+    projected += avg * it.target;
   })));
   return { spent, projected };
 }
@@ -1126,8 +1141,8 @@ function renderDashboard(){
       </div>
       <div class="progress-block">
         <div class="progress-head">
-          <span class="label">Avancement de la grossesse</span>
-          <span class="pct" style="color:var(--terracotta-dark)">${preg.pct}% · semaine ${preg.weeks}/${preg.totalWeeks}</span>
+          <span class="label">Grossesse</span>
+          <span class="pct" style="color:var(--terracotta-dark)">${preg.pct}% · sem. ${preg.weeks}/${preg.totalWeeks}</span>
         </div>
         <div class="track"><div class="fill" style="width:${preg.pct}%; background:var(--terracotta)"></div></div>
         <div class="milestone-note">${icon('sparkle','icon-sm')} ${escapeHtml(milestone.text)}</div>
@@ -1141,7 +1156,7 @@ function renderDashboard(){
     <div class="section-heading">Vos listes</div>
     <div class="progress-block" style="margin-top:0; margin-bottom:16px;">
       <div class="progress-head">
-        <span class="label">Avancement des achats</span>
+        <span class="label">Achats</span>
         <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
       </div>
       <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
@@ -1182,6 +1197,8 @@ function renderCatGrid(container){
 
 function renderListsView(){
   const main = document.getElementById('mainContent');
+  const g = globalTotals();
+  const budget = budgetTotals();
   main.innerHTML = `
     <div class="search-wrap">
       <div class="search-input-wrap">
@@ -1192,6 +1209,14 @@ function renderListsView(){
     </div>
     <div id="searchResults"></div>
     <div id="listsGridWrap">
+      <div class="progress-block" style="margin-top:2px; margin-bottom:16px;">
+        <div class="progress-head">
+          <span class="label">Achats</span>
+          <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
+        </div>
+        <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
+        ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
+      </div>
       <div class="section-heading" style="margin-top:6px;">Toutes vos listes</div>
       <div class="cat-grid" id="catGrid"></div>
     </div>
@@ -2156,7 +2181,7 @@ function renderItemHtml(cat, sec, it){
       </div>
       <div class="item-sub">
         <span>${it.acquired} / ${it.target}</span>
-        ${it.price ? `<span class="link-dot"></span><span>${formatPrice(it.price)}${it.acquired > 0 ? ' · ' + formatPrice(it.price * it.acquired) : ''}</span>` : ''}
+        ${itemSpent(it) > 0 ? `<span class="link-dot"></span><span>${formatPrice(itemSpent(it))}</span>` : ''}
         ${it.link ? '<span class="link-dot"></span>' + icon('link','icon-sm') : ''}
         ${it.note ? '<span class="link-dot"></span><span>note</span>' : ''}
       </div>
@@ -2176,17 +2201,27 @@ function renderItemHtml(cat, sec, it){
       </div>
       <div style="display:flex; gap:10px;">
         <div class="field" style="flex:1;">
-          <label class="field-label">Quantité cible</label>
+          <label class="field-label">Qté cible</label>
           <input type="number" min="0" data-field="target" data-item="${it.id}" value="${it.target}">
         </div>
         <div class="field" style="flex:1;">
-          <label class="field-label">Quantité acquise</label>
+          <label class="field-label">Qté acquise</label>
           <input type="number" min="0" data-field="acquired" data-item="${it.id}" value="${it.acquired}">
         </div>
-        <div class="field" style="flex:1;">
-          <label class="field-label">Prix unitaire (€)</label>
-          <input type="number" min="0" step="0.01" data-field="price" data-item="${it.id}" value="${it.price || ''}" placeholder="0,00">
-        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Prix par unité acquise${it.acquired > 0 ? ' (' + it.acquired + ')' : ''}</label>
+        ${it.acquired > 0 ? `
+          <div class="price-list">
+            ${Array.from({length: it.acquired}).map((_, i) => `
+              <div class="price-list-row">
+                <span class="price-list-label">Unité ${i + 1}</span>
+                <input type="number" min="0" step="0.01" data-price-index="${i}" data-item="${it.id}" value="${(it.prices && it.prices[i]) ? it.prices[i] : ''}" placeholder="0,00 €">
+              </div>
+            `).join('')}
+            ${itemSpent(it) > 0 ? `<div class="price-list-total">Total : <strong>${formatPrice(itemSpent(it))}</strong></div>` : ''}
+          </div>
+        ` : `<p style="color:var(--muted); font-size:12.5px; margin:0;">Augmentez la quantité acquise pour renseigner le prix de chaque unité.</p>`}
       </div>
       <div class="field">
         <label class="field-label">Lien / référence d’achat</label>
@@ -2271,8 +2306,6 @@ function bindItemEvents(cat, sec, it){
     input.addEventListener(evt, () => {
       if(field === 'target' || field === 'acquired'){
         it[field] = clamp(parseInt(input.value || '0', 10), 0, 9999);
-      } else if(field === 'price'){
-        it.price = Math.max(0, parseFloat(input.value) || 0);
       } else {
         it[field] = input.value;
       }
@@ -2280,6 +2313,16 @@ function bindItemEvents(cat, sec, it){
       if(field !== 'note' && field !== 'link' && field !== 'name') render();
     });
     input.addEventListener('blur', () => render());
+  });
+
+  expand.querySelectorAll('[data-price-index]').forEach(input => {
+    input.addEventListener('change', () => {
+      const idx = parseInt(input.dataset.priceIndex, 10);
+      if(!Array.isArray(it.prices)) it.prices = [];
+      while(it.prices.length <= idx) it.prices.push(0);
+      it.prices[idx] = Math.max(0, parseFloat(input.value) || 0);
+      save(); render();
+    });
   });
 
   const photoInput = expand.querySelector(`[data-photo="${it.id}"]`);
@@ -2516,7 +2559,7 @@ function openAddItemModal(cat, sec){
     <h2>Nouvel article</h2>
     <div class="field"><label class="field-label">Nom</label><input type="text" id="itName" placeholder="Ex. Body ML"></div>
     <div style="display:flex; gap:10px;">
-      <div class="field" style="flex:1;"><label class="field-label">Quantité cible</label><input type="number" id="itTarget" min="0" value="1"></div>
+      <div class="field" style="flex:1;"><label class="field-label">Qté cible</label><input type="number" id="itTarget" min="0" value="1"></div>
       <div class="field" style="flex:1;"><label class="field-label">Déjà acquis</label><input type="number" id="itAcquired" min="0" value="0"></div>
     </div>
     <div class="modal-actions">
@@ -2530,7 +2573,7 @@ function openAddItemModal(cat, sec){
     if(!name){ showToast('Donnez un nom à l’article'); return; }
     const target = clamp(parseInt(document.getElementById('itTarget').value||'0',10), 0, 9999);
     const acquired = clamp(parseInt(document.getElementById('itAcquired').value||'0',10), 0, 9999);
-    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', price:0, photos:[] });
+    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', prices:[], photos:[] });
     ui.collapsedSections[sec.id] = false; saveUi();
     save(); closeModal(); render(); showToast('Article ajouté');
   };
