@@ -61,13 +61,18 @@
     padding:16px 18px 12px;
     border-bottom:1px solid var(--border);
   }
-  .header-row{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
-  .header-actions{display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;}
-  .sync-badge{
-    display:flex; align-items:center; gap:5px;
-    font-size:11px; font-weight:800; color:var(--muted-2);
+  .header-row{display:flex; align-items:center; gap:8px;}
+  .header-title-block{flex:0 0 auto; min-width:0;}
+  .header-tagline{
+    flex:1; min-width:0; text-align:center; font-size:12.5px; color:var(--muted); font-weight:700;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 8px;
   }
-  .sync-badge .dot{width:7px; height:7px; border-radius:50%; background:var(--muted-2);}
+  .header-actions{display:flex; align-items:center; flex-shrink:0;}
+  .sync-badge{
+    display:flex; align-items:center; gap:6px;
+    font-size:13px; font-weight:800; color:var(--muted-2);
+  }
+  .sync-badge .dot{width:8px; height:8px; border-radius:50%; background:var(--muted-2); flex-shrink:0;}
   .sync-badge.online .dot{background:var(--sage-dark);}
   .sync-badge.online{color:var(--sage-dark);}
   .sync-badge.error .dot{background:var(--terracotta-dark);}
@@ -476,9 +481,9 @@
 
 <header class="app-header">
   <div class="header-row">
-    <div id="headerContent"></div>
+    <div id="headerContent" class="header-title-block"></div>
+    <div id="headerTagline" class="header-tagline"></div>
     <div class="header-actions">
-      <div id="syncBadge" class="sync-badge"></div>
       <button class="icon-btn-ghost" id="settingsBtn" aria-label="Paramètres">
         <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
       </button>
@@ -873,7 +878,9 @@ function isTypingInTextField(){
   return !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'url' || el.type === 'search')));
 }
 
+let lastConnectionState = 'offline';
 function updateConnectionBadge(state){
+  lastConnectionState = state;
   const el = document.getElementById('syncBadge');
   if(!el) return;
   el.className = 'sync-badge ' + state;
@@ -1066,8 +1073,10 @@ function render(){
 
 function renderHeader(){
   const h = document.getElementById('headerContent');
+  const tagEl = document.getElementById('headerTagline');
+  tagEl.textContent = ui.view === 'dashboard' ? (data.headerTagline || '') : '';
   if(ui.view === 'dashboard'){
-    h.innerHTML = `<div class="brand"><h1>Nidoux</h1>${data.headerTagline ? `<span class="dot">·</span><span style="font-size:12.5px;color:var(--muted);font-weight:700;">${escapeHtml(data.headerTagline)}</span>` : ''}</div>`;
+    h.innerHTML = `<div class="brand"><h1>Nidoux</h1></div>`;
   } else if(ui.view === 'lists'){
     h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
   } else if(ui.view === 'prono'){
@@ -1703,6 +1712,10 @@ function openSettingsPanel(){
   openModal(`
     <h2>Paramètres</h2>
     <div class="field">
+      <label class="field-label">État de synchronisation</label>
+      <div id="syncBadge" class="sync-badge"></div>
+    </div>
+    <div class="field">
       <label class="field-label">Texte sous "Nidoux" (emojis autorisés)</label>
       <input type="text" id="sTagline" value="${escapeAttr(data.headerTagline || '')}" placeholder="Ex. 🍼 votre liste de naissance">
     </div>
@@ -1715,6 +1728,7 @@ function openSettingsPanel(){
       <button class="btn btn-primary" id="mSave">Enregistrer</button>
     </div>
   `);
+  updateConnectionBadge(lastConnectionState);
   document.getElementById('mCancel').onclick = closeModal;
   document.getElementById('mSave').onclick = () => {
     data.headerTagline = document.getElementById('sTagline').value;
