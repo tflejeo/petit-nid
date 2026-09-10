@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Petit Nid — suivi des achats de naissance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF6EC;
+    --card:#FFFFFF;
+    --ink:#3A3529;
+    --muted:#8C8171;
+    --muted-2:#B3A997;
+    --sage:#93AC89;
+    --sage-dark:#5D7A54;
+    --sage-tint:#E8EFE3;
+    --terracotta:#E29A78;
+    --terracotta-dark:#C06E48;
+    --terracotta-tint:#FBEAE1;
+    --blue:#A9C8D8;
+    --blue-tint:#EAF3F6;
+    --pink:#E6C2C2;
+    --amber:#E3A44F;
+    --amber-tint:#FBF0DE;
+    --lavender:#B79BCB;
+    --lavender-tint:#F1E9F6;
+    --border:#EAE1CE;
+    --r-sm:10px;
+    --r-md:16px;
+    --r-lg:26px;
+    --shadow:0 2px 14px rgba(58,53,41,0.07);
+    --shadow-lift:0 10px 30px rgba(58,53,41,0.14);
+    --font-display:'Fraunces', serif;
+    --font-body:'Nunito', sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:15px;
+    line-height:1.45;
+    padding-bottom:92px;
+    min-height:100vh;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+  .icon{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block;}
+  .icon-sm{width:16px;height:16px;}
+  .icon-lg{width:26px;height:26px;}
+
+  header.app-header{
+    position:sticky; top:0; z-index:20;
+    background:rgba(250,246,236,0.92);
+    backdrop-filter:blur(6px);
+    padding:16px 18px 12px;
+    border-bottom:1px solid var(--border);
+  }
+  .sync-badge{
+    position:absolute; top:16px; right:18px;
+    display:flex; align-items:center; gap:5px;
+    font-size:11px; font-weight:800; color:var(--muted-2);
+  }
+  .sync-badge .dot{width:7px; height:7px; border-radius:50%; background:var(--muted-2);}
+  .sync-badge.online .dot{background:var(--sage-dark);}
+  .sync-badge.online{color:var(--sage-dark);}
+  .sync-badge.error .dot{background:var(--terracotta-dark);}
+  .sync-badge.error{color:var(--terracotta-dark);}
+  .brand{display:flex; align-items:baseline; gap:8px;}
+  .brand h1{
+    font-family:var(--font-display);
+    font-optical-sizing:auto;
+    font-weight:600;
+    font-style:italic;
+    font-size:22px;
+    margin:0;
+    color:var(--sage-dark);
+  }
+  .brand span.dot{color:var(--terracotta);}
+  .view-title{
+    display:flex; align-items:center; gap:10px;
+  }
+  .back-btn{
+    background:var(--card); border:1px solid var(--border); border-radius:999px;
+    width:36px;height:36px; display:flex; align-items:center; justify-content:center;
+    color:var(--ink); cursor:pointer; flex-shrink:0;
+  }
+  .back-btn:active{transform:scale(0.94);}
+
+  main{padding:16px 16px 8px; max-width:640px; margin:0 auto;}
+
+  /* Hero / countdown */
+  .hero{
+    background:linear-gradient(155deg, var(--sage-tint) 0%, #FFFDF8 65%);
+    border:1px solid var(--border);
+    border-radius:var(--r-lg);
+    padding:22px 20px;
+    box-shadow:var(--shadow);
+    position:relative;
+    overflow:hidden;
+    margin-bottom:16px;
+  }
+  .hero::after{
+    content:"";
+    position:absolute; right:-30px; top:-30px; width:130px; height:130px;
+    border-radius:50%;
+    background:radial-gradient(circle, var(--terracotta-tint) 0%, transparent 70%);
+  }
+  .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .hero-label{color:var(--muted); font-size:13px; font-weight:700; letter-spacing:0.2px;}
+  .hero-num-row{display:flex; align-items:baseline; gap:10px; margin-top:2px;}
+  .hero-num{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:64px;
+    line-height:1;
+    color:var(--sage-dark);
+    font-variant-numeric:tabular-nums;
+  }
+  .hero-num-unit{font-size:17px; font-weight:700; color:var(--ink);}
+  .hero-date{font-size:13px; color:var(--muted); margin-top:6px;}
+  .icon-btn-ghost{
+    background:transparent; border:none; color:var(--muted); cursor:pointer;
+    width:32px;height:32px; display:flex; align-items:center; justify-content:center;
+    border-radius:999px;
+  }
+  .icon-btn-ghost:active{background:rgba(58,53,41,0.06);}
+
+  .progress-block{margin-top:16px;}
+  .progress-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .progress-head .label{font-size:13px; font-weight:700; color:var(--ink);}
+  .progress-head .pct{font-size:13px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .track{height:10px; background:#EFE8D6; border-radius:999px; overflow:hidden;}
+  .track.thin{height:7px;}
+  .fill{height:100%; border-radius:999px; transition:width 0.5s ease;}
+
+  .section-heading{
+    font-family:var(--font-display);
+    font-size:17px;
+    font-weight:600;
+    margin:22px 0 10px;
+    color:var(--ink);
+  }
+
+  /* Category grid */
+  .cat-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .cat-card{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);
+    padding:14px; box-shadow:var(--shadow); cursor:pointer; text-align:left;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .cat-card:active{transform:scale(0.98);}
+  .cat-icon{
+    width:38px; height:38px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+  }
+  .cat-name{font-weight:800; font-size:14.5px; line-height:1.25;}
+  .cat-meta{font-size:12px; color:var(--muted); font-weight:600;}
+
+  .add-card{
+    border:1.5px dashed var(--muted-2); background:transparent; box-shadow:none;
+    align-items:center; justify-content:center; color:var(--muted); font-weight:700;
+    min-height:118px; flex-direction:column; gap:6px;
+  }
+
+  /* Section accordion */
+  .section-card{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);
+    margin-bottom:12px; overflow:hidden; box-shadow:var(--shadow);
+  }
+  .section-head{
+    padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer;
+  }
+  .section-head .chev{color:var(--muted); transition:transform 0.25s ease; flex-shrink:0;}
+  .section-head.open .chev{transform:rotate(180deg);}
+  .section-info{flex:1; min-width:0;}
+  .section-title-row{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;}
+  .section-title{font-weight:800; font-size:15px;}
+  .section-period{font-size:12.5px; color:var(--muted); font-weight:600;}
+  .section-progress{margin-top:8px;}
+  .section-count{font-size:12px; color:var(--muted); font-weight:700; white-space:nowrap;}
+
+  .section-body{
+    border-top:1px solid var(--border);
+    padding:6px 12px 14px;
+    display:none;
+  }
+  .section-body.open{display:block;}
+
+  .item-row{
+    display:flex; align-items:center; gap:10px; padding:10px 4px;
+    border-bottom:1px solid #F2ECDE;
+  }
+  .item-row:last-of-type{border-bottom:none;}
+  .item-row.done{opacity:0.72;}
+  .status-dot{width:10px;height:10px;border-radius:50%; flex-shrink:0;}
+  .status-incomplet{background:var(--terracotta-dark);}
+  .status-encours{background:var(--amber);}
+  .status-atteint{background:var(--sage-dark);}
+  .status-surplus{background:var(--lavender);}
+  .item-thumb{width:32px; height:32px; border-radius:9px; object-fit:cover; flex-shrink:0; border:1px solid var(--border);}
+
+  .item-main{flex:1; min-width:0; cursor:pointer;}
+  .item-name-row{display:flex; align-items:center; gap:6px;}
+  .item-name{font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .badge-bonus{
+    font-size:10.5px; font-weight:800; color:#fff; background:var(--lavender);
+    padding:2px 7px; border-radius:999px; flex-shrink:0;
+  }
+  .item-sub{font-size:12px; color:var(--muted); margin-top:1px; display:flex; align-items:center; gap:6px;}
+  .link-dot{width:5px;height:5px;border-radius:50%; background:var(--muted-2);}
+
+  .stepper{display:flex; align-items:center; gap:2px; background:#F4EEE1; border-radius:999px; padding:3px; flex-shrink:0;}
+  .stepper button{
+    width:26px; height:26px; border-radius:50%; border:none; background:#fff; color:var(--sage-dark);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.08);
+  }
+  .stepper button:active{transform:scale(0.9);}
+  .stepper button:disabled{opacity:0.35; box-shadow:none;}
+  .stepper .count{min-width:38px; text-align:center; font-weight:800; font-size:13px; font-variant-numeric:tabular-nums;}
+
+  .item-expand{
+    grid-column:1/-1; width:100%;
+    background:#FBF8EF; border:1px solid var(--border); border-radius:var(--r-sm);
+    padding:12px; margin:6px 0 12px; display:flex; flex-direction:column; gap:10px;
+  }
+  .field-label{font-size:11.5px; font-weight:800; color:var(--muted); text-transform:none; margin-bottom:4px; display:block;}
+  textarea, input[type=text], input[type=url], input[type=number], input[type=date]{
+    width:100%; border:1px solid var(--border); border-radius:var(--r-sm); padding:9px 11px;
+    font-family:var(--font-body); font-size:14px; color:var(--ink); background:#fff;
+  }
+  textarea{resize:vertical; min-height:56px;}
+  textarea:focus, input:focus{outline:2px solid var(--sage); outline-offset:1px;}
+  .link-input-wrap{position:relative;}
+  .link-input-wrap .icon{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted-2);}
+  .link-input-wrap input{padding-left:34px;}
+  .link-open{position:absolute; right:8px; top:50%; transform:translateY(-50%); color:var(--sage-dark); text-decoration:none; font-size:12px; font-weight:800;}
+
+  .photo-row{display:flex; align-items:center; gap:10px;}
+  .photo-thumb{width:56px; height:56px; border-radius:var(--r-sm); object-fit:cover; border:1px solid var(--border); flex-shrink:0;}
+  .photo-upload-btn{
+    display:flex; align-items:center; gap:6px; border:1px dashed var(--muted-2); border-radius:var(--r-sm);
+    padding:9px 12px; font-size:13px; font-weight:700; color:var(--muted); cursor:pointer; background:#fff;
+  }
+  .expand-actions{display:flex; justify-content:space-between; align-items:center; margin-top:2px;}
+  .text-btn{background:none; border:none; font-weight:800; font-size:13px; cursor:pointer; padding:6px 4px;}
+  .text-btn.danger{color:var(--terracotta-dark);}
+  .text-btn.muted{color:var(--muted);}
+
+  .add-row-btn{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    width:100%; padding:11px; margin-top:4px; border-radius:var(--r-sm);
+    border:1.5px dashed var(--muted-2); background:transparent; color:var(--sage-dark); font-weight:800; font-size:13.5px; cursor:pointer;
+  }
+  .add-row-btn:active{background:var(--sage-tint);}
+
+  .cat-actions-row{display:flex; gap:8px; margin:14px 0 4px;}
+  .chip-btn{
+    display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px;
+    border:1px solid var(--border); background:#fff; font-weight:700; font-size:12.5px; color:var(--ink); cursor:pointer;
+  }
+  .chip-btn.danger{color:var(--terracotta-dark); border-color:var(--terracotta-tint);}
+
+  /* Bottom nav */
+  nav.bottom-nav{
+    position:fixed; bottom:0; left:0; right:0; z-index:30;
+    background:rgba(255,253,248,0.96); backdrop-filter:blur(8px);
+    border-top:1px solid var(--border);
+    display:flex; padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    max-width:640px; margin:0 auto;
+  }
+  .nav-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:none; border:none; color:var(--muted-2); font-size:11px; font-weight:800; padding:6px 0; cursor:pointer;
+  }
+  .nav-btn.active{color:var(--sage-dark);}
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(58,53,41,0.38);
+    display:flex; align-items:flex-end; justify-content:center; z-index:100;
+  }
+  @media (min-width:520px){ .overlay{align-items:center;} }
+  .modal{
+    background:#fff; width:100%; max-width:460px; border-radius:22px 22px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto;
+    box-shadow:var(--shadow-lift);
+    animation:slideUp 0.22s ease;
+  }
+  @media (min-width:520px){ .modal{border-radius:22px; animation:popIn 0.18s ease;} }
+  @keyframes slideUp{from{transform:translateY(24px); opacity:0.4;} to{transform:translateY(0); opacity:1;}}
+  @keyframes popIn{from{transform:scale(0.96); opacity:0.4;} to{transform:scale(1); opacity:1;}}
+  .modal h2{font-family:var(--font-display); font-weight:600; font-size:19px; margin:0 0 14px;}
+  .field{margin-bottom:12px;}
+  .modal-actions{display:flex; gap:10px; margin-top:16px;}
+  .btn{
+    flex:1; padding:12px; border-radius:999px; font-weight:800; font-size:14px; cursor:pointer; border:none;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-primary{background:var(--sage-dark); color:#fff;}
+  .btn-primary:active{background:#4c6544;}
+  .btn-secondary{background:#F2EDE0; color:var(--ink);}
+  .btn-danger{background:var(--terracotta-dark); color:#fff;}
+  .color-pick{display:flex; gap:8px; flex-wrap:wrap;}
+  .swatch{width:34px; height:34px; border-radius:50%; cursor:pointer; border:2.5px solid transparent;}
+  .swatch.selected{border-color:var(--ink);}
+
+  .empty-state{
+    text-align:center; padding:40px 20px; color:var(--muted);
+  }
+  .empty-state .icon-lg{margin:0 auto 10px; color:var(--muted-2);}
+
+  .toast{
+    position:fixed; bottom:96px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:13px; font-weight:700; z-index:200; opacity:0; pointer-events:none;
+    transition:opacity 0.25s ease, transform 0.25s ease; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+
+  .footer-link{
+    display:block; text-align:center; font-size:12px; color:var(--muted-2); font-weight:700;
+    margin:26px 0 10px; background:none; border:none; cursor:pointer; width:100%;
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div id="headerContent"></div>
+  <div id="syncBadge" class="sync-badge"></div>
+</header>
+
+<main id="mainContent"></main>
+
+<nav class="bottom-nav">
+  <button class="nav-btn" data-nav="dashboard">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9"/></svg>
+    Accueil
+  </button>
+  <button class="nav-btn" data-nav="lists">
+    <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
+    Mes listes
+  </button>
+</nav>
+
+<div id="modalRoot"></div>
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------- Icons ---------- */
+const ICONS = {
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  minus:'<path d="M5 12h14"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  check:'<path d="M4 12l5 5L20 6"/>',
+  chevronDown:'<path d="M6 9l6 6 6-6"/>',
+  chevronLeft:'<path d="M15 18l-6-6 6-6"/>',
+  camera:'<path d="M4 8h3l2-3h6l2 3h3v11a1 1 0 01-1 1H5a1 1 0 01-1-1V8z"/><circle cx="12" cy="14" r="3.4"/>',
+  link:'<path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/>',
+  trash:'<path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13"/>',
+  pencil:'<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+  shirt:'<path d="M8 3l4 2 4-2 4 4-3 3v11H7V10L4 7z"/>',
+  box:'<path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/>',
+  bed:'<path d="M3 18v-6a2 2 0 012-2h14a2 2 0 012 2v6"/><path d="M3 18h18M7 10V7a2 2 0 012-2h6a2 2 0 012 2v3"/>',
+  suitcase:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 13h18"/>',
+  sparkle:'<path d="M12 3l1.8 4.6L18 9.2l-4.2 1.7L12 15l-1.8-4.1L6 9.2l4.2-1.6L12 3z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/>'
+};
+function icon(name, cls){ return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
+
+const CAT_COLORS = [
+  {key:'terracotta', main:'var(--terracotta)', dark:'var(--terracotta-dark)', tint:'var(--terracotta-tint)'},
+  {key:'sage', main:'var(--sage)', dark:'var(--sage-dark)', tint:'var(--sage-tint)'},
+  {key:'blue', main:'var(--blue)', dark:'#5A8CA3', tint:'var(--blue-tint)'},
+  {key:'pink', main:'var(--pink)', dark:'#B87878', tint:'var(--lavender-tint)'},
+  {key:'lavender', main:'var(--lavender)', dark:'#8867A0', tint:'var(--lavender-tint)'}
+];
+function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0]; }
+
+/* ---------- Default data ---------- */
+function buildDefaultData(){
+  function items(list){
+    return list.map(([name, target]) => ({ id: newId(), name, target, acquired: 0, note:'', link:'', photo:'' }));
+  }
+  function section(label, period, list){
+    return { id: newId(), label, period, items: items(list) };
+  }
+
+  const vetements = {
+    id:newId(), name:'Vêtements bébé — 1 à 18 mois', icon:'shirt', color:'terracotta',
+    sections:[
+      section('1 mois','Avril / printemps',[
+        ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama léger',1],
+        ['Pantalon souple',2],['Legging léger',1],['Gilet léger',2],['Combinaison ML + jambes longues',1],
+        ['Tenue printemps',2],['Chaussettes',3],['Bonnet léger',1]
+      ]),
+      section('3 mois','Mai / juin',[
+        ['Body ML léger',4],['Body MC',5],['Pyjama ML léger',3],['Pyjama MC + jambes courtes',2],
+        ['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',2],['Combinaison MC + jambes longues',2],
+        ['Combinaison éponge légère',1],['T-shirt + short',2],['Tenue estivale légère',2],['Tenue habillée été',1],
+        ['Gilet coton léger',2],['Chaussettes légères',3],['Chapeau soleil',1]
+      ]),
+      section('6 mois','Août / septembre',[
+        ['Body MC',6],['Body ML léger',2],['Pyjama MC + jambes courtes',2],['Pyjama ML léger',2],
+        ['Short',3],['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',3],
+        ['Combinaison MC + jambes longues',2],['T-shirt + short',3],['Tenue estivale légère',2],['Tenue couvrante fin d’été',1],
+        ['Gilet coton léger',2],['Chaussettes légères',3],['Chapeau soleil',1]
+      ]),
+      section('9 mois','Novembre / décembre',[
+        ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama chaud',1],
+        ['Pantalon',4],['Legging épais',2],['Pull chaud',2],['Sweat',1],['Gilet chaud',2],
+        ['Combinaison ML + jambes longues',1],['Combinaison chaude / molletonnée',1],['Tenue automne/hiver',3],
+        ['Manteau ou combi-pilote',1],['Bonnet chaud',1],['Chaussettes épaisses',2]
+      ]),
+      section('12 mois','Février / mars',[
+        ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama léger',2],
+        ['Pantalon',4],['Legging',2],['Pull chaud',2],['Sweat',1],['Gilet chaud',2],
+        ['Combinaison ML + jambes longues',1],['Combinaison légère de transition',1],['Tenue quotidienne',3],
+        ['Tenue habillée',1],['Manteau chaud',1],['Veste légère mi-saison',1],['Bonnet chaud',1],['Chaussettes',3]
+      ]),
+      section('18 mois','Août / septembre',[
+        ['Body MC',4],['Body ML léger',2],['Pyjama léger',3],['Pyjama ML léger',1],
+        ['Short',3],['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',3],
+        ['Combinaison MC + jambes longues',1],['T-shirt',4],['Tenue estivale',3],['Tenue habillée',1],
+        ['Gilet coton léger',1],['Veste légère',1],['Chapeau soleil',1],['Chaussettes',3]
+      ]),
+      section('Sans taille','À prévoir',[
+        ['Langes / mousselines',10],['Bavoirs',8],['Capes de bain',2],['Serviettes',2],
+        ['Gigoteuses 0–6 mois',2],['Gigoteuses 6–12 mois',2],['Gigoteuse légère supplémentaire',1],
+        ['Draps-housses',3],['Alèses',2],['Couverture légère',1],['Couverture chaude',1],
+        ['Chapeau été',1],['Bonnet chaud',1],['Combi-pilote / manteau chaud',1]
+      ])
+    ]
+  };
+
+  const puericulture = { id:newId(), name:'Puériculture', icon:'box', color:'sage', sections:[] };
+  const chambre = { id:newId(), name:'Chambre', icon:'bed', color:'blue', sections:[] };
+  const maternite = { id:newId(), name:'Valise de maternité', icon:'suitcase', color:'lavender', sections:[] };
+
+  return {
+    dueDate:'2027-03-25',
+    pregnancyStart:'2026-06-25',
+    categories:[vetements, puericulture, chambre, maternite]
+  };
+}
+
+/* ---------- Firebase config ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyAKjE0E3-4gehxRwncDz7ZhLYXFWVEl3tY",
+  authDomain: "appli-bebe-6c02b.firebaseapp.com",
+  databaseURL: "https://appli-bebe-6c02b-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "appli-bebe-6c02b",
+  storageBucket: "appli-bebe-6c02b.firebasestorage.app",
+  messagingSenderId: "29059419728",
+  appId: "1:29059419728:web:887856fdf02b1949498b55"
+};
+
+/* ---------- State & persistence ---------- */
+const STORAGE_KEY = 'petitNidData_v2';
+const UI_STORAGE_KEY = 'petitNidUi_v1';
+
+function newId(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+
+// `data` is the shared content, synced to Firebase for both parents.
+let data = loadLocalData();
+// `ui` is per-device navigation state (current screen, open sections) — never synced.
+let ui = loadUi();
+let uiIsFresh = !localStorage.getItem(UI_STORAGE_KEY);
+if(uiIsFresh && data.categories[0] && data.categories[0].sections[0]){
+  ui.collapsedSections[data.categories[0].sections[0].id] = false;
+}
+
+function loadLocalData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return buildDefaultData();
+    const parsed = JSON.parse(raw);
+    if(!parsed || !Array.isArray(parsed.categories)) return buildDefaultData();
+    return parsed;
+  }catch(e){
+    return buildDefaultData();
+  }
+}
+function loadUi(){
+  try{
+    const raw = localStorage.getItem(UI_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return {
+      view: (parsed && parsed.view) || 'dashboard',
+      activeCategoryId: (parsed && parsed.activeCategoryId) || null,
+      collapsedSections: (parsed && parsed.collapsedSections) || {},
+      expandedItems: {}
+    };
+  }catch(e){
+    return { view:'dashboard', activeCategoryId:null, collapsedSections:{}, expandedItems:{} };
+  }
+}
+function saveUi(){
+  try{
+    localStorage.setItem(UI_STORAGE_KEY, JSON.stringify({
+      view: ui.view, activeCategoryId: ui.activeCategoryId, collapsedSections: ui.collapsedSections
+    }));
+  }catch(e){}
+}
+
+let dbRef = null;
+let bootstrapped = false;
+let lastSentJson = null;
+let remoteDebounceTimer = null;
+
+function isTypingInTextField(){
+  const el = document.activeElement;
+  return !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'url')));
+}
+
+function updateConnectionBadge(state){
+  const el = document.getElementById('syncBadge');
+  if(!el) return;
+  el.className = 'sync-badge ' + state;
+  const labels = { online:'Synchronisé', offline:'Hors ligne', error:'Erreur de connexion' };
+  el.innerHTML = '<span class="dot"></span>' + labels[state];
+}
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    dbRef = firebase.database().ref('petitNidData');
+    dbRef.on('value', handleRemoteValue, handleRemoteError);
+    firebase.database().ref('.info/connected').on('value', snap => {
+      updateConnectionBadge(snap.val() === true ? 'online' : 'offline');
+    });
+  }catch(e){
+    updateConnectionBadge('error');
+  }
+}
+
+function handleRemoteValue(snapshot){
+  const remote = snapshot.val();
+  if(isTypingInTextField()) return; // ne pas couper la saisie en cours d'un champ
+  if(!remote || !Array.isArray(remote.categories)){
+    if(!bootstrapped){ dbRef.set(data); } // base vide : on y dépose les données locales/par défaut
+    bootstrapped = true;
+    return;
+  }
+  bootstrapped = true;
+  const remoteStr = JSON.stringify(remote);
+  if(remoteStr === lastSentJson) return; // c'est l'écho de notre propre écriture
+  data = remote;
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
+  render();
+}
+
+function handleRemoteError(err){
+  updateConnectionBadge('error');
+  showToast('Connexion à Firebase impossible.');
+}
+
+function save(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+  catch(e){ showToast('Stockage plein — impossible d’enregistrer une photo aussi grande.'); }
+  if(!dbRef) return;
+  clearTimeout(remoteDebounceTimer);
+  remoteDebounceTimer = setTimeout(() => {
+    lastSentJson = JSON.stringify(data);
+    dbRef.set(data).catch(err => showToast('Échec de synchronisation : ' + err.message));
+  }, 400);
+}
+
+/* ---------- Helpers ---------- */
+function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+function itemStatus(target, acquired){
+  if(target <= 0) return acquired > 0 ? 'surplus' : 'atteint';
+  if(acquired > target) return 'surplus';
+  if(acquired === target) return 'atteint';
+  if(acquired / target >= 0.5) return 'encours';
+  return 'incomplet';
+}
+const STATUS_LABEL = { incomplet:'Incomplet', encours:'En cours', atteint:'Atteint', surplus:'Bonus' };
+
+function progressColor(pct){
+  if(pct >= 100) return 'var(--sage-dark)';
+  if(pct >= 50) return 'var(--amber)';
+  return 'var(--terracotta-dark)';
+}
+
+function sectionTotals(section){
+  let target = 0, acquired = 0;
+  section.items.forEach(it => { target += it.target; acquired += Math.min(it.acquired, it.target); });
+  const pct = target > 0 ? Math.round((acquired/target)*100) : (section.items.length ? 100 : 0);
+  return { target, acquired, pct, count: section.items.length };
+}
+function categoryTotals(cat){
+  let target = 0, acquired = 0, count = 0;
+  cat.sections.forEach(s => { s.items.forEach(it => { target += it.target; acquired += Math.min(it.acquired, it.target); count++; }); });
+  const pct = target > 0 ? Math.round((acquired/target)*100) : 0;
+  return { target, acquired, pct, count };
+}
+function globalTotals(){
+  let target = 0, acquired = 0, count = 0;
+  data.categories.forEach(cat => cat.sections.forEach(s => s.items.forEach(it => {
+    target += it.target; acquired += Math.min(it.acquired, it.target); count++;
+  })));
+  const pct = target > 0 ? Math.round((acquired/target)*100) : 0;
+  return { target, acquired, pct, count };
+}
+
+function daysUntil(dateStr){
+  const due = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  return Math.round((b - a) / 86400000);
+}
+function pregnancyProgress(){
+  const start = new Date((data.pregnancyStart || '2026-06-25') + 'T00:00:00');
+  const due = new Date(data.dueDate + 'T00:00:00');
+  const now = new Date();
+  const totalMs = due - start;
+  const elapsedMs = now - start;
+  const pct = totalMs > 0 ? clamp(Math.round((elapsedMs / totalMs) * 100), 0, 100) : 0;
+  const totalWeeks = Math.max(1, Math.round(totalMs / (7 * 86400000)));
+  const weeks = clamp(Math.floor(elapsedMs / (7 * 86400000)), 0, totalWeeks);
+  return { pct, weeks, totalWeeks };
+}
+function formatDate(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 2200);
+}
+
+/* ---------- Rendering ---------- */
+function render(){
+  renderHeader();
+  if(ui.view === 'dashboard') renderDashboard();
+  else if(ui.view === 'lists') renderListsView();
+  else renderCategory();
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    const active = (ui.view === 'category' || ui.view === 'lists') ? 'lists' : 'dashboard';
+    b.classList.toggle('active', b.dataset.nav === active);
+  });
+}
+
+function renderHeader(){
+  const h = document.getElementById('headerContent');
+  if(ui.view === 'dashboard'){
+    h.innerHTML = `<div class="brand"><h1>Petit Nid</h1><span class="dot">·</span><span style="font-size:12.5px;color:var(--muted);font-weight:700;">votre liste de naissance</span></div>`;
+  } else if(ui.view === 'lists'){
+    h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
+  } else {
+    const cat = data.categories.find(c=>c.id===ui.activeCategoryId);
+    h.innerHTML = `<div class="view-title">
+      <button class="back-btn" id="btnBack">${icon('chevronLeft')}</button>
+      <h1 style="font-size:19px;">${escapeHtml(cat ? cat.name : '')}</h1>
+    </div>`;
+    document.getElementById('btnBack').onclick = () => { ui.view = 'lists'; saveUi(); render(); };
+  }
+}
+
+function renderDashboard(){
+  const main = document.getElementById('mainContent');
+  const days = daysUntil(data.dueDate);
+  const g = globalTotals();
+  const preg = pregnancyProgress();
+  let countdownText, countdownNum;
+  if(days > 0){ countdownNum = days; countdownText = days === 1 ? 'jour avant l’arrivée' : 'jours avant l’arrivée'; }
+  else if(days === 0){ countdownNum = '🎉'; countdownText = 'c’est le grand jour !'; }
+  else { countdownNum = Math.abs(days); countdownText = 'jour(s) depuis l’arrivée, bienvenue !'; }
+
+  main.innerHTML = `
+    <div class="hero">
+      <div class="hero-top">
+        <div>
+          <div class="hero-label">Compte à rebours</div>
+          <div class="hero-num-row">
+            <span class="hero-num">${countdownNum}</span>
+            <span class="hero-num-unit">${countdownText}</span>
+          </div>
+          <div class="hero-date">Terme prévu le ${formatDate(data.dueDate)}</div>
+        </div>
+        <button class="icon-btn-ghost" id="btnEditDue" aria-label="Modifier les dates">${icon('gear')}</button>
+      </div>
+      <div class="progress-block">
+        <div class="progress-head">
+          <span class="label">Avancement de la grossesse</span>
+          <span class="pct" style="color:var(--terracotta-dark)">${preg.pct}% · semaine ${preg.weeks}/${preg.totalWeeks}</span>
+        </div>
+        <div class="track"><div class="fill" style="width:${preg.pct}%; background:var(--terracotta)"></div></div>
+      </div>
+      <div class="progress-block">
+        <div class="progress-head">
+          <span class="label">Avancement des achats</span>
+          <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
+        </div>
+        <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
+      </div>
+    </div>
+
+    <div class="section-heading">Vos listes</div>
+    <div class="cat-grid" id="catGrid"></div>
+  `;
+  renderCatGrid(document.getElementById('catGrid'));
+  document.getElementById('btnEditDue').onclick = openDueDateModal;
+}
+
+function renderCatGrid(container){
+  let html = '';
+  data.categories.forEach(cat => {
+    const t = categoryTotals(cat);
+    const c = catColor(cat.color);
+    html += `<button class="cat-card" data-open-cat="${cat.id}">
+      <div class="cat-icon" style="background:${c.main}">${icon(cat.icon, 'icon-lg')}</div>
+      <div>
+        <div class="cat-name">${escapeHtml(cat.name)}</div>
+        <div class="cat-meta">${t.count ? t.acquired + ' / ' + t.target + ' articles' : 'Aucun article'}</div>
+      </div>
+      <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
+    </button>`;
+  });
+  html += `<button class="cat-card add-card" id="btnAddCatFromGrid">${icon('plus','icon-lg')}<span>Nouvelle liste</span></button>`;
+  container.innerHTML = html;
+  container.querySelectorAll('[data-open-cat]').forEach(btn=>{
+    btn.onclick = () => { ui.view='category'; ui.activeCategoryId = btn.dataset.openCat; saveUi(); render(); };
+  });
+  document.getElementById('btnAddCatFromGrid').onclick = openAddCategoryModal;
+}
+
+function renderListsView(){
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="section-heading" style="margin-top:6px;">Toutes vos listes</div><div class="cat-grid" id="catGrid"></div>`;
+  renderCatGrid(document.getElementById('catGrid'));
+}
+
+function renderCategory(){
+  const main = document.getElementById('mainContent');
+  const cat = data.categories.find(c=>c.id===ui.activeCategoryId);
+  if(!cat){ ui.view='lists'; saveUi(); renderListsView(); return; }
+  const t = categoryTotals(cat);
+
+  let html = `
+    <div class="progress-block" style="margin-bottom:4px;">
+      <div class="progress-head">
+        <span class="label">${t.count ? t.acquired + ' / ' + t.target + ' articles réunis' : 'Liste vide pour le moment'}</span>
+        <span class="pct" style="color:${progressColor(t.pct)}">${t.pct}%</span>
+      </div>
+      <div class="track"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
+    </div>
+    <div class="cat-actions-row">
+      <button class="chip-btn" id="btnRenameCat">${icon('pencil','icon-sm')} Renommer</button>
+      <button class="chip-btn danger" id="btnDeleteCat">${icon('trash','icon-sm')} Supprimer la liste</button>
+    </div>
+  `;
+
+  if(cat.sections.length === 0){
+    html += `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Cette liste n’a pas encore de section.<br>Ajoutez-en une pour commencer à suivre vos articles.</div></div>`;
+  } else {
+    html += `<div id="sectionsWrap">`;
+    cat.sections.forEach(sec => { html += renderSectionHtml(cat, sec); });
+    html += `</div>`;
+  }
+  html += `<button class="add-row-btn" id="btnAddSection">${icon('plus','icon-sm')} Ajouter une section</button>`;
+
+  main.innerHTML = html;
+
+  document.getElementById('btnRenameCat').onclick = () => openRenameCategoryModal(cat);
+  document.getElementById('btnDeleteCat').onclick = () => openConfirmModal(
+    'Supprimer cette liste ?',
+    `« ${cat.name} » et tous ses articles seront définitivement supprimés.`,
+    () => {
+      data.categories = data.categories.filter(c=>c.id!==cat.id);
+      ui.view = 'lists'; saveUi(); save(); closeModal(); render(); showToast('Liste supprimée');
+    }
+  );
+  document.getElementById('btnAddSection').onclick = () => openAddSectionModal(cat);
+
+  cat.sections.forEach(sec => bindSectionEvents(cat, sec));
+}
+
+function isSecCollapsed(sec){
+  return ui.collapsedSections[sec.id] !== false;
+}
+
+function renderSectionHtml(cat, sec){
+  const t = sectionTotals(sec);
+  const collapsed = isSecCollapsed(sec);
+  return `
+    <div class="section-card" data-sec-card="${sec.id}">
+      <div class="section-head ${collapsed ? '' : 'open'}" data-sec-toggle="${sec.id}">
+        <div class="section-info">
+          <div class="section-title-row">
+            <span class="section-title">${escapeHtml(sec.label)}</span>
+            ${sec.period ? `<span class="section-period">${escapeHtml(sec.period)}</span>` : ''}
+          </div>
+          <div class="section-progress">
+            <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
+          </div>
+        </div>
+        <span class="section-count">${t.acquired}/${t.target}</span>
+        <span class="chev">${icon('chevronDown','icon-sm')}</span>
+      </div>
+      <div class="section-body ${collapsed ? '' : 'open'}" data-sec-body="${sec.id}">
+        ${sec.items.map(it => renderItemHtml(cat, sec, it)).join('')}
+        <button class="add-row-btn" data-add-item="${sec.id}">${icon('plus','icon-sm')} Ajouter un article</button>
+        <div class="expand-actions" style="margin-top:10px;">
+          <button class="text-btn muted" data-rename-sec="${sec.id}">${icon('pencil','icon-sm')} Renommer la section</button>
+          <button class="text-btn danger" data-del-sec="${sec.id}">${icon('trash','icon-sm')} Supprimer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderItemHtml(cat, sec, it){
+  const status = itemStatus(it.target, it.acquired);
+  const done = status === 'atteint' || status === 'surplus';
+  const expanded = !!ui.expandedItems[it.id];
+  let html = `<div class="item-row ${done ? 'done' : ''}" data-item-row="${it.id}">
+    <span class="status-dot status-${status}"></span>
+    ${it.photo ? `<img class="item-thumb" src="${it.photo}" alt="">` : ''}
+    <div class="item-main" data-item-toggle="${it.id}">
+      <div class="item-name-row">
+        <span class="item-name">${escapeHtml(it.name)}</span>
+        ${status === 'surplus' ? '<span class="badge-bonus">Bonus</span>' : ''}
+      </div>
+      <div class="item-sub">
+        <span>${it.acquired} / ${it.target}</span>
+        ${it.link ? '<span class="link-dot"></span>' + icon('link','icon-sm') : ''}
+        ${it.note ? '<span class="link-dot"></span><span>note</span>' : ''}
+      </div>
+    </div>
+    <div class="stepper">
+      <button data-dec="${it.id}" ${it.acquired<=0?'disabled':''}>${icon('minus','icon-sm')}</button>
+      <span class="count">${it.acquired}</span>
+      <button data-inc="${it.id}">${icon('plus','icon-sm')}</button>
+    </div>
+  </div>`;
+
+  if(expanded){
+    html += `<div class="item-expand" data-item-expand="${it.id}">
+      <div class="field">
+        <label class="field-label">Nom de l’article</label>
+        <input type="text" data-field="name" data-item="${it.id}" value="${escapeAttr(it.name)}">
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label class="field-label">Quantité cible</label>
+          <input type="number" min="0" data-field="target" data-item="${it.id}" value="${it.target}">
+        </div>
+        <div class="field" style="flex:1;">
+          <label class="field-label">Quantité acquise</label>
+          <input type="number" min="0" data-field="acquired" data-item="${it.id}" value="${it.acquired}">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Lien / référence d’achat</label>
+        <div class="link-input-wrap">
+          ${icon('link','icon-sm')}
+          <input type="url" placeholder="https://…" data-field="link" data-item="${it.id}" value="${escapeAttr(it.link)}">
+          ${it.link ? `<a class="link-open" href="${escapeAttr(it.link)}" target="_blank" rel="noopener">Ouvrir</a>` : ''}
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Note</label>
+        <textarea data-field="note" data-item="${it.id}" placeholder="Taille, couleur, magasin…">${escapeHtml(it.note)}</textarea>
+      </div>
+      <div class="field">
+        <label class="field-label">Photo</label>
+        <div class="photo-row">
+          ${it.photo ? `<img class="photo-thumb" src="${it.photo}">` : ''}
+          <label class="photo-upload-btn">
+            ${icon('camera','icon-sm')} ${it.photo ? 'Changer' : 'Ajouter une photo'}
+            <input type="file" accept="image/*" data-photo="${it.id}" style="display:none;">
+          </label>
+          ${it.photo ? `<button class="text-btn danger" data-remove-photo="${it.id}">${icon('x','icon-sm')}</button>` : ''}
+        </div>
+      </div>
+      <div class="expand-actions">
+        <button class="text-btn danger" data-del-item="${it.id}">${icon('trash','icon-sm')} Supprimer l’article</button>
+        <button class="text-btn muted" data-close-item="${it.id}">Fermer</button>
+      </div>
+    </div>`;
+  }
+  return html;
+}
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+/* ---------- Event binding ---------- */
+function bindSectionEvents(cat, sec){
+  const toggle = document.querySelector(`[data-sec-toggle="${sec.id}"]`);
+  if(toggle) toggle.onclick = () => { ui.collapsedSections[sec.id] = !isSecCollapsed(sec); saveUi(); render(); };
+
+  const addItemBtn = document.querySelector(`[data-add-item="${sec.id}"]`);
+  if(addItemBtn) addItemBtn.onclick = () => openAddItemModal(cat, sec);
+
+  const renameBtn = document.querySelector(`[data-rename-sec="${sec.id}"]`);
+  if(renameBtn) renameBtn.onclick = (e) => { e.stopPropagation(); openRenameSectionModal(sec); };
+
+  const delBtn = document.querySelector(`[data-del-sec="${sec.id}"]`);
+  if(delBtn) delBtn.onclick = (e) => {
+    e.stopPropagation();
+    openConfirmModal('Supprimer cette section ?', `« ${sec.label} » et ses articles seront supprimés.`, () => {
+      cat.sections = cat.sections.filter(s=>s.id!==sec.id);
+      save(); closeModal(); render(); showToast('Section supprimée');
+    });
+  };
+
+  sec.items.forEach(it => bindItemEvents(cat, sec, it));
+}
+
+function bindItemEvents(cat, sec, it){
+  const row = document.querySelector(`[data-item-row="${it.id}"]`);
+  if(!row) return;
+
+  const mainEl = row.querySelector(`[data-item-toggle="${it.id}"]`);
+  if(mainEl) mainEl.onclick = () => { ui.expandedItems[it.id] = !ui.expandedItems[it.id]; render(); };
+
+  const inc = row.querySelector(`[data-inc="${it.id}"]`);
+  if(inc) inc.onclick = () => { it.acquired++; save(); render(); };
+  const dec = row.querySelector(`[data-dec="${it.id}"]`);
+  if(dec) dec.onclick = () => { it.acquired = clamp(it.acquired-1, 0, 9999); save(); render(); };
+
+  const expand = document.querySelector(`[data-item-expand="${it.id}"]`);
+  if(!expand) return;
+
+  expand.querySelectorAll('[data-field]').forEach(input => {
+    const field = input.dataset.field;
+    const evt = (input.tagName === 'TEXTAREA' || input.type === 'text' || input.type === 'url') ? 'input' : 'change';
+    input.addEventListener(evt, () => {
+      if(field === 'target' || field === 'acquired'){
+        it[field] = clamp(parseInt(input.value || '0', 10), 0, 9999);
+      } else {
+        it[field] = input.value;
+      }
+      save();
+      if(field !== 'note' && field !== 'link' && field !== 'name') render();
+    });
+    input.addEventListener('blur', () => render());
+  });
+
+  const photoInput = expand.querySelector(`[data-photo="${it.id}"]`);
+  if(photoInput) photoInput.onchange = (e) => handlePhotoUpload(e, it);
+
+  const removePhoto = expand.querySelector(`[data-remove-photo="${it.id}"]`);
+  if(removePhoto) removePhoto.onclick = () => { it.photo=''; save(); render(); };
+
+  const delItem = expand.querySelector(`[data-del-item="${it.id}"]`);
+  if(delItem) delItem.onclick = () => openConfirmModal('Supprimer cet article ?', `« ${it.name} » sera retiré de la liste.`, () => {
+    sec.items = sec.items.filter(x=>x.id!==it.id);
+    save(); closeModal(); render(); showToast('Article supprimé');
+  });
+
+  const closeItem = expand.querySelector(`[data-close-item="${it.id}"]`);
+  if(closeItem) closeItem.onclick = () => { ui.expandedItems[it.id] = false; render(); };
+}
+
+function handlePhotoUpload(e, it){
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ''; // permet de reselectionner le meme fichier plus tard
+  if(!file) return;
+  if(!file.type || !file.type.startsWith('image/')){
+    showToast('Ce fichier n’est pas une image.');
+    return;
+  }
+  const objectUrl = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    try{
+      const maxW = 480;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      it.photo = canvas.toDataURL('image/jpeg', 0.72);
+      save();
+      render();
+      showToast('Photo ajoutée');
+    }catch(err){
+      showToast('Impossible de traiter cette photo.');
+    }finally{
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+  img.onerror = () => {
+    showToast('Impossible de lire cette photo.');
+    URL.revokeObjectURL(objectUrl);
+  };
+  img.src = objectUrl;
+}
+
+/* ---------- Modals ---------- */
+function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
+function openModal(innerHtml){
+  document.getElementById('modalRoot').innerHTML = `<div class="overlay" id="overlayEl"><div class="modal">${innerHtml}</div></div>`;
+  document.getElementById('overlayEl').addEventListener('mousedown', (e) => { if(e.target.id === 'overlayEl') closeModal(); });
+}
+
+function openConfirmModal(title, msg, onConfirm){
+  openModal(`
+    <h2>${escapeHtml(title)}</h2>
+    <p style="color:var(--muted); font-size:14px;">${escapeHtml(msg)}</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-danger" id="mConfirm">${icon('trash','icon-sm')} Supprimer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mConfirm').onclick = onConfirm;
+}
+
+function openDueDateModal(){
+  openModal(`
+    <h2>Dates de grossesse</h2>
+    <div class="field">
+      <label class="field-label">Début de grossesse</label>
+      <input type="date" id="startInput" value="${data.pregnancyStart || '2026-06-25'}">
+    </div>
+    <div class="field">
+      <label class="field-label">Terme prévu</label>
+      <input type="date" id="dueInput" value="${data.dueDate}">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const start = document.getElementById('startInput').value;
+    const due = document.getElementById('dueInput').value;
+    if(start) data.pregnancyStart = start;
+    if(due) data.dueDate = due;
+    save();
+    closeModal(); render();
+  };
+}
+
+function openAddCategoryModal(){
+  let chosen = CAT_COLORS[0].key;
+  openModal(`
+    <h2>Nouvelle liste</h2>
+    <div class="field">
+      <label class="field-label">Nom</label>
+      <input type="text" id="catName" placeholder="Ex. Puériculture">
+    </div>
+    <div class="field">
+      <label class="field-label">Couleur</label>
+      <div class="color-pick" id="colorPick"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Créer</button>
+    </div>
+  `);
+  const pick = document.getElementById('colorPick');
+  pick.innerHTML = CAT_COLORS.map(c => `<div class="swatch ${c.key===chosen?'selected':''}" data-color="${c.key}" style="background:${c.main}"></div>`).join('');
+  pick.querySelectorAll('.swatch').forEach(sw => sw.onclick = () => {
+    chosen = sw.dataset.color;
+    pick.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
+    sw.classList.add('selected');
+  });
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const name = document.getElementById('catName').value.trim();
+    if(!name){ showToast('Donnez un nom à la liste'); return; }
+    data.categories.push({ id:newId(), name, icon:'box', color:chosen, sections:[] });
+    save(); closeModal(); render(); showToast('Liste créée');
+  };
+}
+
+function openRenameCategoryModal(cat){
+  openModal(`
+    <h2>Renommer la liste</h2>
+    <div class="field"><input type="text" id="catName" value="${escapeAttr(cat.name)}"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const v = document.getElementById('catName').value.trim();
+    if(v) cat.name = v;
+    save(); closeModal(); render();
+  };
+}
+
+function openAddSectionModal(cat){
+  openModal(`
+    <h2>Nouvelle section</h2>
+    <div class="field">
+      <label class="field-label">Titre</label>
+      <input type="text" id="secLabel" placeholder="Ex. 2 ans">
+    </div>
+    <div class="field">
+      <label class="field-label">Période (optionnel)</label>
+      <input type="text" id="secPeriod" placeholder="Ex. Été">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Ajouter</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const label = document.getElementById('secLabel').value.trim();
+    if(!label){ showToast('Donnez un titre à la section'); return; }
+    const period = document.getElementById('secPeriod').value.trim();
+    const sec = { id:newId(), label, period, items:[] };
+    cat.sections.push(sec);
+    ui.collapsedSections[sec.id] = false; saveUi();
+    save(); closeModal(); render(); showToast('Section ajoutée');
+  };
+}
+
+function openRenameSectionModal(sec){
+  openModal(`
+    <h2>Modifier la section</h2>
+    <div class="field"><label class="field-label">Titre</label><input type="text" id="secLabel" value="${escapeAttr(sec.label)}"></div>
+    <div class="field"><label class="field-label">Période</label><input type="text" id="secPeriod" value="${escapeAttr(sec.period||'')}"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const l = document.getElementById('secLabel').value.trim();
+    if(l) sec.label = l;
+    sec.period = document.getElementById('secPeriod').value.trim();
+    save(); closeModal(); render();
+  };
+}
+
+function openAddItemModal(cat, sec){
+  openModal(`
+    <h2>Nouvel article</h2>
+    <div class="field"><label class="field-label">Nom</label><input type="text" id="itName" placeholder="Ex. Body ML"></div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label class="field-label">Quantité cible</label><input type="number" id="itTarget" min="0" value="1"></div>
+      <div class="field" style="flex:1;"><label class="field-label">Déjà acquis</label><input type="number" id="itAcquired" min="0" value="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Ajouter</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const name = document.getElementById('itName').value.trim();
+    if(!name){ showToast('Donnez un nom à l’article'); return; }
+    const target = clamp(parseInt(document.getElementById('itTarget').value||'0',10), 0, 9999);
+    const acquired = clamp(parseInt(document.getElementById('itAcquired').value||'0',10), 0, 9999);
+    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', photo:'' });
+    ui.collapsedSections[sec.id] = false; saveUi();
+    save(); closeModal(); render(); showToast('Article ajouté');
+  };
+}
+
+/* ---------- Nav & boot ---------- */
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.onclick = () => {
+    ui.view = btn.dataset.nav;
+    saveUi();
+    render();
+  };
+});
+
+updateConnectionBadge('offline');
+render();
+initFirebase();
+})();
+</script>
+</body>
+</html>
