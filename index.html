@@ -480,53 +480,166 @@ const CAT_COLORS = [
 function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0]; }
 
 /* ---------- Default data ---------- */
+function makeSection(label, period, list){
+  return {
+    id: newId(), label, period,
+    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', photos: [] }))
+  };
+}
+
+// Contenu de départ des listes "Puériculture", "Chambre" et "Valise de maternité",
+// utilisé à la fois pour une toute première installation et pour compléter
+// automatiquement, une seule fois, ces listes si elles étaient encore vides.
+function defaultCategorySeeds(){
+  return {
+    'Puériculture': [
+      ['Repas', '', [
+        ['Biberons 150–180 ml', 4], ['Biberons 260 ml', 4], ['Tétines', 8],
+        ['Goupillon', 1], ['Doseur / distributeur de lait', 1],
+        ['Tire-lait', 1, 'à décider'], ['Coussinets d’allaitement', 1, 'pack — si allaitement'],
+        ['Bavoirs', 10]
+      ]],
+      ['Change & soins', '', [
+        ['Matelas à langer', 1], ['Matelas à langer nomade', 1], ['Housses', 3],
+        ['Coton lavable', 15], ['Coton classique', 1, 'paquet'], ['Sérum physiologique', 1, 'boîte'],
+        ['Thermomètre bébé', 1], ['Ciseaux bébé à bouts ronds', 1], ['Brosse bébé', 1, 'facultatif'],
+        ['Gel lavant bébé', 1], ['Crème pour le change', 1, 'au besoin'], ['Compresses stériles', 1, 'boîte'],
+        ['Petite trousse / pochette de soins', 1]
+      ]],
+      ['Bain', '', [
+        ['Petite baignoire bébé', 1], ['Capes de bain', 3], ['Serviettes', 2],
+        ['Gants de toilette', 4], ['Thermomètre de bain', 1, 'facultatif']
+      ]],
+      ['Langes', '', [
+        ['Langes / mousselines', 12], ['Grandes mousselines', 3]
+      ]],
+      ['Sorties / transport', '', [
+        ['Poussette', 1], ['Nacelle / solution nouveau-né', 1, 'selon poussette'],
+        ['Coque / siège-auto naissance', 1], ['Base Isofix', 1, 'si nécessaire'],
+        ['Sac à langer', 1], ['Porte-bébé / écharpe', 1], ['Couverture légère', 1],
+        ['Chancelière / couverture chaude', 1], ['Pare-soleil voiture', 2]
+      ]],
+      ['Éveil & quotidien', '', [
+        ['Tapis d’éveil', 1], ['Transat', 1, 'facultatif'], ['Sucettes', 4, 'facultatif'],
+        ['Attaches-sucettes', 2, 'facultatif'], ['Boîte à sucettes', 1, 'facultatif'],
+        ['Doudous', 3], ['Babyphone', 1], ['Veilleuse', 1]
+      ]]
+    ],
+    'Chambre': [
+      ['Couchage principal', '', [
+        ['Lit bébé évolutif', 1], ['Matelas', 1], ['Alèses', 2], ['Draps-housses', 4],
+        ['Gigoteuses 0–6 mois', 2], ['Gigoteuses 6–12 mois', 2], ['Gigoteuse légère', 1]
+      ]],
+      ['Berceau / couffin', 'Si souhaité', [
+        ['Berceau ou couffin', 1], ['Matelas adapté', 1], ['Draps adaptés', 3], ['Alèses adaptées', 2]
+      ]],
+      ['Coin change', '', [
+        ['Table à langer', 1], ['Organisateur / panier', 1], ['Poubelle à couches', 1, 'facultatif']
+      ]],
+      ['Rangement', '', [
+        ['Commode', 1], ['Armoire', 1, 'selon espace'], ['Cintres', 15],
+        ['Organisateurs de tiroirs', 3, 'quelques-uns'], ['Panier à linge', 1]
+      ]],
+      ['Confort & déco', '', [
+        ['Thermomètre de chambre', 1], ['Rideau / store occultant', 1], ['Fauteuil', 1, 'facultatif'],
+        ['Boîte à souvenirs', 1], ['Panier à livres', 1, 'facultatif'], ['Mobile', 1, 'facultatif']
+      ]]
+    ],
+    'Valise de maternité': [
+      ['Maman — vêtements', '', [
+        ['Pyjama / tenue de nuit confortable', 2], ['Tenues confortables journée', 2], ['Gilet', 1],
+        ['Culottes confortables', 5], ['Soutiens-gorge d’allaitement', 2, 'si besoin'],
+        ['Chaussons', 1, 'paire'], ['Claquettes / tongs douche', 1, 'paire'], ['Tenue de sortie', 1]
+      ]],
+      ['Maman — toilette & confort', '', [
+        ['Trousse de toilette', 1], ['Protections postpartum', 1, 'paquet'], ['Culottes filet / postpartum', 4],
+        ['Serviette personnelle', 1], ['Papier toilette doux', 1, 'rouleau'], ['Mouchoirs', 1, 'paquet'],
+        ['Baume à lèvres', 1], ['Élastiques / pince à cheveux', 1], ['Sac pour linge sale', 1]
+      ]],
+      ['Pratique', '', [
+        ['Téléphone', 1], ['Chargeur long', 1], ['Rallonge', 1], ['Power bank', 1],
+        ['Écouteurs', 1], ['Veilleuse rechargeable', 1], ['Gourde', 1], ['Snacks', 1]
+      ]],
+      ['Administratif', '', [
+        ['Carte Vitale', 1], ['Pièce d’identité', 1], ['Mutuelle', 1],
+        ['Dossier maternité', 1], ['Documents médicaux', 1], ['Livret de famille / documents nécessaires', 1]
+      ]],
+      ['Bébé — vêtements', '', [
+        ['Bodies', 4], ['Pyjamas', 4], ['Gilet', 1], ['Chaussettes', 2, 'paires'],
+        ['Bonnet', 1], ['Tenue de sortie', 1], ['Combinaison pilote / couverture chaude', 1, 'selon météo']
+      ]],
+      ['Bébé — change & soins', '', [
+        ['Petit paquet de couches', 1, 'si non fourni'], ['Coton', 1, 'paquet'],
+        ['Sérum physiologique', 1, 'quelques dosettes'], ['Cape de bain', 1], ['Sac pour linge sale', 1]
+      ]],
+      ['Retour à la maison', '', [
+        ['Coque / siège-auto installé', 1], ['Tenue adaptée à la météo', 1],
+        ['Couverture / chancelière', 1, 'si nécessaire']
+      ]]
+    ]
+  };
+}
+
+// Complète, une seule fois, les catégories connues qui seraient encore sans
+// section (ex. après une première installation antérieure à cette liste de
+// contenu). N'écrase jamais une liste déjà personnalisée par l'utilisateur.
+function seedKnownEmptyCategories(d){
+  if(d.seededDefaults) return false;
+  const seeds = defaultCategorySeeds();
+  let changed = false;
+  d.categories.forEach(cat => {
+    const seed = seeds[cat.name];
+    if(seed && Array.isArray(cat.sections) && cat.sections.length === 0){
+      cat.sections = seed.map(([label, period, list]) => makeSection(label, period, list));
+      changed = true;
+    }
+  });
+  d.seededDefaults = true;
+  return changed;
+}
+
 function buildDefaultData(){
-  function items(list){
-    return list.map(([name, target]) => ({ id: newId(), name, target, acquired: 0, note:'', link:'', photos: [] }));
-  }
-  function section(label, period, list){
-    return { id: newId(), label, period, items: items(list) };
-  }
+  const seeds = defaultCategorySeeds();
 
   const vetements = {
     id:newId(), name:'Vêtements bébé — 1 à 18 mois', icon:'shirt', color:'terracotta',
     sections:[
-      section('1 mois','Avril / printemps',[
+      makeSection('1 mois','Avril / printemps',[
         ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama léger',1],
         ['Pantalon souple',2],['Legging léger',1],['Gilet léger',2],['Combinaison ML + jambes longues',1],
         ['Tenue printemps',2],['Chaussettes',3],['Bonnet léger',1]
       ]),
-      section('3 mois','Mai / juin',[
+      makeSection('3 mois','Mai / juin',[
         ['Body ML léger',4],['Body MC',5],['Pyjama ML léger',3],['Pyjama MC + jambes courtes',2],
         ['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',2],['Combinaison MC + jambes longues',2],
         ['Combinaison éponge légère',1],['T-shirt + short',2],['Tenue estivale légère',2],['Tenue habillée été',1],
         ['Gilet coton léger',2],['Chaussettes légères',3],['Chapeau soleil',1]
       ]),
-      section('6 mois','Août / septembre',[
+      makeSection('6 mois','Août / septembre',[
         ['Body MC',6],['Body ML léger',2],['Pyjama MC + jambes courtes',2],['Pyjama ML léger',2],
         ['Short',3],['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',3],
         ['Combinaison MC + jambes longues',2],['T-shirt + short',3],['Tenue estivale légère',2],['Tenue couvrante fin d’été',1],
         ['Gilet coton léger',2],['Chaussettes légères',3],['Chapeau soleil',1]
       ]),
-      section('9 mois','Novembre / décembre',[
+      makeSection('9 mois','Novembre / décembre',[
         ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama chaud',1],
         ['Pantalon',4],['Legging épais',2],['Pull chaud',2],['Sweat',1],['Gilet chaud',2],
         ['Combinaison ML + jambes longues',1],['Combinaison chaude / molletonnée',1],['Tenue automne/hiver',3],
         ['Manteau ou combi-pilote',1],['Bonnet chaud',1],['Chaussettes épaisses',2]
       ]),
-      section('12 mois','Février / mars',[
+      makeSection('12 mois','Février / mars',[
         ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama léger',2],
         ['Pantalon',4],['Legging',2],['Pull chaud',2],['Sweat',1],['Gilet chaud',2],
         ['Combinaison ML + jambes longues',1],['Combinaison légère de transition',1],['Tenue quotidienne',3],
         ['Tenue habillée',1],['Manteau chaud',1],['Veste légère mi-saison',1],['Bonnet chaud',1],['Chaussettes',3]
       ]),
-      section('18 mois','Août / septembre',[
+      makeSection('18 mois','Août / septembre',[
         ['Body MC',4],['Body ML léger',2],['Pyjama léger',3],['Pyjama ML léger',1],
         ['Short',3],['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',3],
         ['Combinaison MC + jambes longues',1],['T-shirt',4],['Tenue estivale',3],['Tenue habillée',1],
         ['Gilet coton léger',1],['Veste légère',1],['Chapeau soleil',1],['Chaussettes',3]
       ]),
-      section('Sans taille','À prévoir',[
+      makeSection('Sans taille','À prévoir',[
         ['Langes / mousselines',10],['Bavoirs',8],['Capes de bain',2],['Serviettes',2],
         ['Gigoteuses 0–6 mois',2],['Gigoteuses 6–12 mois',2],['Gigoteuse légère supplémentaire',1],
         ['Draps-housses',3],['Alèses',2],['Couverture légère',1],['Couverture chaude',1],
@@ -535,13 +648,23 @@ function buildDefaultData(){
     ]
   };
 
-  const puericulture = { id:newId(), name:'Puériculture', icon:'box', color:'sage', sections:[] };
-  const chambre = { id:newId(), name:'Chambre', icon:'bed', color:'blue', sections:[] };
-  const maternite = { id:newId(), name:'Valise de maternité', icon:'suitcase', color:'lavender', sections:[] };
+  const puericulture = {
+    id:newId(), name:'Puériculture', icon:'box', color:'sage',
+    sections: seeds['Puériculture'].map(([label, period, list]) => makeSection(label, period, list))
+  };
+  const chambre = {
+    id:newId(), name:'Chambre', icon:'bed', color:'blue',
+    sections: seeds['Chambre'].map(([label, period, list]) => makeSection(label, period, list))
+  };
+  const maternite = {
+    id:newId(), name:'Valise de maternité', icon:'suitcase', color:'lavender',
+    sections: seeds['Valise de maternité'].map(([label, period, list]) => makeSection(label, period, list))
+  };
 
   return {
     dueDate:'2027-03-25',
     pregnancyStart:'2026-06-25',
+    seededDefaults: true,
     categories:[vetements, puericulture, chambre, maternite]
   };
 }
@@ -565,6 +688,7 @@ function newId(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().t
 
 // `data` is the shared content, synced to Firebase for both parents.
 let data = loadLocalData();
+seedKnownEmptyCategories(data);
 // `ui` is per-device navigation state (current screen, open sections) — never synced.
 let ui = loadUi();
 let searchQuery = '';
@@ -697,8 +821,10 @@ function handleRemoteValue(snapshot){
   const remoteStr = JSON.stringify(remote);
   if(remoteStr === lastSentJson) return; // c'est l'écho de notre propre écriture
   data = normalizeData(remote);
+  const seeded = seedKnownEmptyCategories(data);
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
   render();
+  if(seeded) save();
 }
 
 function handleRemoteError(err){
