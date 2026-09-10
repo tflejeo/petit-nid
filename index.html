@@ -1061,7 +1061,7 @@ function collectAllPhotos(){
     cat.sections.forEach(sec => {
       sec.items.forEach(it => {
         (it.photos || []).forEach(src => {
-          out.push({ src, itemName: it.name, catName: cat.name, catId: cat.id, secId: sec.id, itemId: it.id });
+          out.push({ src, itemName: it.name, catName: cat.name, secLabel: sec.label, catId: cat.id, secId: sec.id, itemId: it.id });
         });
       });
     });
@@ -1088,7 +1088,7 @@ function renderPhotoGallery(container){
         <button class="gallery-item" data-gallery-index="${i}">
           <img src="${p.src}" alt="">
           <div class="gallery-caption">${escapeHtml(p.itemName)}</div>
-          <div class="gallery-caption gallery-caption-sub">${escapeHtml(p.catName)}</div>
+          <div class="gallery-caption gallery-caption-sub">${escapeHtml(p.secLabel)}</div>
         </button>
       `).join('')}
     </div>
@@ -1099,7 +1099,7 @@ function renderPhotoGallery(container){
       openLightbox(
         photos.map(p => ({
           src: p.src,
-          caption: `${p.itemName} · ${p.catName}`,
+          caption: `${p.itemName} · ${p.secLabel} · ${p.catName}`,
           onGoto: () => {
             ui.view = 'category';
             ui.activeCategoryId = p.catId;
