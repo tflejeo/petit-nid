@@ -482,13 +482,31 @@ if(uiIsFresh && data.categories[0] && data.categories[0].sections[0]){
   ui.collapsedSections[data.categories[0].sections[0].id] = false;
 }
 
+// Firebase Realtime Database supprime silencieusement les tableaux/objets vides
+// ([] ou {}) lors de l'enregistrement : un champ "sections: []" ou "items: []"
+// revient donc absent après une synchro. On reconstruit ces tableaux ici pour
+// que le reste du code puisse toujours compter dessus sans planter.
+function normalizeData(d){
+  if(!d || typeof d !== 'object') return buildDefaultData();
+  if(!Array.isArray(d.categories)) d.categories = [];
+  d.categories.forEach(cat => {
+    if(!Array.isArray(cat.sections)) cat.sections = [];
+    cat.sections.forEach(sec => {
+      if(!Array.isArray(sec.items)) sec.items = [];
+    });
+  });
+  if(!d.dueDate) d.dueDate = '2027-03-25';
+  if(!d.pregnancyStart) d.pregnancyStart = '2026-06-25';
+  return d;
+}
+
 function loadLocalData(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return buildDefaultData();
     const parsed = JSON.parse(raw);
     if(!parsed || !Array.isArray(parsed.categories)) return buildDefaultData();
-    return parsed;
+    return normalizeData(parsed);
   }catch(e){
     return buildDefaultData();
   }
@@ -549,15 +567,15 @@ function initFirebase(){
 function handleRemoteValue(snapshot){
   const remote = snapshot.val();
   if(isTypingInTextField()) return; // ne pas couper la saisie en cours d'un champ
-  if(!remote || !Array.isArray(remote.categories)){
-    if(!bootstrapped){ dbRef.set(data); } // base vide : on y dépose les données locales/par défaut
+  if(!remote){
+    if(!bootstrapped){ dbRef.set(data); } // rien du tout côté serveur : on y dépose les données locales/par défaut
     bootstrapped = true;
     return;
   }
   bootstrapped = true;
   const remoteStr = JSON.stringify(remote);
   if(remoteStr === lastSentJson) return; // c'est l'écho de notre propre écriture
-  data = remote;
+  data = normalizeData(remote);
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
   render();
 }
