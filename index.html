@@ -105,7 +105,7 @@
     background:linear-gradient(155deg, var(--sage-tint) 0%, #FFFDF8 65%);
     border:1px solid var(--border);
     border-radius:var(--r-lg);
-    padding:22px 20px;
+    padding:16px 18px;
     box-shadow:var(--shadow);
     position:relative;
     overflow:hidden;
@@ -117,19 +117,20 @@
     border-radius:50%;
     background:radial-gradient(circle, var(--terracotta-tint) 0%, transparent 70%);
   }
-  .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
   .hero-label{color:var(--muted); font-size:13px; font-weight:700; letter-spacing:0.2px;}
-  .hero-num-row{display:flex; align-items:baseline; gap:10px; margin-top:2px;}
+  .hero-count-row{display:flex; align-items:center; gap:12px;}
   .hero-num{
     font-family:var(--font-display);
     font-weight:700;
-    font-size:64px;
+    font-size:38px;
     line-height:1;
     color:var(--sage-dark);
     font-variant-numeric:tabular-nums;
+    flex-shrink:0;
   }
-  .hero-num-unit{font-size:17px; font-weight:700; color:var(--ink);}
-  .hero-date{font-size:13px; color:var(--muted); margin-top:6px;}
+  .hero-count-text{display:flex; flex-direction:column; gap:1px; min-width:0;}
+  .hero-num-unit{font-size:13.5px; font-weight:800; color:var(--ink);}
+  .hero-date{font-size:12px; color:var(--muted);}
   .icon-btn-ghost{
     background:transparent; border:none; color:var(--muted); cursor:pointer;
     width:32px;height:32px; display:flex; align-items:center; justify-content:center;
@@ -140,7 +141,7 @@
   .progress-block{margin-top:16px;}
   .size-row{
     display:flex; justify-content:space-between; align-items:center;
-    margin-top:14px; padding-top:14px; border-top:1px solid var(--border);
+    margin-top:12px; padding-top:12px; border-top:1px solid var(--border);
     color:var(--ink); cursor:pointer;
   }
   .size-row .icon{color:var(--muted-2); flex-shrink:0;}
@@ -1109,16 +1110,12 @@ function renderDashboard(){
 
   main.innerHTML = `
     <div class="hero">
-      <div class="hero-top">
-        <div>
-          <div class="hero-label">Compte à rebours</div>
-          <div class="hero-num-row">
-            <span class="hero-num">${countdownNum}</span>
-            <span class="hero-num-unit">${countdownText}</span>
-          </div>
+      <div class="hero-count-row">
+        <span class="hero-num">${countdownNum}</span>
+        <div class="hero-count-text">
+          <div class="hero-num-unit">${countdownText}</div>
           <div class="hero-date">Terme prévu le ${formatDate(data.dueDate)}</div>
         </div>
-        <button class="icon-btn-ghost" id="btnEditDue" aria-label="Modifier les dates">${icon('gear')}</button>
       </div>
       <div class="size-row" id="btnEditSize">
         <div>
@@ -1135,14 +1132,6 @@ function renderDashboard(){
         <div class="track"><div class="fill" style="width:${preg.pct}%; background:var(--terracotta)"></div></div>
         <div class="milestone-note">${icon('sparkle','icon-sm')} ${escapeHtml(milestone.text)}</div>
       </div>
-      <div class="progress-block">
-        <div class="progress-head">
-          <span class="label">Avancement des achats</span>
-          <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
-        </div>
-        <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
-        ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
-      </div>
     </div>
 
     <div id="homeTodos"></div>
@@ -1150,6 +1139,14 @@ function renderDashboard(){
     <div id="photoGallery" style="margin:18px 0;"></div>
 
     <div class="section-heading">Vos listes</div>
+    <div class="progress-block" style="margin-top:0; margin-bottom:16px;">
+      <div class="progress-head">
+        <span class="label">Avancement des achats</span>
+        <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
+      </div>
+      <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
+      ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
+    </div>
     <div class="cat-grid" id="catGrid"></div>
 
     <div id="echoGalleryDash" style="margin-top:22px;"></div>
@@ -1158,7 +1155,6 @@ function renderDashboard(){
   renderPhotoGallery(document.getElementById('photoGallery'));
   renderEchoDashboardGallery(document.getElementById('echoGalleryDash'));
   renderHomeTodos(document.getElementById('homeTodos'));
-  document.getElementById('btnEditDue').onclick = openDueDateModal;
   document.getElementById('btnEditSize').onclick = openSizeModal;
 }
 
@@ -1715,6 +1711,16 @@ function openSettingsPanel(){
       <label class="field-label">État de synchronisation</label>
       <div id="syncBadge" class="sync-badge"></div>
     </div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;">
+        <label class="field-label">Début de grossesse</label>
+        <input type="date" id="sStart" value="${data.pregnancyStart || '2026-06-25'}">
+      </div>
+      <div class="field" style="flex:1;">
+        <label class="field-label">Terme prévu</label>
+        <input type="date" id="sDue" value="${data.dueDate}">
+      </div>
+    </div>
     <div class="field">
       <label class="field-label">Texte sous "Nidoux" (emojis autorisés)</label>
       <input type="text" id="sTagline" value="${escapeAttr(data.headerTagline || '')}" placeholder="Ex. 🍼 votre liste de naissance">
@@ -1731,6 +1737,10 @@ function openSettingsPanel(){
   updateConnectionBadge(lastConnectionState);
   document.getElementById('mCancel').onclick = closeModal;
   document.getElementById('mSave').onclick = () => {
+    const start = document.getElementById('sStart').value;
+    const due = document.getElementById('sDue').value;
+    if(start) data.pregnancyStart = start;
+    if(due) data.dueDate = due;
     data.headerTagline = document.getElementById('sTagline').value;
     data.homeTodoCount = clamp(parseInt(document.getElementById('sTodoCount').value || '0', 10), 0, 50);
     save(); closeModal(); render(); showToast('Paramètres enregistrés');
@@ -2383,33 +2393,6 @@ function openConfirmModal(title, msg, onConfirm){
   `);
   document.getElementById('mCancel').onclick = closeModal;
   document.getElementById('mConfirm').onclick = onConfirm;
-}
-
-function openDueDateModal(){
-  openModal(`
-    <h2>Dates de grossesse</h2>
-    <div class="field">
-      <label class="field-label">Début de grossesse</label>
-      <input type="date" id="startInput" value="${data.pregnancyStart || '2026-06-25'}">
-    </div>
-    <div class="field">
-      <label class="field-label">Terme prévu</label>
-      <input type="date" id="dueInput" value="${data.dueDate}">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Enregistrer</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const start = document.getElementById('startInput').value;
-    const due = document.getElementById('dueInput').value;
-    if(start) data.pregnancyStart = start;
-    if(due) data.dueDate = due;
-    save();
-    closeModal(); render();
-  };
 }
 
 function openSizeModal(){
