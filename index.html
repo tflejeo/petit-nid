@@ -438,6 +438,30 @@
   .prono-winner{border-color:var(--amber); background:var(--amber-tint);}
   .prono-rank{color:var(--muted); font-weight:800; margin-right:2px;}
   .prono-score{margin-top:10px; font-size:12.5px; font-weight:700; color:var(--sage-dark);}
+
+  /* À faire */
+  .todo-row{
+    display:flex; align-items:flex-start; gap:12px; padding:13px 14px;
+    background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);
+    margin-bottom:10px; box-shadow:var(--shadow);
+  }
+  .todo-row.done{opacity:0.6;}
+  .todo-row.done .todo-text{text-decoration:line-through;}
+  .todo-check{
+    width:24px; height:24px; border-radius:50%; border:2px solid var(--muted-2); background:#fff;
+    display:flex; align-items:center; justify-content:center; color:#fff; cursor:pointer; flex-shrink:0; margin-top:1px; padding:0;
+  }
+  .todo-check.checked{background:var(--sage-dark); border-color:var(--sage-dark);}
+  .todo-main{flex:1; min-width:0; cursor:pointer;}
+  .todo-text{font-weight:700; font-size:14.5px;}
+  .todo-meta{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
+  .todo-due{font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:999px;}
+  .todo-due-none{background:#F2EDE0; color:var(--muted);}
+  .todo-due-later{background:var(--sage-tint); color:var(--sage-dark);}
+  .todo-due-soon{background:var(--amber-tint); color:var(--amber);}
+  .todo-due-overdue{background:var(--terracotta-tint); color:var(--terracotta-dark);}
+  .todo-due-done{background:#F2EDE0; color:var(--muted);}
+  .todo-assignee{font-size:11.5px; font-weight:700; color:var(--muted); padding:3px 9px; border-radius:999px; background:#F2EDE0;}
 </style>
 </head>
 <body>
@@ -465,6 +489,10 @@
   <button class="nav-btn" data-nav="echo">
     <svg class="icon" viewBox="0 0 24 24"><path d="M3 12h3l2-7 4 14 2-7h3"/><circle cx="19" cy="12" r="2"/></svg>
     Écho
+  </button>
+  <button class="nav-btn" data-nav="todo">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>
+    À faire
   </button>
 </nav>
 
@@ -698,7 +726,8 @@ function buildDefaultData(){
     pregnancyStart:'2026-06-25',
     seededDefaults: true,
     categories:[vetements, puericulture, chambre, maternite],
-    ultrasounds: []
+    ultrasounds: [],
+    todos: []
   };
 }
 
@@ -750,6 +779,12 @@ function normalizeData(d){
   });
   if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
   d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
+  if(!Array.isArray(d.todos)) d.todos = [];
+  d.todos.forEach(t => {
+    t.dueDate = t.dueDate || '';
+    t.assignee = t.assignee || '';
+    t.done = !!t.done;
+  });
   if(!d.dueDate) d.dueDate = '2027-03-25';
   if(!d.pregnancyStart) d.pregnancyStart = '2026-06-25';
   return d;
@@ -997,9 +1032,10 @@ function render(){
   else if(ui.view === 'lists') renderListsView();
   else if(ui.view === 'prono') renderProno();
   else if(ui.view === 'echo') renderEcho();
+  else if(ui.view === 'todo') renderTodo();
   else renderCategory();
   document.querySelectorAll('.nav-btn').forEach(b=>{
-    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', prono:'prono', echo:'echo' };
+    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', prono:'prono', echo:'echo', todo:'todo' };
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
@@ -1015,6 +1051,8 @@ function renderHeader(){
     h.innerHTML = `<div class="brand"><h1>Mon petit prono</h1></div>`;
   } else if(ui.view === 'echo'){
     h.innerHTML = `<div class="brand"><h1>Échographies</h1></div>`;
+  } else if(ui.view === 'todo'){
+    h.innerHTML = `<div class="brand"><h1>À faire</h1></div>`;
   } else {
     const cat = data.categories.find(c=>c.id===ui.activeCategoryId);
     h.innerHTML = `<div class="view-title">
@@ -1072,9 +1110,12 @@ function renderDashboard(){
 
     <div class="section-heading">Vos listes</div>
     <div class="cat-grid" id="catGrid"></div>
+
+    <div id="echoGalleryDash" style="margin-top:22px;"></div>
   `;
   renderCatGrid(document.getElementById('catGrid'));
   renderPhotoGallery(document.getElementById('photoGallery'));
+  renderEchoDashboardGallery(document.getElementById('echoGalleryDash'));
   document.getElementById('btnEditDue').onclick = openDueDateModal;
 }
 
@@ -1638,6 +1679,32 @@ function collectEchoPhotos(){
   return out;
 }
 
+function renderEchoDashboardGallery(container){
+  const photos = collectEchoPhotos();
+  if(photos.length === 0){ container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <div class="section-heading">Diaporama échographies <span style="color:var(--muted); font-weight:700; font-size:13px;">(${photos.length})</span></div>
+    <div class="gallery-scroll" id="echoDashScroll">
+      ${photos.map((p, i) => `
+        <button class="gallery-item" data-echo-dash-index="${i}">
+          <img src="${p.src}" alt="">
+          <div class="gallery-caption">Semaine ${weekForDate(p.date) ?? '—'}</div>
+          <div class="gallery-caption gallery-caption-sub">${p.date ? formatDate(p.date) : ''}</div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+  container.querySelectorAll('[data-echo-dash-index]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.echoDashIndex, 10);
+      openLightbox(photos.map(p => ({
+        src: p.src,
+        caption: `Semaine ${weekForDate(p.date) ?? '—'}${p.date ? ' · ' + formatDate(p.date) : ''}`
+      })), idx);
+    };
+  });
+}
+
 function renderEcho(){
   const main = document.getElementById('mainContent');
   const entries = (data.ultrasounds || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -1785,6 +1852,113 @@ function openEditEchoModal(u){
       u.date = date; u.note = note;
     }
     save(); closeModal(); render(); showToast(isNew ? 'Échographie ajoutée' : 'Échographie modifiée');
+  };
+}
+
+/* ---------- À faire ---------- */
+function sortedTodos(){
+  return (data.todos || []).slice().sort((a, b) => {
+    if(a.done !== b.done) return a.done ? 1 : -1;
+    const aHas = !!a.dueDate, bHas = !!b.dueDate;
+    if(aHas !== bHas) return aHas ? -1 : 1;
+    if(aHas && bHas) return a.dueDate.localeCompare(b.dueDate);
+    return 0;
+  });
+}
+
+function todoDueClass(t){
+  if(t.done) return 'todo-due-done';
+  if(!t.dueDate) return 'todo-due-none';
+  const days = daysUntil(t.dueDate);
+  if(days < 0) return 'todo-due-overdue';
+  if(days <= 7) return 'todo-due-soon';
+  return 'todo-due-later';
+}
+
+function renderTodo(){
+  const main = document.getElementById('mainContent');
+  const todos = sortedTodos();
+  main.innerHTML = `
+    <button class="add-row-btn" id="btnAddTodo" style="margin:2px 0 18px;">${icon('plus','icon-sm')} Ajouter une tâche</button>
+    <div id="todoList"></div>
+  `;
+  document.getElementById('btnAddTodo').onclick = () => openEditTodoModal(null);
+
+  const listEl = document.getElementById('todoList');
+  if(todos.length === 0){
+    listEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucune tâche pour le moment.</div></div>`;
+    return;
+  }
+  listEl.innerHTML = todos.map(t => renderTodoRow(t)).join('');
+  todos.forEach(t => bindTodoRowEvents(t));
+}
+
+function renderTodoRow(t){
+  const dueLabel = t.dueDate ? formatDate(t.dueDate) : 'Sans échéance';
+  return `<div class="todo-row ${t.done ? 'done' : ''}" data-todo-row="${t.id}">
+    <button class="todo-check ${t.done ? 'checked' : ''}" data-toggle-todo="${t.id}" aria-label="Marquer comme fait">
+      ${t.done ? icon('check','icon-sm') : ''}
+    </button>
+    <div class="todo-main" data-edit-todo="${t.id}">
+      <div class="todo-text">${escapeHtml(t.text)}</div>
+      <div class="todo-meta">
+        <span class="todo-due ${todoDueClass(t)}">${dueLabel}</span>
+        ${t.assignee ? `<span class="todo-assignee">${escapeHtml(t.assignee)}</span>` : ''}
+      </div>
+    </div>
+    <button class="text-btn danger" data-del-todo="${t.id}" aria-label="Supprimer">${icon('trash','icon-sm')}</button>
+  </div>`;
+}
+
+function bindTodoRowEvents(t){
+  const row = document.querySelector(`[data-todo-row="${t.id}"]`);
+  if(!row) return;
+  const checkBtn = row.querySelector(`[data-toggle-todo="${t.id}"]`);
+  if(checkBtn) checkBtn.onclick = () => { t.done = !t.done; save(); render(); };
+  const mainEl = row.querySelector(`[data-edit-todo="${t.id}"]`);
+  if(mainEl) mainEl.onclick = () => openEditTodoModal(t);
+  const delBtn = row.querySelector(`[data-del-todo="${t.id}"]`);
+  if(delBtn) delBtn.onclick = () => openConfirmModal('Supprimer cette tâche ?', `« ${t.text} » sera définitivement supprimée.`, () => {
+    data.todos = data.todos.filter(x => x.id !== t.id);
+    save(); closeModal(); render(); showToast('Tâche supprimée');
+  });
+}
+
+function openEditTodoModal(t){
+  const isNew = !t;
+  openModal(`
+    <h2>${isNew ? 'Nouvelle tâche' : 'Modifier la tâche'}</h2>
+    <div class="field">
+      <label class="field-label">Tâche</label>
+      <input type="text" id="tText" placeholder="Ex. Monter le lit bébé" value="${t ? escapeAttr(t.text) : ''}">
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;">
+        <label class="field-label">Échéance (optionnel)</label>
+        <input type="date" id="tDue" value="${t ? (t.dueDate || '') : ''}">
+      </div>
+      <div class="field" style="flex:1;">
+        <label class="field-label">Assigné à (optionnel)</label>
+        <input type="text" id="tAssignee" placeholder="Ex. Tony" value="${t ? escapeAttr(t.assignee || '') : ''}">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">${isNew ? 'Ajouter' : 'Enregistrer'}</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const text = document.getElementById('tText').value.trim();
+    if(!text){ showToast('Décrivez la tâche'); return; }
+    const dueDate = document.getElementById('tDue').value || '';
+    const assignee = document.getElementById('tAssignee').value.trim();
+    if(isNew){
+      data.todos.push({ id:newId(), text, dueDate, assignee, done:false });
+    } else {
+      t.text = text; t.dueDate = dueDate; t.assignee = assignee;
+    }
+    save(); closeModal(); render(); showToast(isNew ? 'Tâche ajoutée' : 'Tâche modifiée');
   };
 }
 
