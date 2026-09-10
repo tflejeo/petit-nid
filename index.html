@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Petit Nid — suivi des achats de naissance</title>
+<title>Nidoux — suivi des achats de naissance</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -61,8 +61,9 @@
     padding:16px 18px 12px;
     border-bottom:1px solid var(--border);
   }
+  .header-row{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .header-actions{display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;}
   .sync-badge{
-    position:absolute; top:16px; right:18px;
     display:flex; align-items:center; gap:5px;
     font-size:11px; font-weight:800; color:var(--muted-2);
   }
@@ -71,7 +72,7 @@
   .sync-badge.online{color:var(--sage-dark);}
   .sync-badge.error .dot{background:var(--terracotta-dark);}
   .sync-badge.error{color:var(--terracotta-dark);}
-  .brand{display:flex; align-items:baseline; gap:8px;}
+  .brand{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;}
   .brand h1{
     font-family:var(--font-display);
     font-optical-sizing:auto;
@@ -132,6 +133,13 @@
   .icon-btn-ghost:active{background:rgba(58,53,41,0.06);}
 
   .progress-block{margin-top:16px;}
+  .size-row{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:14px; padding-top:14px; border-top:1px solid var(--border);
+    color:var(--ink); cursor:pointer;
+  }
+  .size-row .icon{color:var(--muted-2); flex-shrink:0;}
+  .size-value{font-weight:700; font-size:14px; margin-top:2px;}
   .milestone-note{
     display:flex; align-items:flex-start; gap:6px; margin-top:10px;
     font-size:12.5px; color:var(--sage-dark); font-weight:700; line-height:1.4;
@@ -467,8 +475,15 @@
 <body>
 
 <header class="app-header">
-  <div id="headerContent"></div>
-  <div id="syncBadge" class="sync-badge"></div>
+  <div class="header-row">
+    <div id="headerContent"></div>
+    <div class="header-actions">
+      <div id="syncBadge" class="sync-badge"></div>
+      <button class="icon-btn-ghost" id="settingsBtn" aria-label="Paramètres">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
+      </button>
+    </div>
+  </div>
 </header>
 
 <main id="mainContent"></main>
@@ -727,7 +742,11 @@ function buildDefaultData(){
     seededDefaults: true,
     categories:[vetements, puericulture, chambre, maternite],
     ultrasounds: [],
-    todos: []
+    todos: [],
+    headerTagline: 'votre liste de naissance',
+    homeTodoCount: 3,
+    sizeFruit: '',
+    sizeAnimal: ''
   };
 }
 
@@ -787,6 +806,10 @@ function normalizeData(d){
   });
   if(!d.dueDate) d.dueDate = '2027-03-25';
   if(!d.pregnancyStart) d.pregnancyStart = '2026-06-25';
+  if(typeof d.headerTagline !== 'string') d.headerTagline = 'votre liste de naissance';
+  if(typeof d.homeTodoCount !== 'number') d.homeTodoCount = 3;
+  if(typeof d.sizeFruit !== 'string') d.sizeFruit = '';
+  if(typeof d.sizeAnimal !== 'string') d.sizeAnimal = '';
   return d;
 }
 
@@ -1044,7 +1067,7 @@ function render(){
 function renderHeader(){
   const h = document.getElementById('headerContent');
   if(ui.view === 'dashboard'){
-    h.innerHTML = `<div class="brand"><h1>Petit Nid</h1><span class="dot">·</span><span style="font-size:12.5px;color:var(--muted);font-weight:700;">votre liste de naissance</span></div>`;
+    h.innerHTML = `<div class="brand"><h1>Nidoux</h1>${data.headerTagline ? `<span class="dot">·</span><span style="font-size:12.5px;color:var(--muted);font-weight:700;">${escapeHtml(data.headerTagline)}</span>` : ''}</div>`;
   } else if(ui.view === 'lists'){
     h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
   } else if(ui.view === 'prono'){
@@ -1088,6 +1111,13 @@ function renderDashboard(){
         </div>
         <button class="icon-btn-ghost" id="btnEditDue" aria-label="Modifier les dates">${icon('gear')}</button>
       </div>
+      <div class="size-row" id="btnEditSize">
+        <div>
+          <div class="hero-label">Taille du bébé cette semaine</div>
+          <div class="size-value">${(data.sizeFruit || data.sizeAnimal) ? [data.sizeFruit, data.sizeAnimal].filter(Boolean).map(escapeHtml).join(' · ') : 'Pas encore renseignée'}</div>
+        </div>
+        ${icon('pencil','icon-sm')}
+      </div>
       <div class="progress-block">
         <div class="progress-head">
           <span class="label">Avancement de la grossesse</span>
@@ -1106,6 +1136,8 @@ function renderDashboard(){
       </div>
     </div>
 
+    <div id="homeTodos"></div>
+
     <div id="photoGallery" style="margin:18px 0;"></div>
 
     <div class="section-heading">Vos listes</div>
@@ -1116,7 +1148,9 @@ function renderDashboard(){
   renderCatGrid(document.getElementById('catGrid'));
   renderPhotoGallery(document.getElementById('photoGallery'));
   renderEchoDashboardGallery(document.getElementById('echoGalleryDash'));
+  renderHomeTodos(document.getElementById('homeTodos'));
   document.getElementById('btnEditDue').onclick = openDueDateModal;
+  document.getElementById('btnEditSize').onclick = openSizeModal;
 }
 
 function renderCatGrid(container){
@@ -1613,17 +1647,19 @@ function openBirthResultModal(){
   };
 }
 
-function openAdminAccessModal(){
+function openAdminAccessModal(onUnlocked){
+  onUnlocked = onUnlocked || (() => render());
   if(!adminRef){ showToast('Connexion indisponible, réessayez plus tard.'); return; }
   adminRef.child('pinHash').once('value')
-    .then(snap => { const hash = snap.val(); hash ? openEnterPinModal(hash) : openSetPinModal(); })
+    .then(snap => { const hash = snap.val(); hash ? openEnterPinModal(hash, onUnlocked) : openSetPinModal(onUnlocked); })
     .catch(() => showToast('Connexion indisponible, réessayez plus tard.'));
 }
 
-function openSetPinModal(){
+function openSetPinModal(onUnlocked){
+  onUnlocked = onUnlocked || (() => render());
   openModal(`
     <h2>Créer le code admin</h2>
-    <p style="color:var(--muted); font-size:13.5px;">Ce code sera demandé pour consulter les pronostics. Choisissez 4 à 6 chiffres.</p>
+    <p style="color:var(--muted); font-size:13.5px;">Ce code sera demandé pour l’espace admin. Choisissez 4 à 6 chiffres.</p>
     <div class="field"><label class="field-label">Code PIN</label><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pinNew"></div>
     <div class="field"><label class="field-label">Confirmer le code</label><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pinNewConfirm"></div>
     <div class="modal-actions">
@@ -1639,12 +1675,13 @@ function openSetPinModal(){
     if(a !== b){ showToast('Les deux codes ne correspondent pas'); return; }
     const hash = await sha256Hex(a);
     adminRef.child('pinHash').set(hash)
-      .then(() => { setAdminUnlocked(true); closeModal(); render(); showToast('Code enregistré'); })
+      .then(() => { setAdminUnlocked(true); closeModal(); showToast('Code enregistré'); onUnlocked(); })
       .catch(err => showToast('Échec : ' + err.message));
   };
 }
 
-function openEnterPinModal(existingHash){
+function openEnterPinModal(existingHash, onUnlocked){
+  onUnlocked = onUnlocked || (() => render());
   openModal(`
     <h2>Espace admin</h2>
     <div class="field"><label class="field-label">Code PIN</label><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pinEnter"></div>
@@ -1657,8 +1694,32 @@ function openEnterPinModal(existingHash){
   document.getElementById('mSave').onclick = async () => {
     const v = document.getElementById('pinEnter').value.trim();
     const hash = await sha256Hex(v);
-    if(hash === existingHash){ setAdminUnlocked(true); closeModal(); render(); }
+    if(hash === existingHash){ setAdminUnlocked(true); closeModal(); onUnlocked(); }
     else showToast('Code incorrect');
+  };
+}
+
+function openSettingsPanel(){
+  openModal(`
+    <h2>Paramètres</h2>
+    <div class="field">
+      <label class="field-label">Texte sous "Nidoux" (emojis autorisés)</label>
+      <input type="text" id="sTagline" value="${escapeAttr(data.headerTagline || '')}" placeholder="Ex. 🍼 votre liste de naissance">
+    </div>
+    <div class="field">
+      <label class="field-label">Nombre de tâches affichées sur l’accueil</label>
+      <input type="number" min="0" max="20" id="sTodoCount" value="${data.homeTodoCount}">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Fermer</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    data.headerTagline = document.getElementById('sTagline').value;
+    data.homeTodoCount = clamp(parseInt(document.getElementById('sTodoCount').value || '0', 10), 0, 50);
+    save(); closeModal(); render(); showToast('Paramètres enregistrés');
   };
 }
 
@@ -1922,6 +1983,22 @@ function bindTodoRowEvents(t){
     data.todos = data.todos.filter(x => x.id !== t.id);
     save(); closeModal(); render(); showToast('Tâche supprimée');
   });
+}
+
+function renderHomeTodos(container){
+  const count = data.homeTodoCount || 0;
+  if(count <= 0){ container.innerHTML = ''; return; }
+  const todos = sortedTodos().filter(t => !t.done).slice(0, count);
+  if(todos.length === 0){ container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <div class="section-heading" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>À faire</span>
+      <button class="text-btn muted" id="btnSeeAllTodos" style="font-size:12.5px; padding:0;">Voir tout</button>
+    </div>
+    ${todos.map(t => renderTodoRow(t)).join('')}
+  `;
+  todos.forEach(t => bindTodoRowEvents(t));
+  document.getElementById('btnSeeAllTodos').onclick = () => { ui.view = 'todo'; saveUi(); render(); };
 }
 
 function openEditTodoModal(t){
@@ -2321,6 +2398,25 @@ function openDueDateModal(){
   };
 }
 
+function openSizeModal(){
+  openModal(`
+    <h2>Taille du bébé</h2>
+    <p style="color:var(--muted); font-size:13.5px;">Un fruit et un animal pour visualiser la taille de bébé cette semaine.</p>
+    <div class="field"><label class="field-label">Fruit</label><input type="text" id="szFruit" placeholder="Ex. 🥭 Mangue" value="${escapeAttr(data.sizeFruit || '')}"></div>
+    <div class="field"><label class="field-label">Animal</label><input type="text" id="szAnimal" placeholder="Ex. 🐱 Chaton" value="${escapeAttr(data.sizeAnimal || '')}"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    data.sizeFruit = document.getElementById('szFruit').value.trim();
+    data.sizeAnimal = document.getElementById('szAnimal').value.trim();
+    save(); closeModal(); render();
+  };
+}
+
 function openAddCategoryModal(){
   let chosen = CAT_COLORS[0].key;
   openModal(`
@@ -2451,6 +2547,11 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     render();
   };
 });
+
+document.getElementById('settingsBtn').onclick = () => {
+  if(isAdminUnlocked) openSettingsPanel();
+  else openAdminAccessModal(() => openSettingsPanel());
+};
 
 updateConnectionBadge('offline');
 render();
