@@ -275,10 +275,36 @@
   .lightbox-prev{left:12px;}
   .lightbox-next{right:12px;}
   .lightbox-next .icon{transform:rotate(180deg);}
-  .lightbox-count{
-    position:absolute; bottom:22px; left:50%; transform:translateX(-50%); color:#fff; font-size:13px; font-weight:700;
-    background:rgba(0,0,0,0.35); padding:4px 12px; border-radius:999px;
+  .lightbox-footer{
+    position:absolute; bottom:22px; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:8px; max-width:86vw;
   }
+  .lightbox-caption{
+    color:#fff; font-size:13px; font-weight:700; text-align:center;
+    background:rgba(0,0,0,0.35); padding:6px 14px; border-radius:999px;
+  }
+  .lightbox-count{color:#fff; font-size:12px; font-weight:700; opacity:0.85;}
+
+  /* Photo gallery */
+  .gallery-scroll{
+    display:flex; gap:12px; overflow-x:auto; padding:2px 2px 12px;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+    scroll-snap-type:x mandatory; scroll-padding-left:2px;
+  }
+  .gallery-scroll::-webkit-scrollbar{display:none;}
+  .gallery-item{
+    flex:0 0 auto; width:132px; background:none; border:none; padding:0; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; scroll-snap-align:start;
+  }
+  .gallery-item img{
+    width:132px; height:132px; object-fit:cover; border-radius:var(--r-md);
+    border:1px solid var(--border); box-shadow:var(--shadow);
+  }
+  .gallery-caption{
+    font-size:12px; font-weight:700; color:var(--ink); margin-top:6px; text-align:center;
+    width:132px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .gallery-caption-sub{font-weight:600; color:var(--muted); font-size:11px; margin-top:1px;}
   .expand-actions{display:flex; justify-content:space-between; align-items:center; margin-top:2px;}
   .text-btn{background:none; border:none; font-weight:800; font-size:13px; cursor:pointer; padding:6px 4px;}
   .text-btn.danger{color:var(--terracotta-dark);}
@@ -383,18 +409,6 @@
   .search-result-main{flex:1; min-width:0;}
   .search-result-breadcrumb{font-size:12px; color:var(--muted); font-weight:600; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .search-result-count{font-size:12px; font-weight:800; color:var(--muted); flex-shrink:0;}
-
-  /* Daily quote */
-  .quote-card{
-    display:flex; gap:10px; align-items:flex-start;
-    background:var(--sage-tint); border-radius:var(--r-md);
-    padding:16px 18px; margin-bottom:16px; color:var(--sage-dark);
-  }
-  .quote-card .icon{flex-shrink:0; margin-top:2px;}
-  .quote-text{
-    font-family:var(--font-display); font-style:italic; font-weight:500;
-    font-size:15px; line-height:1.5; margin:0;
-  }
 
   /* Prono */
   .choice-row{display:flex; gap:8px;}
@@ -905,64 +919,6 @@ function formatDate(dateStr){
   return d.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
 }
 
-/* Pensées originales sur la maternité/la parentalité — non attribuées à qui que ce soit,
-   pour éviter d'attribuer à tort une citation à une personne réelle. Une par jour, en boucle. */
-const QUOTES = [
-  "Un enfant n’a pas besoin de parents parfaits, juste de parents présents.",
-  "Chaque petit geste répété façonne, sans bruit, la sécurité de demain.",
-  "La patience d’aujourd’hui devient la confiance de votre enfant plus tard.",
-  "On n’apprend pas à être parent, on le devient un jour à la fois.",
-  "Le calme que vous montrez, votre enfant apprendra à le retrouver en lui.",
-  "Un câlin ne résout rien, et pourtant il répare presque tout.",
-  "Vos doutes sont le signe que vous prenez ce rôle au sérieux.",
-  "L’amour d’un parent ne se mesure pas, il se sent dans les détails.",
-  "Chaque nuit courte se paiera un jour en souvenirs immenses.",
-  "Un enfant grandit dans le regard qui croit en lui.",
-  "Il n’y a pas de bonne méthode, seulement la vôtre, ajustée chaque jour.",
-  "Le temps que vous donnez vaut plus que le temps que vous planifiez.",
-  "Accueillir un bébé, c’est accepter de tout réapprendre en même temps que lui.",
-  "La tendresse répétée construit, brique après brique, un adulte apaisé.",
-  "Vous n’avez pas à tout savoir, seulement à rester là.",
-  "Un sourire de bébé efface d’un coup la nuit la plus longue.",
-  "Le désordre d’aujourd’hui est souvent le décor des plus beaux souvenirs.",
-  "Être parent, c’est apprendre à aimer sans attendre de retour immédiat.",
-  "Chaque question sans réponse d’un enfant est une porte vers sa curiosité.",
-  "Le premier cadeau d’un parent, c’est simplement d’être là.",
-  "On ne devient pas parfait en devenant parent, on devient plus vrai.",
-  "La sécurité d’un enfant tient dans la constance, pas dans la perfection.",
-  "Un jour difficile n’efface jamais tous les bons qui l’ont précédé.",
-  "Le lien se tisse dans les gestes simples répétés sans compter.",
-  "Vous apprenez votre enfant en même temps qu’il vous apprend à vous.",
-  "La confiance d’un enfant se construit dans les petites promesses tenues.",
-  "Ce que vous donnez sans le voir, votre enfant le rend un jour, transformé.",
-  "Un parent fatigué qui reste doux fait un travail immense et invisible.",
-  "Le rire d’un enfant est la preuve que tout va, malgré tout, dans le bon sens.",
-  "Grandir ensemble veut dire accepter de changer, vous aussi.",
-  "Il n’y a pas d’instant trop petit pour marquer un enfant durablement.",
-  "Un parent qui doute est souvent un parent qui aime avec attention.",
-  "La routine du soir compte plus qu’on ne le pense pour un tout-petit.",
-  "Ce que vous nommez calmement, l’enfant apprend à l’apprivoiser aussi.",
-  "L’attente de la naissance est déjà, en soi, un apprentissage de patience.",
-  "Un couple qui se soutient construit le premier port d’attache de l’enfant.",
-  "Le silence partagé avec un bébé vaut parfois tous les discours.",
-  "Chaque étape franchie aujourd’hui semblait impossible il y a un mois.",
-  "Votre présence compte plus que votre performance.",
-  "Un enfant retient moins vos mots que la manière dont vous les dites.",
-  "Se préparer à devenir parent, c’est déjà commencer à aimer.",
-  "La tendresse ne s’épuise pas, elle se transforme avec la fatigue.",
-  "Ce petit être ne demande pas la perfection, il demande votre attention.",
-  "Un foyer paisible se construit avant même l’arrivée de l’enfant.",
-  "Le plus grand cadeau que vous ferez à votre enfant, c’est de bien vous entourer."
-];
-
-function dayOfYear(d){
-  const start = new Date(d.getFullYear(), 0, 0);
-  return Math.floor((d - start) / 86400000);
-}
-function todaysQuote(){
-  return QUOTES[dayOfYear(new Date()) % QUOTES.length];
-}
-
 let toastTimer = null;
 function showToast(msg){
   const el = document.getElementById('toast');
@@ -1043,15 +999,13 @@ function renderDashboard(){
       </div>
     </div>
 
-    <div class="quote-card">
-      ${icon('sparkle','icon-sm')}
-      <p class="quote-text">${escapeHtml(todaysQuote())}</p>
-    </div>
+    <div id="photoGallery" style="margin:18px 0;"></div>
 
     <div class="section-heading">Vos listes</div>
     <div class="cat-grid" id="catGrid"></div>
   `;
   renderCatGrid(document.getElementById('catGrid'));
+  renderPhotoGallery(document.getElementById('photoGallery'));
   document.getElementById('btnEditDue').onclick = openDueDateModal;
 }
 
@@ -1099,6 +1053,68 @@ function renderListsView(){
   if(clearBtn) clearBtn.onclick = () => { searchQuery = ''; render(); };
   renderCatGrid(document.getElementById('catGrid'));
   renderSearchState();
+}
+
+function collectAllPhotos(){
+  const out = [];
+  data.categories.forEach(cat => {
+    cat.sections.forEach(sec => {
+      sec.items.forEach(it => {
+        (it.photos || []).forEach(src => {
+          out.push({ src, itemName: it.name, catName: cat.name, catId: cat.id, secId: sec.id, itemId: it.id });
+        });
+      });
+    });
+  });
+  return out;
+}
+
+function renderPhotoGallery(container){
+  const photos = collectAllPhotos();
+  if(photos.length === 0){
+    container.innerHTML = `
+      <div class="section-heading">Galerie photos</div>
+      <div class="empty-state" style="padding:24px 20px;">
+        ${icon('camera','icon-lg')}
+        <div>Les photos ajoutées à vos articles apparaîtront ici, pour comparer les styles en un clin d’œil.</div>
+      </div>
+    `;
+    return;
+  }
+  container.innerHTML = `
+    <div class="section-heading">Galerie photos <span style="color:var(--muted); font-weight:700; font-size:13px;">(${photos.length})</span></div>
+    <div class="gallery-scroll" id="galleryScroll">
+      ${photos.map((p, i) => `
+        <button class="gallery-item" data-gallery-index="${i}">
+          <img src="${p.src}" alt="">
+          <div class="gallery-caption">${escapeHtml(p.itemName)}</div>
+          <div class="gallery-caption gallery-caption-sub">${escapeHtml(p.catName)}</div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+  container.querySelectorAll('[data-gallery-index]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.galleryIndex, 10);
+      openLightbox(
+        photos.map(p => ({
+          src: p.src,
+          caption: `${p.itemName} · ${p.catName}`,
+          onGoto: () => {
+            ui.view = 'category';
+            ui.activeCategoryId = p.catId;
+            ui.collapsedSections[p.secId] = false;
+            ui.expandedItems[p.itemId] = true;
+            saveUi();
+            render();
+            const row = document.querySelector(`[data-item-row="${p.itemId}"]`);
+            if(row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+          }
+        })),
+        idx
+      );
+    };
+  });
 }
 
 function normalizeSearch(s){
@@ -1650,24 +1666,31 @@ function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
 
 function openLightbox(photos, startIndex){
   const root = document.getElementById('lightboxRoot');
-  let idx = clamp(startIndex, 0, photos.length - 1);
+  const items = photos.map(p => (typeof p === 'string') ? { src: p } : p);
+  let idx = clamp(startIndex, 0, items.length - 1);
   function close(){ root.innerHTML = ''; }
   function draw(){
+    const cur = items[idx];
     root.innerHTML = `
       <div class="lightbox-overlay" id="lbOverlay">
         <button class="lightbox-close" id="lbClose" aria-label="Fermer">${icon('x')}</button>
-        ${photos.length > 1 ? `<button class="lightbox-nav lightbox-prev" id="lbPrev" aria-label="Photo précédente">${icon('chevronLeft')}</button>` : ''}
-        <img class="lightbox-img" src="${photos[idx]}">
-        ${photos.length > 1 ? `<button class="lightbox-nav lightbox-next" id="lbNext" aria-label="Photo suivante">${icon('chevronLeft')}</button>` : ''}
-        ${photos.length > 1 ? `<div class="lightbox-count">${idx + 1} / ${photos.length}</div>` : ''}
+        ${items.length > 1 ? `<button class="lightbox-nav lightbox-prev" id="lbPrev" aria-label="Photo précédente">${icon('chevronLeft')}</button>` : ''}
+        <img class="lightbox-img" src="${cur.src}">
+        ${items.length > 1 ? `<button class="lightbox-nav lightbox-next" id="lbNext" aria-label="Photo suivante">${icon('chevronLeft')}</button>` : ''}
+        <div class="lightbox-footer">
+          ${cur.caption ? `<div class="lightbox-caption">${escapeHtml(cur.caption)}</div>` : ''}
+          ${items.length > 1 ? `<div class="lightbox-count">${idx + 1} / ${items.length}</div>` : ''}
+          ${cur.onGoto ? `<button class="btn btn-primary" id="lbGoto">Voir l’article</button>` : ''}
+        </div>
       </div>
     `;
     document.getElementById('lbClose').onclick = close;
     document.getElementById('lbOverlay').addEventListener('mousedown', (e) => { if(e.target.id === 'lbOverlay') close(); });
-    if(photos.length > 1){
-      document.getElementById('lbPrev').onclick = () => { idx = (idx - 1 + photos.length) % photos.length; draw(); };
-      document.getElementById('lbNext').onclick = () => { idx = (idx + 1) % photos.length; draw(); };
+    if(items.length > 1){
+      document.getElementById('lbPrev').onclick = () => { idx = (idx - 1 + items.length) % items.length; draw(); };
+      document.getElementById('lbNext').onclick = () => { idx = (idx + 1) % items.length; draw(); };
     }
+    if(cur.onGoto) document.getElementById('lbGoto').onclick = () => { close(); cur.onGoto(); };
   }
   draw();
 }
