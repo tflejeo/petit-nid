@@ -132,6 +132,15 @@
   .icon-btn-ghost:active{background:rgba(58,53,41,0.06);}
 
   .progress-block{margin-top:16px;}
+  .milestone-note{
+    display:flex; align-items:flex-start; gap:6px; margin-top:10px;
+    font-size:12.5px; color:var(--sage-dark); font-weight:700; line-height:1.4;
+  }
+  .budget-summary{
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:10px;
+    font-size:13px; color:var(--ink);
+  }
+  .budget-summary strong{color:var(--sage-dark);}
   .progress-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
   .progress-head .label{font-size:13px; font-weight:700; color:var(--ink);}
   .progress-head .pct{font-size:13px; font-weight:800; font-variant-numeric:tabular-nums;}
@@ -426,6 +435,9 @@
   .prono-meta{font-size:12.5px; color:var(--muted); font-weight:600; margin-top:2px;}
   .prono-details{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--muted); margin-top:10px;}
   .prono-details strong{color:var(--ink);}
+  .prono-winner{border-color:var(--amber); background:var(--amber-tint);}
+  .prono-rank{color:var(--muted); font-weight:800; margin-right:2px;}
+  .prono-score{margin-top:10px; font-size:12.5px; font-weight:700; color:var(--sage-dark);}
 </style>
 </head>
 <body>
@@ -480,7 +492,9 @@ const ICONS = {
   suitcase:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 13h18"/>',
   sparkle:'<path d="M12 3l1.8 4.6L18 9.2l-4.2 1.7L12 15l-1.8-4.1L6 9.2l4.2-1.6L12 3z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/>',
-  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14.5" r="1.2"/>',
+  trophy:'<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4"/>'
 };
 function icon(name, cls){ return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
 
@@ -497,7 +511,7 @@ function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0];
 function makeSection(label, period, list){
   return {
     id: newId(), label, period,
-    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', photos: [] }))
+    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', price: 0, photos: [] }))
   };
 }
 
@@ -725,6 +739,7 @@ function normalizeData(d){
       sec.items.forEach(it => {
         if(!Array.isArray(it.photos)) it.photos = it.photo ? [it.photo] : [];
         delete it.photo;
+        it.price = Number(it.price) || 0;
       });
     });
   });
@@ -773,7 +788,9 @@ let remoteDebounceTimer = null;
 
 let pronosRef = null;
 let adminRef = null;
+let resultRef = null;
 let pronosList = [];
+let birthResult = null;
 const ADMIN_UNLOCKED_KEY = 'petitNidAdminUnlocked_v1';
 let isAdminUnlocked = (function(){ try{ return localStorage.getItem(ADMIN_UNLOCKED_KEY) === '1'; }catch(e){ return false; } })();
 function setAdminUnlocked(v){
@@ -807,6 +824,11 @@ function initFirebase(){
     pronosRef = firebase.database().ref('petitNidPronos');
     pronosRef.on('value', handlePronosValue);
     adminRef = firebase.database().ref('petitNidAdmin');
+    resultRef = firebase.database().ref('petitNidResult');
+    resultRef.on('value', snap => {
+      birthResult = snap.val() || null;
+      if(ui.view === 'prono' && isAdminUnlocked) render();
+    });
     firebase.database().ref('.info/connected').on('value', snap => {
       updateConnectionBadge(snap.val() === true ? 'online' : 'offline');
     });
@@ -896,6 +918,20 @@ function globalTotals(){
   return { target, acquired, pct, count };
 }
 
+function formatPrice(n){
+  return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR', maximumFractionDigits:2 }).format(n || 0);
+}
+
+function budgetTotals(){
+  let spent = 0, projected = 0;
+  data.categories.forEach(cat => cat.sections.forEach(sec => sec.items.forEach(it => {
+    const price = Number(it.price) || 0;
+    spent += price * it.acquired;
+    projected += price * it.target;
+  })));
+  return { spent, projected };
+}
+
 function daysUntil(dateStr){
   const due = new Date(dateStr + 'T00:00:00');
   const now = new Date();
@@ -913,6 +949,25 @@ function pregnancyProgress(){
   const totalWeeks = Math.max(1, Math.round(totalMs / (7 * 86400000)));
   const weeks = clamp(Math.floor(elapsedMs / (7 * 86400000)), 0, totalWeeks);
   return { pct, weeks, totalWeeks };
+}
+
+const PREGNANCY_MILESTONES = [
+  { week: 0,  text: 'Le compte à rebours démarre tout juste.' },
+  { week: 6,  text: 'Premier trimestre en cours — encore un peu de patience avant les échographies clés.' },
+  { week: 12, text: 'Vous entrez dans le 2ᵉ trimestre.' },
+  { week: 20, text: 'Vous êtes environ à mi-chemin de la grossesse.' },
+  { week: 28, text: 'Vous entrez dans le 3ᵉ trimestre.' },
+  { week: 32, text: 'Bon moment pour commencer à préparer la valise de maternité.' },
+  { week: 36, text: 'La valise de maternité peut être prête à partir de maintenant.' },
+  { week: 37, text: 'Le bébé est considéré à terme à partir d’aujourd’hui.' },
+  { week: 40, text: 'Vous êtes arrivés au terme prévu !' },
+  { week: 41, text: 'Le terme est dépassé — le grand jour ne devrait plus tarder.' }
+];
+function currentMilestone(){
+  const { weeks } = pregnancyProgress();
+  let current = PREGNANCY_MILESTONES[0];
+  PREGNANCY_MILESTONES.forEach(m => { if(weeks >= m.week) current = m; });
+  return current;
 }
 function formatDate(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
@@ -965,6 +1020,8 @@ function renderDashboard(){
   const days = daysUntil(data.dueDate);
   const g = globalTotals();
   const preg = pregnancyProgress();
+  const milestone = currentMilestone();
+  const budget = budgetTotals();
   let countdownText, countdownNum;
   if(days > 0){ countdownNum = days; countdownText = days === 1 ? 'jour avant l’arrivée' : 'jours avant l’arrivée'; }
   else if(days === 0){ countdownNum = '🎉'; countdownText = 'c’est le grand jour !'; }
@@ -989,6 +1046,7 @@ function renderDashboard(){
           <span class="pct" style="color:var(--terracotta-dark)">${preg.pct}% · semaine ${preg.weeks}/${preg.totalWeeks}</span>
         </div>
         <div class="track"><div class="fill" style="width:${preg.pct}%; background:var(--terracotta)"></div></div>
+        <div class="milestone-note">${icon('sparkle','icon-sm')} ${escapeHtml(milestone.text)}</div>
       </div>
       <div class="progress-block">
         <div class="progress-head">
@@ -996,6 +1054,7 @@ function renderDashboard(){
           <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
         </div>
         <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
+        ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
       </div>
     </div>
 
@@ -1190,6 +1249,71 @@ function findProno(firstName, lastName){
   return pronosList.find(p => normalizeSearch(p.firstName) === nf && normalizeSearch(p.lastName) === nl) || null;
 }
 
+function fmtDuration(ms){
+  if(!isFinite(ms)) return '—';
+  const totalMin = Math.round(ms / 60000);
+  const days = Math.floor(totalMin / 1440);
+  const hours = Math.floor((totalMin % 1440) / 60);
+  const mins = totalMin % 60;
+  const parts = [];
+  if(days) parts.push(days + ' j');
+  if(hours) parts.push(hours + ' h');
+  if(!days && mins) parts.push(mins + ' min');
+  return parts.length ? parts.join(' ') : '0 min';
+}
+
+// Classe chaque pronostic par rang sur chaque critère renseigné (date/heure, sexe,
+// prénom, poids, taille), puis additionne ces rangs : le total le plus bas gagne.
+// C'est équivalent à un classement golfique, ce qui permet de comparer équitablement
+// des critères aussi différents qu'un écart de temps, un poids et un sexe deviné.
+function computeRankings(list, result){
+  if(!result || list.length === 0) return null;
+  const actualDateTime = result.actualDate
+    ? new Date(result.actualDate + 'T' + (result.actualTime || '12:00')).getTime()
+    : null;
+  const hasWeight = result.actualWeightKg !== undefined && result.actualWeightKg !== '' && result.actualWeightKg !== null;
+  const hasHeight = result.actualHeightCm !== undefined && result.actualHeightCm !== '' && result.actualHeightCm !== null;
+  const hasSex = !!result.actualSex;
+  const hasName = !!(result.actualFirstName && result.actualFirstName.trim());
+  if(!actualDateTime && !hasWeight && !hasHeight && !hasSex && !hasName) return null;
+
+  function numDiff(guess, actual){
+    const g = parseFloat(guess), a = parseFloat(actual);
+    if(isNaN(g) || isNaN(a)) return Infinity;
+    return Math.abs(g - a);
+  }
+  function rankOf(values){
+    const finite = values.filter(v => isFinite(v)).sort((a,b) => a - b);
+    return values.map(v => isFinite(v) ? finite.indexOf(v) + 1 : finite.length + 1);
+  }
+
+  const dtVals = list.map(p => {
+    if(!actualDateTime || !p.guessDate) return Infinity;
+    return Math.abs(new Date(p.guessDate + 'T' + (p.guessTime || '12:00')).getTime() - actualDateTime);
+  });
+  const wVals = hasWeight ? list.map(p => numDiff(p.weightKg, result.actualWeightKg)) : null;
+  const hVals = hasHeight ? list.map(p => numDiff(p.heightCm, result.actualHeightCm)) : null;
+  const dtRanks = actualDateTime ? rankOf(dtVals) : null;
+  const wRanks = wVals ? rankOf(wVals) : null;
+  const hRanks = hVals ? rankOf(hVals) : null;
+
+  return list.map((p, i) => {
+    let score = 0, criteria = 0;
+    const entry = { p };
+    if(dtRanks){ entry.dtDiffMs = dtVals[i]; score += dtRanks[i]; criteria++; }
+    if(wRanks){ entry.wDiff = wVals[i]; score += wRanks[i]; criteria++; }
+    if(hRanks){ entry.hDiff = hVals[i]; score += hRanks[i]; criteria++; }
+    if(hasSex){ entry.sexOk = p.sex === result.actualSex; score += entry.sexOk ? 1 : 2; criteria++; }
+    if(hasName){ entry.nameOk = !!p.firstNameGuess && normalizeSearch(p.firstNameGuess) === normalizeSearch(result.actualFirstName); score += entry.nameOk ? 1 : 2; criteria++; }
+    entry.score = criteria > 0 ? score : null;
+    return entry;
+  }).sort((a, b) => {
+    if(a.score === null) return 1;
+    if(b.score === null) return -1;
+    return a.score - b.score;
+  });
+}
+
 function renderPronoForm(main){
   let editingKey = null;
   let chosenSex = null;
@@ -1292,32 +1416,53 @@ function renderPronoForm(main){
 
 function renderPronoAdmin(main){
   const list = pronosList;
+  const rankings = computeRankings(list, birthResult);
+  const hasResult = !!rankings || (birthResult && Object.keys(birthResult).some(k => birthResult[k]));
+
   main.innerHTML = `
     <div class="cat-actions-row" style="margin-top:2px;">
       <button class="chip-btn" id="btnLockAdmin">${icon('x','icon-sm')} Quitter l’espace admin</button>
       <button class="chip-btn" id="btnChangePin">${icon('gear','icon-sm')} Changer le code</button>
     </div>
+
+    <div class="section-heading">Résultat de la naissance</div>
+    <div class="prono-row" style="margin-bottom:16px;">
+      ${hasResult && birthResult ? `
+        <div class="prono-details" style="margin-top:0;">
+          ${birthResult.actualDate ? `<span>Née le : <strong>${formatDate(birthResult.actualDate)}${birthResult.actualTime ? ' à ' + escapeHtml(birthResult.actualTime) : ''}</strong></span>` : ''}
+          ${birthResult.actualSex ? `<span>Sexe : <strong>${birthResult.actualSex === 'garcon' ? 'Garçon' : 'Fille'}</strong></span>` : ''}
+          ${birthResult.actualFirstName ? `<span>Prénom : <strong>${escapeHtml(birthResult.actualFirstName)}</strong></span>` : ''}
+          ${birthResult.actualWeightKg ? `<span>Poids : <strong>${escapeHtml(birthResult.actualWeightKg)} kg</strong></span>` : ''}
+          ${birthResult.actualHeightCm ? `<span>Taille : <strong>${escapeHtml(birthResult.actualHeightCm)} cm</strong></span>` : ''}
+        </div>
+      ` : `<p style="color:var(--muted); font-size:13px; margin:0;">Renseignez le résultat réel pour classer automatiquement les pronostics.</p>`}
+      <button class="chip-btn" id="btnEditResult" style="margin-top:12px;">${icon('pencil','icon-sm')} ${hasResult ? 'Modifier le résultat' : 'Renseigner le résultat'}</button>
+    </div>
+
     <div class="section-heading">Pronostics reçus (${list.length})</div>
     <div id="pronoList"></div>
   `;
   const listEl = document.getElementById('pronoList');
   if(list.length === 0){
     listEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun pronostic pour le moment.<br>Partagez le site pour en recevoir !</div></div>`;
+  } else if(rankings){
+    listEl.innerHTML = rankings.map((r, i) => renderPronoRankedRow(r, i)).join('');
   } else {
     listEl.innerHTML = list.map(p => renderPronoRow(p)).join('');
-    listEl.querySelectorAll('[data-del-prono]').forEach(btn => {
-      btn.onclick = () => openConfirmModal(
-        'Supprimer ce pronostic ?',
-        `Le pronostic de ${btn.dataset.name} sera définitivement supprimé.`,
-        () => {
-          pronosRef.child(btn.dataset.key).remove();
-          closeModal(); showToast('Pronostic supprimé');
-        }
-      );
-    });
   }
+  listEl.querySelectorAll('[data-del-prono]').forEach(btn => {
+    btn.onclick = () => openConfirmModal(
+      'Supprimer ce pronostic ?',
+      `Le pronostic de ${btn.dataset.name} sera définitivement supprimé.`,
+      () => {
+        pronosRef.child(btn.dataset.key).remove();
+        closeModal(); showToast('Pronostic supprimé');
+      }
+    );
+  });
   document.getElementById('btnLockAdmin').onclick = () => { setAdminUnlocked(false); render(); };
   document.getElementById('btnChangePin').onclick = openSetPinModal;
+  document.getElementById('btnEditResult').onclick = openBirthResultModal;
 }
 
 function renderPronoRow(p){
@@ -1337,6 +1482,84 @@ function renderPronoRow(p){
       ${p.heightCm ? `<span>Taille : <strong>${escapeHtml(p.heightCm)} cm</strong></span>` : ''}
     </div>
   </div>`;
+}
+
+function renderPronoRankedRow(r, i){
+  const p = r.p;
+  const rank = i + 1;
+  const isWinner = rank === 1 && r.score !== null;
+  const sexLabel = p.sex === 'garcon' ? 'Garçon' : p.sex === 'fille' ? 'Fille' : '—';
+  const dateLabel = p.guessDate ? formatDate(p.guessDate) : 'Date non renseignée';
+  return `<div class="prono-row ${isWinner ? 'prono-winner' : ''}">
+    <div class="prono-row-top">
+      <div>
+        <div class="prono-name">
+          ${isWinner ? icon('trophy','icon-sm') : `<span class="prono-rank">#${rank}</span>`}
+          ${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}
+        </div>
+        <div class="prono-meta">${dateLabel}${p.guessTime ? ' à ' + escapeHtml(p.guessTime) : ''} · ${sexLabel}</div>
+      </div>
+      <button class="text-btn danger" data-del-prono data-key="${p.__key}" data-name="${escapeAttr(p.firstName + ' ' + p.lastName)}">${icon('trash','icon-sm')}</button>
+    </div>
+    <div class="prono-details">
+      ${p.firstNameGuess ? `<span>Prénom : <strong>${escapeHtml(p.firstNameGuess)}</strong>${r.nameOk === true ? ' ✅' : r.nameOk === false ? ' ❌' : ''}</span>` : ''}
+      ${p.weightKg ? `<span>Poids : <strong>${escapeHtml(p.weightKg)} kg</strong>${isFinite(r.wDiff) ? ' (écart ' + r.wDiff.toFixed(2) + ' kg)' : ''}</span>` : ''}
+      ${p.heightCm ? `<span>Taille : <strong>${escapeHtml(p.heightCm)} cm</strong>${isFinite(r.hDiff) ? ' (écart ' + r.hDiff.toFixed(1) + ' cm)' : ''}</span>` : ''}
+      ${r.sexOk !== undefined ? `<span>Sexe : ${r.sexOk ? '✅' : '❌'}</span>` : ''}
+      ${isFinite(r.dtDiffMs) ? `<span>Écart date/heure : <strong>${fmtDuration(r.dtDiffMs)}</strong></span>` : ''}
+    </div>
+    ${r.score !== null ? `<div class="prono-score">Score : <strong>${r.score}</strong> <span style="color:var(--muted); font-weight:600;">(le plus petit gagne)</span></div>` : ''}
+  </div>`;
+}
+
+function openBirthResultModal(){
+  if(!resultRef){ showToast('Connexion indisponible, réessayez plus tard.'); return; }
+  const r = birthResult || {};
+  openModal(`
+    <h2>Résultat de la naissance</h2>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label class="field-label">Date de naissance</label><input type="date" id="rDate" value="${r.actualDate || ''}"></div>
+      <div class="field" style="flex:1;"><label class="field-label">Heure</label><input type="time" id="rTime" value="${r.actualTime || ''}"></div>
+    </div>
+    <div class="field">
+      <label class="field-label">Sexe</label>
+      <div class="choice-row">
+        <button type="button" class="choice-btn" data-sex="fille">Fille</button>
+        <button type="button" class="choice-btn" data-sex="garcon">Garçon</button>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Prénom</label><input type="text" id="rName" value="${escapeAttr(r.actualFirstName || '')}"></div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label class="field-label">Poids (kg)</label><input type="number" step="0.1" min="0" id="rWeight" value="${r.actualWeightKg || ''}"></div>
+      <div class="field" style="flex:1;"><label class="field-label">Taille (cm)</label><input type="number" step="0.5" min="0" id="rHeight" value="${r.actualHeightCm || ''}"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  let chosenSex = r.actualSex || null;
+  document.querySelectorAll('[data-sex]').forEach(b => {
+    b.classList.toggle('selected', b.dataset.sex === chosenSex);
+    b.onclick = () => {
+      chosenSex = b.dataset.sex;
+      document.querySelectorAll('[data-sex]').forEach(x => x.classList.toggle('selected', x === b));
+    };
+  });
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const payload = {
+      actualDate: document.getElementById('rDate').value || '',
+      actualTime: document.getElementById('rTime').value || '',
+      actualSex: chosenSex || '',
+      actualFirstName: document.getElementById('rName').value.trim(),
+      actualWeightKg: document.getElementById('rWeight').value || '',
+      actualHeightCm: document.getElementById('rHeight').value || ''
+    };
+    resultRef.set(payload)
+      .then(() => { closeModal(); showToast('Résultat enregistré'); render(); })
+      .catch(err => showToast('Échec : ' + err.message));
+  };
 }
 
 function openAdminAccessModal(){
@@ -1481,6 +1704,7 @@ function renderItemHtml(cat, sec, it){
       </div>
       <div class="item-sub">
         <span>${it.acquired} / ${it.target}</span>
+        ${it.price ? `<span class="link-dot"></span><span>${formatPrice(it.price)}${it.acquired > 0 ? ' · ' + formatPrice(it.price * it.acquired) : ''}</span>` : ''}
         ${it.link ? '<span class="link-dot"></span>' + icon('link','icon-sm') : ''}
         ${it.note ? '<span class="link-dot"></span><span>note</span>' : ''}
       </div>
@@ -1506,6 +1730,10 @@ function renderItemHtml(cat, sec, it){
         <div class="field" style="flex:1;">
           <label class="field-label">Quantité acquise</label>
           <input type="number" min="0" data-field="acquired" data-item="${it.id}" value="${it.acquired}">
+        </div>
+        <div class="field" style="flex:1;">
+          <label class="field-label">Prix unitaire (€)</label>
+          <input type="number" min="0" step="0.01" data-field="price" data-item="${it.id}" value="${it.price || ''}" placeholder="0,00">
         </div>
       </div>
       <div class="field">
@@ -1591,6 +1819,8 @@ function bindItemEvents(cat, sec, it){
     input.addEventListener(evt, () => {
       if(field === 'target' || field === 'acquired'){
         it[field] = clamp(parseInt(input.value || '0', 10), 0, 9999);
+      } else if(field === 'price'){
+        it.price = Math.max(0, parseFloat(input.value) || 0);
       } else {
         it[field] = input.value;
       }
@@ -1856,7 +2086,7 @@ function openAddItemModal(cat, sec){
     if(!name){ showToast('Donnez un nom à l’article'); return; }
     const target = clamp(parseInt(document.getElementById('itTarget').value||'0',10), 0, 9999);
     const acquired = clamp(parseInt(document.getElementById('itAcquired').value||'0',10), 0, 9999);
-    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', photos:[] });
+    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', price:0, photos:[] });
     ui.collapsedSections[sec.id] = false; saveUi();
     save(); closeModal(); render(); showToast('Article ajouté');
   };
