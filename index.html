@@ -164,17 +164,17 @@
   .price-list-row input{flex:1;}
   .price-list-total{font-size:12.5px; font-weight:700; color:var(--sage-dark); margin-top:2px;}
   .unit-list{display:flex; flex-direction:column; gap:12px;}
-  .unit-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
+  .unit-row{display:flex; align-items:center; gap:10px; flex-wrap:nowrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
   .unit-row:last-child{border-bottom:none; padding-bottom:0;}
-  .unit-price-input{width:80px; flex-shrink:0;}
-  .unit-photos{display:flex; flex-wrap:wrap; gap:6px; align-items:center; flex:1; min-width:120px;}
-  .unit-photo-thumb{position:relative; width:38px; height:38px; flex-shrink:0;}
-  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
+  .unit-price-input{width:56px; flex-shrink:0; text-align:center; padding-left:4px; padding-right:4px;}
+  .unit-photos{display:flex; flex-wrap:wrap; gap:6px; align-items:center; flex:1; min-width:0;}
+  .unit-photo-thumb{position:relative; width:56px; height:56px; flex-shrink:0;}
+  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:10px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
   .unit-photo-add-sm{
-    width:38px; height:38px; border-radius:8px; border:1.5px dashed var(--muted-2); flex-shrink:0;
+    width:56px; height:56px; border-radius:10px; border:1.5px dashed var(--muted-2); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff;
   }
-  .photo-del.photo-del-sm{width:16px; height:16px; top:-4px; right:-4px; padding:0;}
+  .photo-del.photo-del-sm{width:18px; height:18px; top:-5px; right:-5px; padding:0;}
   .photo-del.photo-del-sm .icon{width:10px; height:10px;}
   .progress-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; flex-wrap:nowrap;}
   .progress-head .label{font-size:13px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -2277,7 +2277,6 @@ function renderItemHtml(cat, sec, it){
           <div class="unit-list">
             ${Array.from({length: it.acquired}).map((_, i) => `
               <div class="unit-row">
-                <input type="number" class="unit-price-input" min="0" step="0.01" data-price-index="${i}" data-item="${it.id}" value="${(it.prices && it.prices[i]) ? it.prices[i] : ''}" placeholder="0,00 €">
                 <div class="unit-photos">
                   ${(it.unitPhotos[i] || []).map((p, pi) => `
                     <div class="unit-photo-thumb">
@@ -2290,6 +2289,7 @@ function renderItemHtml(cat, sec, it){
                     <input type="file" accept="image/*" multiple data-add-unit-photo="${it.id}" data-unit="${i}" style="display:none;">
                   </label>
                 </div>
+                <input type="number" class="unit-price-input" min="0" step="0.01" data-price-index="${i}" data-item="${it.id}" value="${(it.prices && it.prices[i]) ? it.prices[i] : ''}" placeholder="€">
               </div>
             `).join('')}
             ${itemSpent(it) > 0 ? `<div class="price-list-total">Total : <strong>${formatPrice(itemSpent(it))}</strong></div>` : ''}
