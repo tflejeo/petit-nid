@@ -164,17 +164,17 @@
   .price-list-row input{flex:1;}
   .price-list-total{font-size:12.5px; font-weight:700; color:var(--sage-dark); margin-top:2px;}
   .unit-list{display:flex; flex-direction:column; gap:12px;}
-  .unit-row{display:flex; align-items:center; gap:10px; flex-wrap:nowrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
+  .unit-row{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
   .unit-row:last-child{border-bottom:none; padding-bottom:0;}
-  .unit-price-input{width:56px; flex-shrink:0; text-align:center; padding-left:4px; padding-right:4px;}
-  .unit-photos{display:flex; flex-wrap:wrap; gap:6px; align-items:center; flex:1; min-width:0;}
-  .unit-photo-thumb{position:relative; width:56px; height:56px; flex-shrink:0;}
+  .unit-row input.unit-price-input{width:52px; flex-shrink:0; text-align:center; padding:9px 2px; margin-left:auto;}
+  .unit-photos{display:flex; gap:6px; align-items:center; flex:1; min-width:0;}
+  .unit-photo-thumb{position:relative; width:44px; height:44px; flex-shrink:0;}
   .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:10px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
   .unit-photo-add-sm{
-    width:56px; height:56px; border-radius:10px; border:1.5px dashed var(--muted-2); flex-shrink:0;
+    width:44px; height:44px; border-radius:10px; border:1.5px dashed var(--muted-2); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff;
   }
-  .photo-del.photo-del-sm{width:18px; height:18px; top:-5px; right:-5px; padding:0;}
+  .photo-del.photo-del-sm{width:16px; height:16px; top:-4px; right:-4px; padding:0;}
   .photo-del.photo-del-sm .icon{width:10px; height:10px;}
   .progress-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; flex-wrap:nowrap;}
   .progress-head .label{font-size:13px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -847,7 +847,7 @@ function normalizeItemPhotos(it){
   const rawUnits = denseArrayFrom(it.unitPhotos);
   const unitPhotos = [];
   for(let i = 0; i < (it.acquired || 0); i++){
-    const slot = denseArrayFrom(rawUnits[i]).filter(Boolean);
+    const slot = denseArrayFrom(rawUnits[i]).filter(Boolean).slice(0, 3);
     unitPhotos.push(slot);
   }
   it.unitPhotos = unitPhotos;
@@ -2278,16 +2278,18 @@ function renderItemHtml(cat, sec, it){
             ${Array.from({length: it.acquired}).map((_, i) => `
               <div class="unit-row">
                 <div class="unit-photos">
-                  ${(it.unitPhotos[i] || []).map((p, pi) => `
+                  ${(it.unitPhotos[i] || []).slice(0, 3).map((p, pi) => `
                     <div class="unit-photo-thumb">
                       <img src="${p}" data-zoom-unit-photo="${it.id}" data-unit="${i}" data-index="${pi}">
                       <button class="photo-del photo-del-sm" data-del-unit-photo="${it.id}" data-unit="${i}" data-index="${pi}" aria-label="Supprimer la photo">${icon('x','icon-sm')}</button>
                     </div>
                   `).join('')}
-                  <label class="unit-photo-add-sm">
-                    ${icon('camera','icon-sm')}
-                    <input type="file" accept="image/*" multiple data-add-unit-photo="${it.id}" data-unit="${i}" style="display:none;">
-                  </label>
+                  ${(it.unitPhotos[i] || []).length < 3 ? `
+                    <label class="unit-photo-add-sm">
+                      ${icon('camera','icon-sm')}
+                      <input type="file" accept="image/*" multiple data-add-unit-photo="${it.id}" data-unit="${i}" style="display:none;">
+                    </label>
+                  ` : ''}
                 </div>
                 <input type="number" class="unit-price-input" min="0" step="0.01" data-price-index="${i}" data-item="${it.id}" value="${(it.prices && it.prices[i]) ? it.prices[i] : ''}" placeholder="€">
               </div>
@@ -2469,14 +2471,20 @@ function handleAddUnitPhotos(e, it, unitIndex){
   const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
   e.target.value = '';
   if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
-  Promise.allSettled(files.map(compressImageFile)).then(results => {
+  if(!Array.isArray(it.unitPhotos)) it.unitPhotos = [];
+  while(it.unitPhotos.length <= unitIndex) it.unitPhotos.push([]);
+  if(!Array.isArray(it.unitPhotos[unitIndex])) it.unitPhotos[unitIndex] = [];
+  const bucket = it.unitPhotos[unitIndex];
+  const room = Math.max(0, 3 - bucket.length);
+  if(room <= 0){ showToast('Maximum 3 photos par unité.'); return; }
+  const toProcess = files.slice(0, room);
+  Promise.allSettled(toProcess.map(compressImageFile)).then(results => {
     let added = 0;
-    if(!Array.isArray(it.unitPhotos)) it.unitPhotos = [];
-    while(it.unitPhotos.length <= unitIndex) it.unitPhotos.push([]);
-    if(!Array.isArray(it.unitPhotos[unitIndex])) it.unitPhotos[unitIndex] = [];
-    results.forEach(r => { if(r.status === 'fulfilled'){ it.unitPhotos[unitIndex].push(r.value); added++; } });
+    results.forEach(r => { if(r.status === 'fulfilled'){ bucket.push(r.value); added++; } });
     if(added > 0){ save(); render(); }
-    showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter ces photos.');
+    if(added > 0 && files.length > toProcess.length) showToast(added + ' photo(s) ajoutée(s) — maximum 3 par unité.');
+    else if(added > 0) showToast(added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée');
+    else showToast('Impossible de traiter ces photos.');
   });
 }
 
