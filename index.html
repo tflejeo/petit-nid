@@ -462,6 +462,10 @@
     <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 8h18M12 8v13M7.5 8a2.5 2.5 0 010-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 010 5"/></svg>
     Prono
   </button>
+  <button class="nav-btn" data-nav="echo">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M3 12h3l2-7 4 14 2-7h3"/><circle cx="19" cy="12" r="2"/></svg>
+    Écho
+  </button>
 </nav>
 
 <div id="modalRoot"></div>
@@ -693,7 +697,8 @@ function buildDefaultData(){
     dueDate:'2027-03-25',
     pregnancyStart:'2026-06-25',
     seededDefaults: true,
-    categories:[vetements, puericulture, chambre, maternite]
+    categories:[vetements, puericulture, chambre, maternite],
+    ultrasounds: []
   };
 }
 
@@ -743,6 +748,8 @@ function normalizeData(d){
       });
     });
   });
+  if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
+  d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
   if(!d.dueDate) d.dueDate = '2027-03-25';
   if(!d.pregnancyStart) d.pregnancyStart = '2026-06-25';
   return d;
@@ -989,9 +996,10 @@ function render(){
   if(ui.view === 'dashboard') renderDashboard();
   else if(ui.view === 'lists') renderListsView();
   else if(ui.view === 'prono') renderProno();
+  else if(ui.view === 'echo') renderEcho();
   else renderCategory();
   document.querySelectorAll('.nav-btn').forEach(b=>{
-    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', prono:'prono' };
+    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', prono:'prono', echo:'echo' };
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
@@ -1005,6 +1013,8 @@ function renderHeader(){
     h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
   } else if(ui.view === 'prono'){
     h.innerHTML = `<div class="brand"><h1>Mon petit prono</h1></div>`;
+  } else if(ui.view === 'echo'){
+    h.innerHTML = `<div class="brand"><h1>Échographies</h1></div>`;
   } else {
     const cat = data.categories.find(c=>c.id===ui.activeCategoryId);
     h.innerHTML = `<div class="view-title">
@@ -1608,6 +1618,173 @@ function openEnterPinModal(existingHash){
     const hash = await sha256Hex(v);
     if(hash === existingHash){ setAdminUnlocked(true); closeModal(); render(); }
     else showToast('Code incorrect');
+  };
+}
+
+/* ---------- Échographies ---------- */
+function weekForDate(dateStr){
+  if(!dateStr) return null;
+  const start = new Date((data.pregnancyStart || '2026-06-25') + 'T00:00:00');
+  const d = new Date(dateStr + 'T00:00:00');
+  const week = Math.floor((d - start) / (7 * 86400000));
+  return week < 0 ? 0 : week;
+}
+
+function collectEchoPhotos(){
+  const out = [];
+  (data.ultrasounds || []).slice()
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    .forEach(u => (u.photos || []).forEach(src => out.push({ src, date: u.date, note: u.note })));
+  return out;
+}
+
+function renderEcho(){
+  const main = document.getElementById('mainContent');
+  const entries = (data.ultrasounds || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const photos = collectEchoPhotos();
+
+  main.innerHTML = `
+    <button class="add-row-btn" id="btnAddEcho" style="margin:2px 0 18px;">${icon('plus','icon-sm')} Ajouter une échographie</button>
+    ${photos.length ? `
+      <div class="section-heading" style="margin-top:0;">Diaporama <span style="color:var(--muted); font-weight:700; font-size:13px;">(${photos.length})</span></div>
+      <div class="gallery-scroll" id="echoScroll">
+        ${photos.map((p, i) => `
+          <button class="gallery-item" data-echo-index="${i}">
+            <img src="${p.src}" alt="">
+            <div class="gallery-caption">Semaine ${weekForDate(p.date) ?? '—'}</div>
+            <div class="gallery-caption gallery-caption-sub">${p.date ? formatDate(p.date) : ''}</div>
+          </button>
+        `).join('')}
+      </div>
+    ` : ''}
+    <div class="section-heading">Vos échographies</div>
+    <div id="echoList"></div>
+  `;
+
+  document.getElementById('btnAddEcho').onclick = () => openEditEchoModal(null);
+
+  if(photos.length){
+    main.querySelectorAll('[data-echo-index]').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.echoIndex, 10);
+        openLightbox(photos.map(p => ({
+          src: p.src,
+          caption: `Semaine ${weekForDate(p.date) ?? '—'}${p.date ? ' · ' + formatDate(p.date) : ''}`
+        })), idx);
+      };
+    });
+  }
+
+  const listEl = document.getElementById('echoList');
+  if(entries.length === 0){
+    listEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Ajoutez votre première échographie pour démarrer le diaporama.</div></div>`;
+    return;
+  }
+  listEl.innerHTML = entries.map(u => renderEchoEntry(u)).join('');
+  entries.forEach(u => bindEchoEntryEvents(u));
+}
+
+function renderEchoEntry(u){
+  const week = weekForDate(u.date);
+  return `<div class="prono-row" style="margin-bottom:12px;" data-echo-card="${u.id}">
+    <div class="prono-row-top">
+      <div>
+        <div class="prono-name">${u.date ? formatDate(u.date) : 'Date non renseignée'}</div>
+        <div class="prono-meta">${week !== null ? 'Semaine ' + week : ''}${u.note ? ' · ' + escapeHtml(u.note) : ''}</div>
+      </div>
+      <div style="display:flex; gap:2px;">
+        <button class="text-btn muted" data-edit-echo="${u.id}" aria-label="Modifier">${icon('pencil','icon-sm')}</button>
+        <button class="text-btn danger" data-del-echo="${u.id}" aria-label="Supprimer">${icon('trash','icon-sm')}</button>
+      </div>
+    </div>
+    <div class="photo-grid" style="margin-top:10px;">
+      ${(u.photos || []).map((p, i) => `
+        <div class="photo-item">
+          <img src="${p}" data-zoom-echo="${u.id}" data-index="${i}">
+          <button class="photo-del" data-del-echo-photo="${u.id}" data-index="${i}" aria-label="Supprimer cette photo">${icon('x','icon-sm')}</button>
+        </div>
+      `).join('')}
+      <label class="photo-add-tile">
+        ${icon('camera','icon-sm')}
+        <input type="file" accept="image/*" multiple data-echo-photo="${u.id}" style="display:none;">
+      </label>
+    </div>
+  </div>`;
+}
+
+function bindEchoEntryEvents(u){
+  const card = document.querySelector(`[data-echo-card="${u.id}"]`);
+  if(!card) return;
+
+  const editBtn = card.querySelector(`[data-edit-echo="${u.id}"]`);
+  if(editBtn) editBtn.onclick = () => openEditEchoModal(u);
+
+  const delBtn = card.querySelector(`[data-del-echo="${u.id}"]`);
+  if(delBtn) delBtn.onclick = () => openConfirmModal(
+    'Supprimer cette échographie ?',
+    `L’échographie du ${u.date ? formatDate(u.date) : '—'} et ses photos seront supprimées.`,
+    () => {
+      data.ultrasounds = data.ultrasounds.filter(x => x.id !== u.id);
+      save(); closeModal(); render(); showToast('Échographie supprimée');
+    }
+  );
+
+  const photoInput = card.querySelector(`[data-echo-photo="${u.id}"]`);
+  if(photoInput) photoInput.onchange = (e) => handleEchoPhotoUpload(e, u);
+
+  card.querySelectorAll('[data-del-echo-photo]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.index, 10);
+      u.photos.splice(idx, 1);
+      save(); render();
+    };
+  });
+
+  card.querySelectorAll('[data-zoom-echo]').forEach(imgEl => {
+    imgEl.onclick = () => openLightbox(u.photos, parseInt(imgEl.dataset.index, 10));
+  });
+}
+
+function handleEchoPhotoUpload(e, u){
+  const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
+  e.target.value = '';
+  if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
+  Promise.allSettled(files.map(compressImageFile)).then(results => {
+    let added = 0;
+    results.forEach(r => { if(r.status === 'fulfilled'){ u.photos.push(r.value); added++; } });
+    if(added > 0){ save(); render(); }
+    showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter ces photos.');
+  });
+}
+
+function openEditEchoModal(u){
+  const isNew = !u;
+  openModal(`
+    <h2>${isNew ? 'Nouvelle échographie' : 'Modifier l’échographie'}</h2>
+    <div class="field">
+      <label class="field-label">Date de l’échographie</label>
+      <input type="date" id="eDate" value="${u ? (u.date || '') : ''}">
+    </div>
+    <div class="field">
+      <label class="field-label">Note (optionnel)</label>
+      <input type="text" id="eNote" placeholder="Ex. écho du 2ᵉ trimestre" value="${u ? escapeAttr(u.note || '') : ''}">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">${isNew ? 'Créer' : 'Enregistrer'}</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const date = document.getElementById('eDate').value;
+    if(!date){ showToast('Indiquez la date de l’échographie'); return; }
+    const note = document.getElementById('eNote').value.trim();
+    if(isNew){
+      data.ultrasounds.push({ id:newId(), date, note, photos:[] });
+    } else {
+      u.date = date; u.note = note;
+    }
+    save(); closeModal(); render(); showToast(isNew ? 'Échographie ajoutée' : 'Échographie modifiée');
   };
 }
 
