@@ -307,7 +307,14 @@
     position:fixed; inset:0; background:rgba(20,17,13,0.94); z-index:300;
     display:flex; align-items:center; justify-content:center;
   }
-  .lightbox-img{max-width:92vw; max-height:80vh; border-radius:12px; object-fit:contain;}
+  .lightbox-imgwrap{
+    max-width:92vw; max-height:80vh; display:flex; align-items:center; justify-content:center;
+    overflow:hidden; touch-action:none;
+  }
+  .lightbox-img{
+    max-width:92vw; max-height:80vh; border-radius:12px; object-fit:contain;
+    transform-origin:center center; will-change:transform; user-select:none; -webkit-user-drag:none;
+  }
   .lightbox-close{
     position:absolute; top:18px; right:18px; width:40px; height:40px; border-radius:50%;
     background:rgba(255,255,255,0.15); border:none; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer;
@@ -333,12 +340,9 @@
   .vlike-description{
     font-size:13px; color:var(--ink); white-space:pre-wrap; margin:10px 0 0; line-height:1.5;
   }
-  .reaction-picker{display:flex; gap:6px; margin-top:12px;}
-  .reaction-emoji-btn{
-    width:38px; height:38px; border-radius:50%; border:1.5px solid var(--border); background:#fff;
-    font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer;
-  }
-  .reaction-emoji-btn.selected{border-color:var(--sage-dark); background:var(--sage-tint);}
+  .star-picker{display:flex; gap:4px; margin-top:12px;}
+  .star-btn{background:none; border:none; font-size:26px; line-height:1; color:var(--muted-2); cursor:pointer; padding:0;}
+  .star-btn.filled{color:var(--amber);}
   .comments-thread{margin-top:12px; padding-top:12px; border-top:1px solid var(--border);}
   .comment-row{
     display:flex; justify-content:space-between; align-items:flex-start; gap:8px;
@@ -908,7 +912,7 @@ function normalizeData(d){
     v.photos = v.photos.filter(Boolean).map(p => (typeof p === 'string') ? p : (p && p.src) || '').filter(Boolean);
     v.note = v.note || '';
     v.link = v.link || '';
-    v.reaction = v.reaction || '';
+    v.rating = Number(v.rating) || 0;
     if(!Array.isArray(v.comments)) v.comments = [];
     v.comments = v.comments.filter(Boolean).map(c => ({ id: c.id || newId(), author: c.author || '', text: c.text || '', at: c.at || 0 }));
   });
@@ -2223,8 +2227,6 @@ function openEditTodoModal(t){
 }
 
 /* ---------- Mes likes Vinted ---------- */
-const REACTION_EMOJIS = ['❤️','😍','👍','😂','😐','👎'];
-
 function getMyName(){
   try{ return localStorage.getItem('petitNidMyName') || ''; }catch(e){ return ''; }
 }
@@ -2267,17 +2269,8 @@ function deleteVintedComment(v, commentId){
   save(); render();
 }
 
-function collectVintedLikePhotos(){
-  const out = [];
-  (data.vintedLikes || []).forEach(v => {
-    (v.photos || []).forEach(src => out.push({ src, note: v.note, link: v.link }));
-  });
-  return out;
-}
-
 function renderVintedLikesSection(container){
   const likes = data.vintedLikes || [];
-  const photos = collectVintedLikePhotos();
   const notifOn = ('Notification' in window) && Notification.permission === 'granted';
 
   container.innerHTML = `
@@ -2288,34 +2281,11 @@ function renderVintedLikesSection(container){
         <button class="chip-btn" id="btnAddVintedLike">${icon('plus','icon-sm')} Ajouter</button>
       </div>
     </div>
-    ${photos.length ? `
-      <div class="gallery-scroll" id="vlikeScroll" style="margin-bottom:16px;">
-        ${photos.map((p, i) => `
-          <button class="gallery-item" data-vlike-index="${i}">
-            <img src="${p.src}" alt="" style="width:132px; height:132px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
-            <div class="gallery-caption">${escapeHtml(p.note || 'Vinted')}</div>
-          </button>
-        `).join('')}
-      </div>
-    ` : ''}
     <div id="vlikeList"></div>
   `;
 
   document.getElementById('btnAddVintedLike').onclick = () => openEditVintedLikeModal(null);
   document.getElementById('btnNotifVinted').onclick = requestVintedNotifPermission;
-
-  if(photos.length){
-    container.querySelectorAll('[data-vlike-index]').forEach(btn => {
-      btn.onclick = () => {
-        const idx = parseInt(btn.dataset.vlikeIndex, 10);
-        openLightbox(photos.map(p => ({
-          src: p.src,
-          caption: p.note || 'Vinted',
-          onGoto: p.link ? () => window.open(p.link, '_blank', 'noopener') : null
-        })), idx);
-      };
-    });
-  }
 
   const listEl = document.getElementById('vlikeList');
   if(likes.length === 0){
@@ -2331,7 +2301,7 @@ function renderVintedLikeEntry(v){
   return `<div class="prono-row" style="margin-bottom:14px;" data-vlike-card="${v.id}">
     <div class="prono-row-top">
       <div>
-        <div class="prono-name">${v.reaction ? `<span style="margin-right:4px;">${v.reaction}</span>` : ''}${v.note ? escapeHtml(v.note.split('\n')[0]) : 'Sans description'}</div>
+        <div class="prono-name">${v.note ? escapeHtml(v.note.split('\n')[0]) : 'Sans description'}</div>
         ${v.link ? `<div class="prono-meta">${icon('link','icon-sm')} <a href="${escapeAttr(v.link)}" target="_blank" rel="noopener" style="color:var(--sage-dark);">Voir sur Vinted</a></div>` : ''}
       </div>
       <div style="display:flex; gap:2px;">
@@ -2352,8 +2322,8 @@ function renderVintedLikeEntry(v){
       </label>
     </div>
     ${v.note && v.note.includes('\n') ? `<p class="vlike-description">${escapeHtml(v.note)}</p>` : ''}
-    <div class="reaction-picker">
-      ${REACTION_EMOJIS.map(e => `<button class="reaction-emoji-btn ${v.reaction === e ? 'selected' : ''}" data-set-reaction="${v.id}" data-emoji="${e}">${e}</button>`).join('')}
+    <div class="star-picker">
+      ${[1,2,3,4,5].map(n => `<button class="star-btn ${n <= v.rating ? 'filled' : ''}" data-set-rating="${v.id}" data-value="${n}" aria-label="${n} étoile(s)">★</button>`).join('')}
     </div>
     <div class="comments-thread">
       ${comments.map(c => `
@@ -2402,10 +2372,10 @@ function bindVintedLikeEntryEvents(v){
     imgEl.onclick = () => openLightbox(v.photos, parseInt(imgEl.dataset.index, 10));
   });
 
-  card.querySelectorAll('[data-set-reaction]').forEach(btn => {
+  card.querySelectorAll('[data-set-rating]').forEach(btn => {
     btn.onclick = () => {
-      const emoji = btn.dataset.emoji;
-      v.reaction = (v.reaction === emoji) ? '' : emoji;
+      const val = parseInt(btn.dataset.value, 10);
+      v.rating = (v.rating === val) ? 0 : val;
       save(); render();
     };
   });
@@ -2840,7 +2810,7 @@ function openLightbox(photos, startIndex){
       <div class="lightbox-overlay" id="lbOverlay">
         <button class="lightbox-close" id="lbClose" aria-label="Fermer">${icon('x')}</button>
         ${items.length > 1 ? `<button class="lightbox-nav lightbox-prev" id="lbPrev" aria-label="Photo précédente">${icon('chevronLeft')}</button>` : ''}
-        <img class="lightbox-img" src="${cur.src}">
+        <div class="lightbox-imgwrap" id="lbImgWrap"><img class="lightbox-img" id="lbImg" src="${cur.src}"></div>
         ${items.length > 1 ? `<button class="lightbox-nav lightbox-next" id="lbNext" aria-label="Photo suivante">${icon('chevronLeft')}</button>` : ''}
         <div class="lightbox-footer">
           ${cur.caption ? `<div class="lightbox-caption">${escapeHtml(cur.caption)}</div>` : ''}
@@ -2850,26 +2820,87 @@ function openLightbox(photos, startIndex){
       </div>
     `;
     const overlay = document.getElementById('lbOverlay');
+    const imgWrap = document.getElementById('lbImgWrap');
+    const imgEl = document.getElementById('lbImg');
     document.getElementById('lbClose').onclick = close;
     overlay.addEventListener('mousedown', (e) => { if(e.target.id === 'lbOverlay') close(); });
+
+    // --- Zoom pincé (2 doigts), panoramique (1 doigt quand zoomé),
+    //     double-tap pour zoomer, et balayage gauche/droite quand pas zoomé.
+    let scale = 1, tx = 0, ty = 0;
+    let pinchStartDist = null, pinchStartScale = 1;
+    let panStartX = 0, panStartY = 0;
+    let swipeStartX = null, swipeStartY = null;
+    let lastTapTime = 0;
+
+    function applyTransform(){
+      imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    }
+    function resetZoom(){ scale = 1; tx = 0; ty = 0; applyTransform(); }
+    function distance(t0, t1){ return Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY); }
+
     if(items.length > 1){
       document.getElementById('lbPrev').onclick = () => go(-1);
       document.getElementById('lbNext').onclick = () => go(1);
-      let touchStartX = null, touchStartY = null;
-      overlay.addEventListener('touchstart', (e) => {
-        if(e.touches.length === 1){ touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }
-      }, { passive:true });
-      overlay.addEventListener('touchend', (e) => {
-        if(touchStartX === null) return;
-        const t = e.changedTouches[0];
-        const dx = (t ? t.clientX : touchStartX) - touchStartX;
-        const dy = (t ? t.clientY : touchStartY) - touchStartY;
-        touchStartX = null; touchStartY = null;
-        if(Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)){
-          go(dx < 0 ? 1 : -1);
-        }
-      }, { passive:true });
     }
+
+    imgWrap.addEventListener('touchstart', (e) => {
+      if(e.touches.length === 2){
+        pinchStartDist = distance(e.touches[0], e.touches[1]);
+        pinchStartScale = scale;
+        swipeStartX = null;
+      } else if(e.touches.length === 1){
+        if(scale > 1){
+          panStartX = e.touches[0].clientX - tx;
+          panStartY = e.touches[0].clientY - ty;
+        } else {
+          swipeStartX = e.touches[0].clientX;
+          swipeStartY = e.touches[0].clientY;
+        }
+      }
+    }, { passive:true });
+
+    imgWrap.addEventListener('touchmove', (e) => {
+      if(e.touches.length === 2 && pinchStartDist){
+        e.preventDefault();
+        const newDist = distance(e.touches[0], e.touches[1]);
+        scale = clamp(pinchStartScale * (newDist / pinchStartDist), 1, 4);
+        applyTransform();
+      } else if(e.touches.length === 1 && scale > 1){
+        e.preventDefault();
+        tx = e.touches[0].clientX - panStartX;
+        ty = e.touches[0].clientY - panStartY;
+        applyTransform();
+      }
+    }, { passive:false });
+
+    imgWrap.addEventListener('touchend', (e) => {
+      if(e.touches.length === 0){
+        pinchStartDist = null;
+        if(scale < 1.05) resetZoom();
+        if(swipeStartX !== null && scale <= 1){
+          const t = e.changedTouches[0];
+          const dx = (t ? t.clientX : swipeStartX) - swipeStartX;
+          const dy = (t ? t.clientY : swipeStartY) - swipeStartY;
+          if(Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) && items.length > 1){
+            go(dx < 0 ? 1 : -1);
+            swipeStartX = null;
+            return;
+          }
+          const now = Date.now();
+          if(now - lastTapTime < 300){
+            scale = scale > 1 ? 1 : 2.4;
+            tx = 0; ty = 0;
+            applyTransform();
+            lastTapTime = 0;
+          } else {
+            lastTapTime = now;
+          }
+        }
+        swipeStartX = null;
+      }
+    }, { passive:true });
+
     if(cur.onGoto) document.getElementById('lbGoto').onclick = () => { close(); cur.onGoto(); };
   }
   draw();
