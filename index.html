@@ -328,17 +328,27 @@
     background:rgba(0,0,0,0.35); padding:6px 14px; border-radius:999px;
   }
   .lightbox-count{color:#fff; font-size:12px; font-weight:700; opacity:0.85;}
-  .reaction-bar{display:flex; flex-wrap:wrap; gap:6px; justify-content:center; max-width:80vw;}
-  .reaction-chip{
-    display:flex; align-items:center; gap:3px; background:rgba(255,255,255,0.15); color:#fff;
-    padding:5px 8px; border-radius:999px; font-size:13px; cursor:pointer;
+
+  /* Vinted likes: reaction picker + comment thread */
+  .vlike-description{
+    font-size:13px; color:var(--ink); white-space:pre-wrap; margin:10px 0 0; line-height:1.5;
   }
-  .reaction-chip .icon{width:11px; height:11px;}
-  .reaction-add{
-    background:rgba(255,255,255,0.15); color:#fff; border:none; border-radius:999px;
-    padding:6px 12px; font-size:13px; font-weight:700; cursor:pointer;
+  .reaction-picker{display:flex; gap:6px; margin-top:12px;}
+  .reaction-emoji-btn{
+    width:38px; height:38px; border-radius:50%; border:1.5px solid var(--border); background:#fff;
+    font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
-  .reaction-add:active{background:rgba(255,255,255,0.3);}
+  .reaction-emoji-btn.selected{border-color:var(--sage-dark); background:var(--sage-tint);}
+  .comments-thread{margin-top:12px; padding-top:12px; border-top:1px solid var(--border);}
+  .comment-row{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:8px;
+    font-size:13px; margin-bottom:8px; line-height:1.4;
+  }
+  .comment-row strong{color:var(--sage-dark);}
+  .comment-text{color:var(--ink);}
+  .comment-form{display:flex; gap:8px; margin-top:4px;}
+  .comment-form input{flex:1; padding:9px 12px; border:1px solid var(--border); border-radius:999px; font-size:13px; font-family:var(--font-body);}
+  .comment-form button{flex-shrink:0;}
 
   /* Photo gallery */
   .gallery-scroll{
@@ -895,11 +905,12 @@ function normalizeData(d){
   if(!Array.isArray(d.vintedLikes)) d.vintedLikes = [];
   d.vintedLikes.forEach(v => {
     if(!Array.isArray(v.photos)) v.photos = [];
-    v.photos = v.photos.filter(Boolean).map(p =>
-      (typeof p === 'string') ? { src: p, reactions: [] } : { src: p.src || '', reactions: Array.isArray(p.reactions) ? p.reactions.filter(Boolean) : [] }
-    ).filter(p => p.src);
+    v.photos = v.photos.filter(Boolean).map(p => (typeof p === 'string') ? p : (p && p.src) || '').filter(Boolean);
     v.note = v.note || '';
     v.link = v.link || '';
+    v.reaction = v.reaction || '';
+    if(!Array.isArray(v.comments)) v.comments = [];
+    v.comments = v.comments.filter(Boolean).map(c => ({ id: c.id || newId(), author: c.author || '', text: c.text || '', at: c.at || 0 }));
   });
   if(!Array.isArray(d.todos)) d.todos = [];
   d.todos.forEach(t => {
@@ -2212,50 +2223,61 @@ function openEditTodoModal(t){
 }
 
 /* ---------- Mes likes Vinted ---------- */
-function reactionSummary(photo){
-  const reactions = (photo && photo.reactions) || [];
-  const likes = reactions.filter(r => r.type === 'like').length;
-  const dislikes = reactions.filter(r => r.type === 'dislike').length;
-  if(!likes && !dislikes) return '';
-  return [likes ? `👍${likes}` : '', dislikes ? `👎${dislikes}` : ''].filter(Boolean).join(' ');
+const REACTION_EMOJIS = ['❤️','😍','👍','😂','😐','👎'];
+
+function getMyName(){
+  try{ return localStorage.getItem('petitNidMyName') || ''; }catch(e){ return ''; }
+}
+function setMyName(name){
+  try{ localStorage.setItem('petitNidMyName', name); }catch(e){}
 }
 
-function addVintedReaction(entryId, photoIndex, type){
-  const entry = (data.vintedLikes || []).find(v => v.id === entryId);
-  if(!entry || !entry.photos[photoIndex]) return;
-  if(!Array.isArray(entry.photos[photoIndex].reactions)) entry.photos[photoIndex].reactions = [];
-  entry.photos[photoIndex].reactions.push({ id:newId(), type });
-  save();
-}
-
-function removeVintedReaction(entryId, photoIndex, reactionId){
-  const entry = (data.vintedLikes || []).find(v => v.id === entryId);
-  if(!entry || !entry.photos[photoIndex]) return;
-  entry.photos[photoIndex].reactions = (entry.photos[photoIndex].reactions || []).filter(r => r.id !== reactionId);
-  save();
-}
-
-function vintedPhotoLightboxItem(v, photoIndex){
-  const p = v.photos[photoIndex];
-  return {
-    src: p.src,
-    caption: v.note || 'Vinted',
-    onGoto: v.link ? () => window.open(v.link, '_blank', 'noopener') : null,
-    reactable: { entryId: v.id, photoIndex }
+function openNamePromptModal(onConfirm){
+  openModal(`
+    <h2>Votre prénom</h2>
+    <p style="color:var(--muted); font-size:13px;">Pour savoir qui a écrit quoi dans les commentaires.</p>
+    <div class="field"><input type="text" id="myNameInput" placeholder="Ex. Tony"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Valider</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const name = document.getElementById('myNameInput').value.trim();
+    if(!name){ showToast('Indiquez votre prénom'); return; }
+    setMyName(name);
+    closeModal();
+    onConfirm(name);
   };
 }
 
-function collectVintedLikeRefs(){
+function addVintedComment(v, text){
+  const name = getMyName();
+  if(!name){ openNamePromptModal((chosenName) => pushVintedComment(v, chosenName, text)); return; }
+  pushVintedComment(v, name, text);
+}
+function pushVintedComment(v, author, text){
+  if(!Array.isArray(v.comments)) v.comments = [];
+  v.comments.push({ id:newId(), author, text, at: Date.now() });
+  save(); render();
+}
+function deleteVintedComment(v, commentId){
+  v.comments = (v.comments || []).filter(c => c.id !== commentId);
+  save(); render();
+}
+
+function collectVintedLikePhotos(){
   const out = [];
   (data.vintedLikes || []).forEach(v => {
-    (v.photos || []).forEach((p, pi) => { if(p && p.src) out.push({ v, pi }); });
+    (v.photos || []).forEach(src => out.push({ src, note: v.note, link: v.link }));
   });
   return out;
 }
 
 function renderVintedLikesSection(container){
   const likes = data.vintedLikes || [];
-  const refs = collectVintedLikeRefs();
+  const photos = collectVintedLikePhotos();
   const notifOn = ('Notification' in window) && Notification.permission === 'granted';
 
   container.innerHTML = `
@@ -2266,15 +2288,12 @@ function renderVintedLikesSection(container){
         <button class="chip-btn" id="btnAddVintedLike">${icon('plus','icon-sm')} Ajouter</button>
       </div>
     </div>
-    ${refs.length ? `
+    ${photos.length ? `
       <div class="gallery-scroll" id="vlikeScroll" style="margin-bottom:16px;">
-        ${refs.map(({v, pi}, i) => `
+        ${photos.map((p, i) => `
           <button class="gallery-item" data-vlike-index="${i}">
-            <span class="item-thumb-wrap" style="width:132px; height:132px; display:block;">
-              <img src="${v.photos[pi].src}" alt="" style="width:132px; height:132px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
-              ${reactionSummary(v.photos[pi]) ? `<span class="item-thumb-count" style="font-size:11px; padding:2px 6px;">${reactionSummary(v.photos[pi])}</span>` : ''}
-            </span>
-            <div class="gallery-caption">${escapeHtml(v.note || 'Vinted')}</div>
+            <img src="${p.src}" alt="" style="width:132px; height:132px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
+            <div class="gallery-caption">${escapeHtml(p.note || 'Vinted')}</div>
           </button>
         `).join('')}
       </div>
@@ -2285,11 +2304,15 @@ function renderVintedLikesSection(container){
   document.getElementById('btnAddVintedLike').onclick = () => openEditVintedLikeModal(null);
   document.getElementById('btnNotifVinted').onclick = requestVintedNotifPermission;
 
-  if(refs.length){
+  if(photos.length){
     container.querySelectorAll('[data-vlike-index]').forEach(btn => {
       btn.onclick = () => {
         const idx = parseInt(btn.dataset.vlikeIndex, 10);
-        openLightbox(refs.map(({v, pi}) => vintedPhotoLightboxItem(v, pi)), idx);
+        openLightbox(photos.map(p => ({
+          src: p.src,
+          caption: p.note || 'Vinted',
+          onGoto: p.link ? () => window.open(p.link, '_blank', 'noopener') : null
+        })), idx);
       };
     });
   }
@@ -2304,10 +2327,11 @@ function renderVintedLikesSection(container){
 }
 
 function renderVintedLikeEntry(v){
-  return `<div class="prono-row" style="margin-bottom:12px;" data-vlike-card="${v.id}">
+  const comments = v.comments || [];
+  return `<div class="prono-row" style="margin-bottom:14px;" data-vlike-card="${v.id}">
     <div class="prono-row-top">
       <div>
-        <div class="prono-name">${v.note ? escapeHtml(v.note) : 'Sans commentaire'}</div>
+        <div class="prono-name">${v.reaction ? `<span style="margin-right:4px;">${v.reaction}</span>` : ''}${v.note ? escapeHtml(v.note.split('\n')[0]) : 'Sans description'}</div>
         ${v.link ? `<div class="prono-meta">${icon('link','icon-sm')} <a href="${escapeAttr(v.link)}" target="_blank" rel="noopener" style="color:var(--sage-dark);">Voir sur Vinted</a></div>` : ''}
       </div>
       <div style="display:flex; gap:2px;">
@@ -2318,8 +2342,7 @@ function renderVintedLikeEntry(v){
     <div class="photo-grid" style="margin-top:10px;">
       ${(v.photos || []).map((p, i) => `
         <div class="photo-item">
-          <img src="${p.src}" data-zoom-vlike-photo="${v.id}" data-index="${i}">
-          ${reactionSummary(p) ? `<span class="item-thumb-count" style="left:auto; right:-3px; bottom:-3px;">${reactionSummary(p)}</span>` : ''}
+          <img src="${p}" data-zoom-vlike-photo="${v.id}" data-index="${i}">
           <button class="photo-del" data-del-vlike-photo="${v.id}" data-index="${i}" aria-label="Supprimer cette photo">${icon('x','icon-sm')}</button>
         </div>
       `).join('')}
@@ -2327,6 +2350,22 @@ function renderVintedLikeEntry(v){
         ${icon('camera','icon-sm')}
         <input type="file" accept="image/*" multiple data-add-vlike-photo="${v.id}" style="display:none;">
       </label>
+    </div>
+    ${v.note && v.note.includes('\n') ? `<p class="vlike-description">${escapeHtml(v.note)}</p>` : ''}
+    <div class="reaction-picker">
+      ${REACTION_EMOJIS.map(e => `<button class="reaction-emoji-btn ${v.reaction === e ? 'selected' : ''}" data-set-reaction="${v.id}" data-emoji="${e}">${e}</button>`).join('')}
+    </div>
+    <div class="comments-thread">
+      ${comments.map(c => `
+        <div class="comment-row">
+          <div><strong>${escapeHtml(c.author)}</strong> <span class="comment-text">${escapeHtml(c.text)}</span></div>
+          <button class="text-btn muted" data-del-comment="${v.id}" data-comment-id="${c.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
+        </div>
+      `).join('')}
+      <form class="comment-form" data-comment-form="${v.id}">
+        <input type="text" data-comment-input="${v.id}" placeholder="Ajouter un commentaire…">
+        <button type="submit" class="chip-btn">Envoyer</button>
+      </form>
     </div>
   </div>`;
 }
@@ -2341,7 +2380,7 @@ function bindVintedLikeEntryEvents(v){
   const delBtn = card.querySelector(`[data-del-vlike="${v.id}"]`);
   if(delBtn) delBtn.onclick = () => openConfirmModal(
     'Supprimer ce like ?',
-    'Cette publication et ses photos seront définitivement supprimées.',
+    'Cette publication, ses photos et ses commentaires seront définitivement supprimés.',
     () => {
       data.vintedLikes = data.vintedLikes.filter(x => x.id !== v.id);
       save(); closeModal(); render(); showToast('Supprimé');
@@ -2360,10 +2399,29 @@ function bindVintedLikeEntryEvents(v){
   });
 
   card.querySelectorAll('[data-zoom-vlike-photo]').forEach(imgEl => {
-    imgEl.onclick = () => {
-      const idx = parseInt(imgEl.dataset.index, 10);
-      openLightbox(v.photos.map((_, pi) => vintedPhotoLightboxItem(v, pi)), idx);
+    imgEl.onclick = () => openLightbox(v.photos, parseInt(imgEl.dataset.index, 10));
+  });
+
+  card.querySelectorAll('[data-set-reaction]').forEach(btn => {
+    btn.onclick = () => {
+      const emoji = btn.dataset.emoji;
+      v.reaction = (v.reaction === emoji) ? '' : emoji;
+      save(); render();
     };
+  });
+
+  const form = card.querySelector(`[data-comment-form="${v.id}"]`);
+  if(form) form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = card.querySelector(`[data-comment-input="${v.id}"]`);
+    const text = input.value.trim();
+    if(!text) return;
+    input.value = '';
+    addVintedComment(v, text);
+  });
+
+  card.querySelectorAll('[data-del-comment]').forEach(btn => {
+    btn.onclick = () => deleteVintedComment(v, btn.dataset.commentId);
   });
 }
 
@@ -2373,7 +2431,7 @@ function handleVintedLikePhotoUpload(e, v){
   if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
   Promise.allSettled(files.map(compressImageFile)).then(results => {
     let added = 0;
-    results.forEach(r => { if(r.status === 'fulfilled'){ v.photos.push({ src:r.value, reactions:[] }); added++; } });
+    results.forEach(r => { if(r.status === 'fulfilled'){ v.photos.push(r.value); added++; } });
     if(added > 0){ save(); render(); }
     showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter ces photos.');
   });
@@ -2384,8 +2442,8 @@ function openEditVintedLikeModal(v){
   openModal(`
     <h2>${isNew ? 'Nouveau like Vinted' : 'Modifier'}</h2>
     <div class="field">
-      <label class="field-label">Commentaire (optionnel)</label>
-      <input type="text" id="vlNote" placeholder="Ex. Pour la valise de maternité" value="${v ? escapeAttr(v.note || '') : ''}">
+      <label class="field-label">Description (optionnel)</label>
+      <textarea id="vlNote" placeholder="Ex. Lot 5€ — body + chaussettes, pointure 1 mois">${v ? escapeHtml(v.note || '') : ''}</textarea>
     </div>
     <div class="field">
       <label class="field-label">Lien Vinted (optionnel)</label>
@@ -2405,7 +2463,7 @@ function openEditVintedLikeModal(v){
     const note = document.getElementById('vlNote').value.trim();
     const link = document.getElementById('vlLink').value.trim();
     if(isNew){
-      data.vintedLikes.push({ id:newId(), note, link, photos:[] });
+      data.vintedLikes.push({ id:newId(), note, link, reaction:'', comments:[], photos:[] });
     } else {
       v.note = note; v.link = link;
     }
@@ -2787,7 +2845,6 @@ function openLightbox(photos, startIndex){
         <div class="lightbox-footer">
           ${cur.caption ? `<div class="lightbox-caption">${escapeHtml(cur.caption)}</div>` : ''}
           ${items.length > 1 ? `<div class="lightbox-count">${idx + 1} / ${items.length}</div>` : ''}
-          ${cur.reactable ? renderReactionBar(cur.reactable) : ''}
           ${cur.onGoto ? `<button class="btn btn-primary" id="lbGoto">Voir l’article</button>` : ''}
         </div>
       </div>
@@ -2814,37 +2871,8 @@ function openLightbox(photos, startIndex){
       }, { passive:true });
     }
     if(cur.onGoto) document.getElementById('lbGoto').onclick = () => { close(); cur.onGoto(); };
-    if(cur.reactable) bindReactionBar(cur.reactable, draw);
   }
   draw();
-}
-
-function renderReactionBar(reactable){
-  const entry = (data.vintedLikes || []).find(v => v.id === reactable.entryId);
-  const photo = entry && entry.photos[reactable.photoIndex];
-  const reactions = (photo && photo.reactions) || [];
-  return `
-    <div class="reaction-bar">
-      ${reactions.map(r => `
-        <span class="reaction-chip ${r.type}" data-remove-reaction="${r.id}">
-          ${r.type === 'like' ? '👍' : '👎'}${icon('x','icon-sm')}
-        </span>
-      `).join('')}
-      <button class="reaction-add like" id="lbReactLike">👍 +</button>
-      <button class="reaction-add dislike" id="lbReactDislike">👎 +</button>
-    </div>
-  `;
-}
-
-function bindReactionBar(reactable, redraw){
-  const { entryId, photoIndex } = reactable;
-  const likeBtn = document.getElementById('lbReactLike');
-  const dislikeBtn = document.getElementById('lbReactDislike');
-  if(likeBtn) likeBtn.onclick = () => { addVintedReaction(entryId, photoIndex, 'like'); redraw(); };
-  if(dislikeBtn) dislikeBtn.onclick = () => { addVintedReaction(entryId, photoIndex, 'dislike'); redraw(); };
-  document.querySelectorAll('[data-remove-reaction]').forEach(chip => {
-    chip.onclick = () => { removeVintedReaction(entryId, photoIndex, chip.dataset.removeReaction); redraw(); };
-  });
 }
 
 function openModal(innerHtml){
