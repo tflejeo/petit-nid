@@ -164,20 +164,26 @@
   .price-list-row input{flex:1;}
   .price-list-total{font-size:12.5px; font-weight:700; color:var(--sage-dark); margin-top:2px;}
   .unit-list{display:flex; flex-direction:column; gap:12px;}
-  .unit-row{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
+  .unit-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
   .unit-row:last-child{border-bottom:none; padding-bottom:0;}
-  .unit-row input.unit-qty-input{width:30px; flex-shrink:0; text-align:center; padding:9px 2px;}
-  .unit-row input.unit-price-input{width:46px; flex-shrink:0; text-align:center; padding:9px 2px;}
-  .unit-del-btn{flex-shrink:0; padding:4px !important;}
-  .unit-photos{display:flex; gap:5px; align-items:center; flex:1; min-width:0;}
-  .unit-photo-thumb{position:relative; width:36px; height:36px; flex-shrink:0;}
-  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
+  .unit-header-row{padding-bottom:4px; border-bottom:none;}
+  .unit-col-label{font-size:10.5px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px;}
+  .unit-col-label:first-child{width:52px; text-align:center;}
+  .unit-col-label:nth-child(2){width:56px; text-align:center;}
+  .unit-del-spacer{width:24px; flex-shrink:0;}
+  .unit-controls{display:flex; align-items:center; gap:8px; flex-shrink:0; margin-left:auto;}
+  .unit-row input.unit-qty-input{width:52px; flex-shrink:0; text-align:center; padding:9px 2px;}
+  .unit-row input.unit-price-input{width:56px; flex-shrink:0; text-align:center; padding:9px 2px;}
+  .unit-del-btn{flex-shrink:0; padding:4px !important; width:24px;}
+  .unit-photos{display:flex; flex-wrap:wrap; gap:6px; align-items:center; flex:1 1 auto; min-width:0;}
+  .unit-photo-thumb{position:relative; width:64px; height:64px; flex-shrink:0;}
+  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:var(--r-sm); border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
   .unit-photo-add-sm{
-    width:36px; height:36px; border-radius:8px; border:1.5px dashed var(--muted-2); flex-shrink:0;
+    width:64px; height:64px; border-radius:var(--r-sm); border:1.5px dashed var(--muted-2); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff;
   }
-  .photo-del.photo-del-sm{width:14px; height:14px; top:-4px; right:-4px; padding:0;}
-  .photo-del.photo-del-sm .icon{width:8px; height:8px;}
+  .photo-del.photo-del-sm{width:18px; height:18px; top:-5px; right:-5px; padding:0;}
+  .photo-del.photo-del-sm .icon{width:10px; height:10px;}
   .progress-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; flex-wrap:nowrap;}
   .progress-head .label{font-size:13px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .progress-head .pct{font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; flex-shrink:0;}
@@ -900,6 +906,13 @@ function normalizeItemPurchases(it){
     delete it.photos;
   }
   it.extraPhotos = denseArrayFrom(it.extraPhotos).filter(Boolean);
+  syncAcquiredFromPurchases(it);
+}
+
+function syncAcquiredFromPurchases(it){
+  if(it.purchases && it.purchases.length){
+    it.acquired = it.purchases.reduce((s, p) => s + (Number(p.qty) || 0), 0);
+  }
 }
 
 function normalizeData(d){
@@ -2557,9 +2570,9 @@ function renderItemHtml(cat, sec, it){
       </div>
     </div>
     <div class="stepper">
-      <button data-dec="${it.id}" ${it.acquired<=0?'disabled':''}>${icon('minus','icon-sm')}</button>
+      <button data-dec="${it.id}" ${(it.acquired<=0 || it.purchases.length)?'disabled':''}>${icon('minus','icon-sm')}</button>
       <span class="count">${it.acquired}</span>
-      <button data-inc="${it.id}">${icon('plus','icon-sm')}</button>
+      <button data-inc="${it.id}" ${it.purchases.length?'disabled':''}>${icon('plus','icon-sm')}</button>
     </div>
   </div>`;
 
@@ -2575,14 +2588,22 @@ function renderItemHtml(cat, sec, it){
           <input type="number" min="0" data-field="target" data-item="${it.id}" value="${it.target}">
         </div>
         <div class="field" style="flex:1;">
-          <label class="field-label">Qté acquise</label>
-          <input type="number" min="0" data-field="acquired" data-item="${it.id}" value="${it.acquired}">
+          <label class="field-label">Qté acquise${it.purchases.length ? ' (= somme des lots)' : ''}</label>
+          <input type="number" min="0" data-field="acquired" data-item="${it.id}" value="${it.acquired}" ${it.purchases.length ? 'readonly style="background:#F2EDE0; color:var(--muted);"' : ''}>
         </div>
       </div>
       <div class="field">
         <label class="field-label">Achats${it.purchases.length ? ' (' + it.purchases.length + ')' : ''}</label>
         ${it.purchases.length ? `
           <div class="unit-list">
+            <div class="unit-row unit-header-row">
+              <div class="unit-photos"></div>
+              <div class="unit-controls">
+                <span class="unit-col-label">Qté</span>
+                <span class="unit-col-label">Prix</span>
+                <span class="unit-del-spacer"></span>
+              </div>
+            </div>
             ${it.purchases.map((p) => `
               <div class="unit-row">
                 <div class="unit-photos">
@@ -2599,9 +2620,11 @@ function renderItemHtml(cat, sec, it){
                     </label>
                   ` : ''}
                 </div>
-                <input type="number" class="unit-qty-input" min="1" data-purchase-qty="${p.id}" data-item="${it.id}" value="${p.qty}" title="Quantité de ce lot">
-                <input type="number" class="unit-price-input" min="0" step="0.01" data-purchase-price="${p.id}" data-item="${it.id}" value="${p.price || ''}" placeholder="€">
-                <button class="text-btn danger unit-del-btn" data-del-purchase="${it.id}" data-purchase="${p.id}" aria-label="Supprimer ce lot">${icon('x','icon-sm')}</button>
+                <div class="unit-controls">
+                  <input type="number" class="unit-qty-input" min="1" data-purchase-qty="${p.id}" data-item="${it.id}" value="${p.qty}">
+                  <input type="number" class="unit-price-input" min="0" step="0.01" data-purchase-price="${p.id}" data-item="${it.id}" value="${p.price || ''}" placeholder="€">
+                  <button class="text-btn danger unit-del-btn" data-del-purchase="${it.id}" data-purchase="${p.id}" aria-label="Supprimer ce lot">${icon('x','icon-sm')}</button>
+                </div>
               </div>
             `).join('')}
             ${itemSpent(it) > 0 ? `<div class="price-list-total">Total : <strong>${formatPrice(itemSpent(it))}</strong></div>` : ''}
@@ -2704,6 +2727,7 @@ function bindItemEvents(cat, sec, it){
       const p = (it.purchases || []).find(x => x.id === input.dataset.purchaseQty);
       if(!p) return;
       p.qty = Math.max(1, parseInt(input.value, 10) || 1);
+      syncAcquiredFromPurchases(it);
       save(); render();
     });
   });
@@ -2721,12 +2745,14 @@ function bindItemEvents(cat, sec, it){
   if(addPurchaseBtn) addPurchaseBtn.onclick = () => {
     if(!Array.isArray(it.purchases)) it.purchases = [];
     it.purchases.push({ id:newId(), qty:1, price:0, photos:[] });
+    syncAcquiredFromPurchases(it);
     save(); render();
   };
 
   expand.querySelectorAll('[data-del-purchase]').forEach(btn => {
     btn.onclick = () => {
       it.purchases = (it.purchases || []).filter(p => p.id !== btn.dataset.purchase);
+      syncAcquiredFromPurchases(it);
       save(); render();
     };
   });
