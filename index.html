@@ -166,16 +166,18 @@
   .unit-list{display:flex; flex-direction:column; gap:12px;}
   .unit-row{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
   .unit-row:last-child{border-bottom:none; padding-bottom:0;}
-  .unit-row input.unit-price-input{width:76px; flex-shrink:0; text-align:center; padding:9px 4px; margin-left:auto;}
-  .unit-photos{display:flex; gap:6px; align-items:center; flex:1; min-width:0;}
-  .unit-photo-thumb{position:relative; width:64px; height:64px; flex-shrink:0;}
-  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:10px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
+  .unit-row input.unit-qty-input{width:30px; flex-shrink:0; text-align:center; padding:9px 2px;}
+  .unit-row input.unit-price-input{width:46px; flex-shrink:0; text-align:center; padding:9px 2px;}
+  .unit-del-btn{flex-shrink:0; padding:4px !important;}
+  .unit-photos{display:flex; gap:5px; align-items:center; flex:1; min-width:0;}
+  .unit-photo-thumb{position:relative; width:36px; height:36px; flex-shrink:0;}
+  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
   .unit-photo-add-sm{
-    width:64px; height:64px; border-radius:var(--r-sm); border:1.5px dashed var(--muted-2); flex-shrink:0;
+    width:36px; height:36px; border-radius:8px; border:1.5px dashed var(--muted-2); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff;
   }
-  .photo-del.photo-del-sm{width:18px; height:18px; top:-5px; right:-5px; padding:0;}
-  .photo-del.photo-del-sm .icon{width:10px; height:10px;}
+  .photo-del.photo-del-sm{width:14px; height:14px; top:-4px; right:-4px; padding:0;}
+  .photo-del.photo-del-sm .icon{width:8px; height:8px;}
   .progress-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; flex-wrap:nowrap;}
   .progress-head .label{font-size:13px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .progress-head .pct{font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; flex-shrink:0;}
@@ -611,7 +613,7 @@ function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0];
 function makeSection(label, period, list){
   return {
     id: newId(), label, period,
-    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', prices: [], unitPhotos: [], extraPhotos: [] }))
+    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', purchases: [], extraPhotos: [] }))
   };
 }
 
@@ -847,7 +849,7 @@ if(uiIsFresh && data.categories[0] && data.categories[0].sections[0]){
 // certains indices d'un tableau ont été élagués car vides).
 function allItemPhotos(it){
   const out = [];
-  (it.unitPhotos || []).forEach(arr => (arr || []).forEach(p => { if(p) out.push(p); }));
+  (it.purchases || []).forEach(p => (p.photos || []).forEach(src => { if(src) out.push(src); }));
   (it.extraPhotos || []).forEach(p => { if(p) out.push(p); });
   return out;
 }
@@ -865,25 +867,38 @@ function denseArrayFrom(raw){
   return [];
 }
 
-function normalizeItemPhotos(it){
-  if(Array.isArray(it.photos)){
-    // migration depuis l'ancien format (une photo par unité, tableau plat)
-    const legacy = it.photos;
-    const migratedUnits = [];
-    for(let i = 0; i < (it.acquired || 0); i++){
-      migratedUnits.push(legacy[i] ? [legacy[i]] : []);
+function normalizeItemPurchases(it){
+  if(Array.isArray(it.purchases)){
+    it.purchases.forEach(p => {
+      p.id = p.id || newId();
+      p.qty = Math.max(1, parseInt(p.qty, 10) || 1);
+      p.price = Number(p.price) || 0;
+      p.photos = denseArrayFrom(p.photos).filter(Boolean).slice(0, 3);
+    });
+  } else {
+    // migration depuis l'ancien modèle (un prix + une photo par unité acquise)
+    const prices = denseArrayFrom(it.prices);
+    const rawUnits = denseArrayFrom(it.unitPhotos);
+    const legacyPhotos = Array.isArray(it.photos) ? it.photos : null; // très ancien modèle, une photo par unité
+    const n = Math.max(prices.length, rawUnits.length, legacyPhotos ? (it.acquired || 0) : 0);
+    const purchases = [];
+    for(let i = 0; i < n; i++){
+      const price = Number(prices[i]) || 0;
+      let photos = denseArrayFrom(rawUnits[i]).filter(Boolean);
+      if(!photos.length && legacyPhotos && legacyPhotos[i]) photos = [legacyPhotos[i]];
+      if(price > 0 || photos.length){
+        purchases.push({ id:newId(), qty:1, price, photos: photos.slice(0, 3) });
+      }
     }
-    it.unitPhotos = migratedUnits;
-    it.extraPhotos = legacy.slice(it.acquired || 0).filter(Boolean);
+    it.purchases = purchases;
+    delete it.prices;
+    delete it.unitPhotos;
+    if(legacyPhotos && !it.extraPhotos){
+      it.extraPhotos = legacyPhotos.slice(it.acquired || 0).filter(Boolean);
+    }
+    delete it.photo;
     delete it.photos;
   }
-  const rawUnits = denseArrayFrom(it.unitPhotos);
-  const unitPhotos = [];
-  for(let i = 0; i < (it.acquired || 0); i++){
-    const slot = denseArrayFrom(rawUnits[i]).filter(Boolean).slice(0, 3);
-    unitPhotos.push(slot);
-  }
-  it.unitPhotos = unitPhotos;
   it.extraPhotos = denseArrayFrom(it.extraPhotos).filter(Boolean);
 }
 
@@ -900,7 +915,7 @@ function normalizeData(d){
           it.prices = legacy > 0 ? new Array(it.acquired || 0).fill(legacy) : [];
         }
         delete it.price;
-        normalizeItemPhotos(it);
+        normalizeItemPurchases(it);
       });
     });
   });
@@ -1140,16 +1155,17 @@ function formatPrice(n){
 }
 
 function itemSpent(it){
-  const prices = Array.isArray(it.prices) ? it.prices : [];
-  return prices.slice(0, it.acquired).reduce((sum, p) => sum + (Number(p) || 0), 0);
+  return (it.purchases || []).reduce((sum, p) => sum + (Number(p.price) || 0), 0);
 }
 
 function budgetTotals(){
   let spent = 0, projected = 0;
   data.categories.forEach(cat => cat.sections.forEach(sec => sec.items.forEach(it => {
-    const prices = (Array.isArray(it.prices) ? it.prices : []).map(Number).filter(p => p > 0);
-    spent += itemSpent(it);
-    const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+    const purchases = it.purchases || [];
+    const spentForItem = purchases.reduce((s, p) => s + (Number(p.price) || 0), 0);
+    const qtyForItem = purchases.reduce((s, p) => s + (Number(p.qty) || 0), 0);
+    spent += spentForItem;
+    const avg = qtyForItem > 0 ? spentForItem / qtyForItem : 0;
     projected += avg * it.target;
   })));
   return { spent, projected };
@@ -2564,31 +2580,34 @@ function renderItemHtml(cat, sec, it){
         </div>
       </div>
       <div class="field">
-        <label class="field-label">Prix &amp; photo par unité${it.acquired > 0 ? ' (' + it.acquired + ')' : ''}</label>
-        ${it.acquired > 0 ? `
+        <label class="field-label">Achats${it.purchases.length ? ' (' + it.purchases.length + ')' : ''}</label>
+        ${it.purchases.length ? `
           <div class="unit-list">
-            ${Array.from({length: it.acquired}).map((_, i) => `
+            ${it.purchases.map((p) => `
               <div class="unit-row">
                 <div class="unit-photos">
-                  ${(it.unitPhotos[i] || []).slice(0, 3).map((p, pi) => `
+                  ${(p.photos || []).slice(0, 3).map((src, pi) => `
                     <div class="unit-photo-thumb">
-                      <img src="${p}" data-zoom-unit-photo="${it.id}" data-unit="${i}" data-index="${pi}">
-                      <button class="photo-del photo-del-sm" data-del-unit-photo="${it.id}" data-unit="${i}" data-index="${pi}" aria-label="Supprimer la photo">${icon('x','icon-sm')}</button>
+                      <img src="${src}" data-zoom-purchase-photo="${it.id}" data-purchase="${p.id}" data-index="${pi}">
+                      <button class="photo-del photo-del-sm" data-del-purchase-photo="${it.id}" data-purchase="${p.id}" data-index="${pi}" aria-label="Supprimer la photo">${icon('x','icon-sm')}</button>
                     </div>
                   `).join('')}
-                  ${(it.unitPhotos[i] || []).length < 3 ? `
+                  ${(p.photos || []).length < 3 ? `
                     <label class="unit-photo-add-sm">
                       ${icon('camera','icon-sm')}
-                      <input type="file" accept="image/*" multiple data-add-unit-photo="${it.id}" data-unit="${i}" style="display:none;">
+                      <input type="file" accept="image/*" multiple data-add-purchase-photo="${it.id}" data-purchase="${p.id}" style="display:none;">
                     </label>
                   ` : ''}
                 </div>
-                <input type="number" class="unit-price-input" min="0" step="0.01" data-price-index="${i}" data-item="${it.id}" value="${(it.prices && it.prices[i]) ? it.prices[i] : ''}" placeholder="€">
+                <input type="number" class="unit-qty-input" min="1" data-purchase-qty="${p.id}" data-item="${it.id}" value="${p.qty}" title="Quantité de ce lot">
+                <input type="number" class="unit-price-input" min="0" step="0.01" data-purchase-price="${p.id}" data-item="${it.id}" value="${p.price || ''}" placeholder="€">
+                <button class="text-btn danger unit-del-btn" data-del-purchase="${it.id}" data-purchase="${p.id}" aria-label="Supprimer ce lot">${icon('x','icon-sm')}</button>
               </div>
             `).join('')}
             ${itemSpent(it) > 0 ? `<div class="price-list-total">Total : <strong>${formatPrice(itemSpent(it))}</strong></div>` : ''}
           </div>
-        ` : `<p style="color:var(--muted); font-size:12.5px; margin:0;">Augmentez la quantité acquise pour lier un prix et une photo à chaque unité.</p>`}
+        ` : ''}
+        <button type="button" class="add-row-btn" data-add-purchase="${it.id}" style="margin-top:${it.purchases.length ? '10px' : '0'};">${icon('plus','icon-sm')} Ajouter un lot (photo + quantité + prix)</button>
         ${it.extraPhotos.length ? `<div class="field-label" style="margin:12px 0 6px;">Autres photos</div>` : ''}
         <div class="photo-grid" style="margin-top:${it.extraPhotos.length ? '0' : '10px'};">
           ${it.extraPhotos.map((p, idx) => p ? `
@@ -2680,38 +2699,59 @@ function bindItemEvents(cat, sec, it){
     input.addEventListener('blur', () => render());
   });
 
-  expand.querySelectorAll('[data-price-index]').forEach(input => {
+  expand.querySelectorAll('[data-purchase-qty]').forEach(input => {
     input.addEventListener('change', () => {
-      const idx = parseInt(input.dataset.priceIndex, 10);
-      if(!Array.isArray(it.prices)) it.prices = [];
-      while(it.prices.length <= idx) it.prices.push(0);
-      it.prices[idx] = Math.max(0, parseFloat(input.value) || 0);
+      const p = (it.purchases || []).find(x => x.id === input.dataset.purchaseQty);
+      if(!p) return;
+      p.qty = Math.max(1, parseInt(input.value, 10) || 1);
       save(); render();
     });
+  });
+
+  expand.querySelectorAll('[data-purchase-price]').forEach(input => {
+    input.addEventListener('change', () => {
+      const p = (it.purchases || []).find(x => x.id === input.dataset.purchasePrice);
+      if(!p) return;
+      p.price = Math.max(0, parseFloat(input.value) || 0);
+      save(); render();
+    });
+  });
+
+  const addPurchaseBtn = expand.querySelector(`[data-add-purchase="${it.id}"]`);
+  if(addPurchaseBtn) addPurchaseBtn.onclick = () => {
+    if(!Array.isArray(it.purchases)) it.purchases = [];
+    it.purchases.push({ id:newId(), qty:1, price:0, photos:[] });
+    save(); render();
+  };
+
+  expand.querySelectorAll('[data-del-purchase]').forEach(btn => {
+    btn.onclick = () => {
+      it.purchases = (it.purchases || []).filter(p => p.id !== btn.dataset.purchase);
+      save(); render();
+    };
   });
 
   const photoInput = expand.querySelector(`[data-photo="${it.id}"]`);
   if(photoInput) photoInput.onchange = (e) => handlePhotoUpload(e, it);
 
-  expand.querySelectorAll('[data-add-unit-photo]').forEach(input => {
-    input.onchange = (e) => handleAddUnitPhotos(e, it, parseInt(input.dataset.unit, 10));
+  expand.querySelectorAll('[data-add-purchase-photo]').forEach(input => {
+    input.onchange = (e) => handleAddPurchasePhotos(e, it, input.dataset.purchase);
   });
 
-  expand.querySelectorAll('[data-del-unit-photo]').forEach(btn => {
+  expand.querySelectorAll('[data-del-purchase-photo]').forEach(btn => {
     btn.onclick = () => {
-      const u = parseInt(btn.dataset.unit, 10);
+      const p = (it.purchases || []).find(x => x.id === btn.dataset.purchase);
       const idx = parseInt(btn.dataset.index, 10);
-      if(Array.isArray(it.unitPhotos) && Array.isArray(it.unitPhotos[u])) it.unitPhotos[u].splice(idx, 1);
+      if(p && Array.isArray(p.photos)) p.photos.splice(idx, 1);
       save(); render();
     };
   });
 
-  expand.querySelectorAll('[data-zoom-unit-photo]').forEach(imgEl => {
+  expand.querySelectorAll('[data-zoom-purchase-photo]').forEach(imgEl => {
     imgEl.onclick = () => {
-      const u = parseInt(imgEl.dataset.unit, 10);
+      const p = (it.purchases || []).find(x => x.id === imgEl.dataset.purchase);
       const idx = parseInt(imgEl.dataset.index, 10);
-      const photos = (it.unitPhotos && it.unitPhotos[u]) || [];
-      openLightbox(photos, idx);
+      openLightbox((p && p.photos) || [], idx);
     };
   });
 
@@ -2759,22 +2799,21 @@ function compressImageFile(file){
   });
 }
 
-function handleAddUnitPhotos(e, it, unitIndex){
+function handleAddPurchasePhotos(e, it, purchaseId){
   const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
   e.target.value = '';
   if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
-  if(!Array.isArray(it.unitPhotos)) it.unitPhotos = [];
-  while(it.unitPhotos.length <= unitIndex) it.unitPhotos.push([]);
-  if(!Array.isArray(it.unitPhotos[unitIndex])) it.unitPhotos[unitIndex] = [];
-  const bucket = it.unitPhotos[unitIndex];
-  const room = Math.max(0, 3 - bucket.length);
-  if(room <= 0){ showToast('Maximum 3 photos par unité.'); return; }
+  const p = (it.purchases || []).find(x => x.id === purchaseId);
+  if(!p) return;
+  if(!Array.isArray(p.photos)) p.photos = [];
+  const room = Math.max(0, 3 - p.photos.length);
+  if(room <= 0){ showToast('Maximum 3 photos par lot.'); return; }
   const toProcess = files.slice(0, room);
   Promise.allSettled(toProcess.map(compressImageFile)).then(results => {
     let added = 0;
-    results.forEach(r => { if(r.status === 'fulfilled'){ bucket.push(r.value); added++; } });
+    results.forEach(r => { if(r.status === 'fulfilled'){ p.photos.push(r.value); added++; } });
     if(added > 0){ save(); render(); }
-    if(added > 0 && files.length > toProcess.length) showToast(added + ' photo(s) ajoutée(s) — maximum 3 par unité.');
+    if(added > 0 && files.length > toProcess.length) showToast(added + ' photo(s) ajoutée(s) — maximum 3 par lot.');
     else if(added > 0) showToast(added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée');
     else showToast('Impossible de traiter ces photos.');
   });
@@ -3059,7 +3098,7 @@ function openAddItemModal(cat, sec){
     if(!name){ showToast('Donnez un nom à l’article'); return; }
     const target = clamp(parseInt(document.getElementById('itTarget').value||'0',10), 0, 9999);
     const acquired = clamp(parseInt(document.getElementById('itAcquired').value||'0',10), 0, 9999);
-    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', prices:[], unitPhotos:[], extraPhotos:[] });
+    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', purchases:[], extraPhotos:[] });
     ui.collapsedSections[sec.id] = false; saveUi();
     save(); closeModal(); render(); showToast('Article ajouté');
   };
