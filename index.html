@@ -312,6 +312,12 @@
     width:64px; height:64px; border-radius:var(--r-sm); border:1.5px dashed var(--muted-2);
     display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff; flex-shrink:0;
   }
+  .photo-add-tile.uploading{cursor:default; border-style:solid; border-color:var(--sage-tint); background:var(--sage-tint);}
+  .photo-add-spinner{
+    width:20px; height:20px; border-radius:50%; border:2.5px solid var(--sage-dark); border-top-color:transparent;
+    animation:spin 0.7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
   .item-thumb-wrap{position:relative; flex-shrink:0; border:none; background:none; padding:0; cursor:pointer;}
   .item-thumb-count{
     position:absolute; bottom:-4px; right:-4px; background:var(--ink); color:#fff;
@@ -568,6 +574,10 @@
     <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
     Mes listes
   </button>
+  <button class="nav-btn" data-nav="listsv2">
+    <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/><circle cx="17.5" cy="15.5" r="1"/></svg>
+    Listes V2
+  </button>
   <button class="nav-btn" data-nav="echo">
     <svg class="icon" viewBox="0 0 24 24"><path d="M3 12h3l2-7 4 14 2-7h3"/><circle cx="19" cy="12" r="2"/></svg>
     Écho
@@ -774,6 +784,47 @@ function restoreThreeMoisSection(d){
   return true;
 }
 
+/* ---------- Mes listes V2 : tailles, catégories, marques, objectifs ---------- */
+const V2_DEFAULT_SIZES = ['1 mois','3 mois','6 mois','9 mois','12 mois','18 mois','Sans taille'];
+const V2_DEFAULT_CATEGORIES = [
+  'Body','T-shirt','Pull / Sweat','Gilet',
+  'Pantalon','Legging','Short',
+  'Pyjama','Combinaison','Grenouillère',
+  'Veste','Manteau','Combi-pilote',
+  'Bonnet','Chapeau','Chaussettes','Chaussons','Moufles','Bavoir',
+  'Gigoteuse','Couverture',
+  'Cape de bain','Serviette','Lange',
+  'Doudou','Tenue de sortie'
+];
+// Objectifs par défaut, repris et retravaillés depuis le catalogue "Vêtements bébé" d'origine
+// (les variantes manches courtes/longues ont été fusionnées dans une seule catégorie par taille).
+const V2_DEFAULT_TARGETS = {
+  '1 mois': { 'Body':8, 'Pyjama':6, 'Pantalon':2, 'Legging':1, 'Gilet':2, 'Combinaison':1, 'Tenue de sortie':2, 'Chaussettes':3, 'Bonnet':1 },
+  '3 mois': { 'Body':9, 'Pyjama':5, 'Pantalon':2, 'Legging':1, 'Combinaison':5, 'T-shirt':2, 'Short':2, 'Tenue de sortie':3, 'Gilet':2, 'Chaussettes':3, 'Chapeau':1 },
+  '6 mois': { 'Body':8, 'Pyjama':4, 'Short':6, 'Pantalon':2, 'Legging':1, 'Combinaison':5, 'T-shirt':3, 'Tenue de sortie':3, 'Gilet':2, 'Chaussettes':3, 'Chapeau':1 },
+  '9 mois': { 'Body':8, 'Pyjama':6, 'Pantalon':4, 'Legging':2, 'Pull / Sweat':3, 'Gilet':2, 'Combinaison':2, 'Tenue de sortie':3, 'Manteau':1, 'Bonnet':1, 'Chaussettes':2 },
+  '12 mois': { 'Body':8, 'Pyjama':7, 'Pantalon':4, 'Legging':2, 'Pull / Sweat':3, 'Gilet':2, 'Combinaison':2, 'Tenue de sortie':4, 'Manteau':1, 'Veste':1, 'Bonnet':1, 'Chaussettes':3 },
+  '18 mois': { 'Body':6, 'Pyjama':4, 'Short':3, 'Pantalon':2, 'Legging':1, 'Combinaison':4, 'T-shirt':4, 'Tenue de sortie':4, 'Gilet':1, 'Veste':1, 'Chapeau':1, 'Chaussettes':3 },
+  'Sans taille': { 'Lange':10, 'Bavoir':8, 'Cape de bain':2, 'Serviette':2, 'Gigoteuse':5, 'Couverture':2, 'Chapeau':1, 'Bonnet':1, 'Manteau':1 }
+};
+
+function buildDefaultV2(){
+  const sizes = V2_DEFAULT_SIZES.map(label => ({ id:newId(), label }));
+  const categories = V2_DEFAULT_CATEGORIES.map(label => ({ id:newId(), label }));
+  const sizeIdByLabel = Object.fromEntries(sizes.map(s => [s.label, s.id]));
+  const catIdByLabel = Object.fromEntries(categories.map(c => [c.label, c.id]));
+  const targets = [];
+  Object.keys(V2_DEFAULT_TARGETS).forEach(sizeLabel => {
+    const sizeId = sizeIdByLabel[sizeLabel];
+    const cats = V2_DEFAULT_TARGETS[sizeLabel];
+    Object.keys(cats).forEach(catLabel => {
+      const categoryId = catIdByLabel[catLabel];
+      if(sizeId && categoryId) targets.push({ sizeId, categoryId, target: cats[catLabel] });
+    });
+  });
+  return { sizes, categories, brands: [], targets, lots: [] };
+}
+
 function buildDefaultData(){
   const seeds = defaultCategorySeeds();
 
@@ -849,7 +900,8 @@ function buildDefaultData(){
     headerTagline: 'votre liste de naissance',
     homeTodoCount: 3,
     sizeFruit: '',
-    sizeAnimal: ''
+    sizeAnimal: '',
+    v2: buildDefaultV2()
   };
 }
 
@@ -965,6 +1017,28 @@ function syncAcquiredFromPurchases(it){
   }
 }
 
+function normalizeV2(d){
+  if(!d.v2 || typeof d.v2 !== 'object') d.v2 = buildDefaultV2();
+  const v2 = d.v2;
+  v2.sizes = denseArrayFrom(v2.sizes).filter(Boolean);
+  v2.categories = denseArrayFrom(v2.categories).filter(Boolean);
+  v2.brands = denseArrayFrom(v2.brands).filter(Boolean);
+  v2.targets = denseArrayFrom(v2.targets).filter(Boolean).map(t => ({ sizeId:t.sizeId, categoryId:t.categoryId, target: Math.max(0, parseInt(t.target,10) || 0) }));
+  v2.lots = denseArrayFrom(v2.lots).filter(Boolean).map(lot => {
+    lot.id = lot.id || newId();
+    lot.photos = denseArrayFrom(lot.photos).filter(Boolean);
+    lot.price = Number(lot.price) || 0;
+    lot.entries = denseArrayFrom(lot.entries).filter(Boolean).map(e => ({
+      id: e.id || newId(),
+      sizeId: e.sizeId || '',
+      categoryId: e.categoryId || '',
+      brandId: e.brandId || '',
+      qty: Math.max(1, parseInt(e.qty,10) || 1)
+    }));
+    return lot;
+  });
+}
+
 function normalizeData(d){
   if(!d || typeof d !== 'object') return buildDefaultData();
   if(!Array.isArray(d.categories)) d.categories = [];
@@ -986,6 +1060,7 @@ function normalizeData(d){
   });
   if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
   d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
+  normalizeV2(d);
   if(!Array.isArray(d.synonyms)) d.synonyms = [];
   d.synonyms.forEach(g => { g.terms = Array.isArray(g.terms) ? g.terms.filter(Boolean) : []; });
   d.synonyms = d.synonyms.filter(g => g.terms.length >= 2);
@@ -1298,12 +1373,13 @@ function render(){
   renderHeader();
   if(ui.view === 'dashboard') renderDashboard();
   else if(ui.view === 'lists') renderListsView();
+  else if(ui.view === 'listsv2') renderListsV2();
   else if(ui.view === 'prono') renderProno();
   else if(ui.view === 'echo') renderEcho();
   else if(ui.view === 'todo') renderTodo();
   else renderCategory();
   document.querySelectorAll('.nav-btn').forEach(b=>{
-    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', prono:'prono', echo:'echo', todo:'todo' };
+    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo' };
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
@@ -1317,6 +1393,8 @@ function renderHeader(){
     h.innerHTML = `<div class="brand"><h1>Nidoux</h1></div>`;
   } else if(ui.view === 'lists'){
     h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
+  } else if(ui.view === 'listsv2'){
+    h.innerHTML = `<div class="brand"><h1>Mes listes V2</h1></div>`;
   } else if(ui.view === 'prono'){
     h.innerHTML = `<div class="brand"><h1>Mon petit prono</h1></div>`;
   } else if(ui.view === 'echo'){
@@ -2657,6 +2735,351 @@ function openEditVintedLikeModal(v){
       v.note = note; v.link = link;
     }
     save(); closeModal(); render(); showToast(isNew ? 'Ajouté' : 'Modifié');
+  };
+}
+
+/* ---------- Mes listes V2 ---------- */
+function v2SizeLabel(id){ const s = (data.v2.sizes||[]).find(x=>x.id===id); return s ? s.label : '—'; }
+function v2CategoryLabel(id){ const c = (data.v2.categories||[]).find(x=>x.id===id); return c ? c.label : '—'; }
+function v2BrandLabel(id){ if(!id) return ''; const b = (data.v2.brands||[]).find(x=>x.id===id); return b ? b.label : ''; }
+
+function v2AcquiredFor(sizeId, categoryId){
+  let n = 0;
+  (data.v2.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+    if(e.sizeId === sizeId && e.categoryId === categoryId) n += Number(e.qty) || 0;
+  }));
+  return n;
+}
+function v2TargetFor(sizeId, categoryId){
+  const t = (data.v2.targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
+  return t ? t.target : 0;
+}
+function v2EntriesFor(sizeId, categoryId){
+  const out = [];
+  (data.v2.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+    if(e.sizeId === sizeId && e.categoryId === categoryId) out.push({ lot, entry:e });
+  }));
+  return out;
+}
+function v2CategoriesForSize(sizeId){
+  return (data.v2.categories || []).filter(c => v2TargetFor(sizeId, c.id) > 0 || v2EntriesFor(sizeId, c.id).length > 0);
+}
+function v2SizeTotals(sizeId){
+  let acquired = 0, target = 0;
+  v2CategoriesForSize(sizeId).forEach(c => { acquired += v2AcquiredFor(sizeId, c.id); target += v2TargetFor(sizeId, c.id); });
+  const pct = target > 0 ? Math.round((acquired / target) * 100) : 0;
+  return { acquired, target, pct };
+}
+function isV2SizeCollapsed(sizeId){ return ui.collapsedSections['v2-' + sizeId] !== false; }
+
+function renderListsV2(){
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `
+    <button class="add-row-btn" id="btnAddVetement" style="margin:2px 0 12px;">${icon('plus','icon-sm')} Ajouter un vêtement</button>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
+      <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Tailles / catégories / marques</button>
+    </div>
+    <div id="v2SizeList">
+      ${(data.v2.sizes || []).map(size => renderV2SizeCard(size)).join('')}
+    </div>
+  `;
+  bindListsV2Events();
+}
+
+function renderV2SizeCard(size){
+  const t = v2SizeTotals(size.id);
+  const collapsed = isV2SizeCollapsed(size.id);
+  const cats = v2CategoriesForSize(size.id);
+  return `
+    <div class="section-card">
+      <div class="section-head ${collapsed ? '' : 'open'}" data-v2-size-toggle="${size.id}">
+        <div class="section-info">
+          <div class="section-title-row"><span class="section-title">${escapeHtml(size.label)}</span></div>
+          <div class="section-progress"><div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div></div>
+        </div>
+        <span class="section-count">${t.acquired}/${t.target}</span>
+        <span class="chev">${icon('chevronDown','icon-sm')}</span>
+      </div>
+      <div class="section-body ${collapsed ? '' : 'open'}">
+        ${cats.length ? cats.map(cat => renderV2CategoryRow(size, cat)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:4px;">Aucun objectif ni article pour cette taille pour l’instant.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderV2CategoryRow(size, cat){
+  const acquired = v2AcquiredFor(size.id, cat.id);
+  const target = v2TargetFor(size.id, cat.id);
+  const status = itemStatus(target, acquired);
+  const key = size.id + '::' + cat.id;
+  const expanded = !!ui.expandedItems['v2-' + key];
+  const entries = v2EntriesFor(size.id, cat.id);
+  let html = `<div class="item-row" data-v2-cat-row="${key}">
+    <span class="status-dot status-${status}"></span>
+    <div class="item-main" data-v2-cat-toggle="${key}">
+      <div class="item-name-row"><span class="item-name">${escapeHtml(cat.label)}</span></div>
+      <div class="item-sub"><span>${acquired} / ${target}</span></div>
+    </div>
+  </div>`;
+  if(expanded){
+    html += `<div class="item-expand">
+      <div class="field">
+        <label class="field-label">Objectif pour « ${escapeHtml(size.label)} »</label>
+        <input type="number" min="0" data-v2-target="${key}" value="${target}">
+      </div>
+      ${entries.length ? entries.map(({lot, entry}) => renderV2EntryRow(lot, entry)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`}
+    </div>`;
+  }
+  return html;
+}
+
+function renderV2EntryRow(lot, entry){
+  const brand = v2BrandLabel(entry.brandId);
+  return `<div class="unit-row" data-v2-entry-row="${entry.id}">
+    <div class="unit-photos">
+      ${(lot.photos && lot.photos[0]) ? `
+        <div class="unit-photo-thumb"><img src="${lot.photos[0]}" data-v2-zoom-lot="${lot.id}"></div>
+      ` : ''}
+    </div>
+    <div style="flex:1; font-size:13px; color:var(--ink); min-width:0;">
+      ${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}${lot.price ? ' · lot ' + formatPrice(lot.price) : ''}
+    </div>
+    <button class="text-btn danger" data-v2-del-entry="${entry.id}" data-v2-lot="${lot.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
+  </div>`;
+}
+
+function bindListsV2Events(){
+  const addBtn = document.getElementById('btnAddVetement');
+  if(addBtn) addBtn.onclick = openAddVetementModal;
+  const manageBtn = document.getElementById('btnManageV2');
+  if(manageBtn) manageBtn.onclick = openManageV2Modal;
+
+  document.querySelectorAll('[data-v2-size-toggle]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.v2SizeToggle;
+      ui.collapsedSections['v2-' + id] = !isV2SizeCollapsed(id);
+      saveUi(); render();
+    };
+  });
+
+  document.querySelectorAll('[data-v2-cat-toggle]').forEach(el => {
+    el.onclick = () => {
+      const key = 'v2-' + el.dataset.v2CatToggle;
+      ui.expandedItems[key] = !ui.expandedItems[key];
+      render();
+    };
+  });
+
+  document.querySelectorAll('[data-v2-target]').forEach(input => {
+    input.addEventListener('change', () => {
+      const [sizeId, categoryId] = input.dataset.v2Target.split('::');
+      const val = clamp(parseInt(input.value, 10) || 0, 0, 999);
+      let t = (data.v2.targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
+      if(t) t.target = val;
+      else { if(!Array.isArray(data.v2.targets)) data.v2.targets = []; data.v2.targets.push({ sizeId, categoryId, target: val }); }
+      save(); render();
+    });
+  });
+
+  document.querySelectorAll('[data-v2-zoom-lot]').forEach(imgEl => {
+    imgEl.onclick = () => {
+      const lot = (data.v2.lots || []).find(l => l.id === imgEl.dataset.v2ZoomLot);
+      if(lot && lot.photos && lot.photos.length) openLightbox(lot.photos, 0);
+    };
+  });
+
+  document.querySelectorAll('[data-v2-del-entry]').forEach(btn => {
+    btn.onclick = () => openConfirmModal('Supprimer cet article ?', 'Cette ligne sera retirée du lot (les autres articles du même lot ne sont pas affectés).', () => {
+      const lot = (data.v2.lots || []).find(l => l.id === btn.dataset.v2Lot);
+      if(lot){
+        lot.entries = lot.entries.filter(e => e.id !== btn.dataset.v2DelEntry);
+        if(lot.entries.length === 0) data.v2.lots = data.v2.lots.filter(l => l.id !== lot.id);
+      }
+      save(); closeModal(); render(); showToast('Article supprimé');
+    });
+  });
+}
+
+function openAddVetementModal(){
+  let photos = [];
+  const firstSize = (data.v2.sizes && data.v2.sizes[0]) || {};
+  const firstCat = (data.v2.categories && data.v2.categories[0]) || {};
+  let lines = [{ id:newId(), sizeId:firstSize.id || '', categoryId:firstCat.id || '', brandId:'', qty:1 }];
+
+  function sizeOptions(selected){
+    return (data.v2.sizes || []).map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
+  }
+  function catOptions(selected){
+    return (data.v2.categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
+  }
+  function brandOptions(selected){
+    return `<option value="">Marque —</option>` + (data.v2.brands || []).map(b => `<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHtml(b.label)}</option>`).join('');
+  }
+  function linesHtml(){
+    return lines.map(l => `
+      <div class="v2-line-row" data-line="${l.id}">
+        <div style="display:flex; gap:8px;">
+          <select data-line-field="sizeId" data-line="${l.id}" style="flex:1; min-width:0;">${sizeOptions(l.sizeId)}</select>
+          <select data-line-field="categoryId" data-line="${l.id}" style="flex:1; min-width:0;">${catOptions(l.categoryId)}</select>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <select data-line-field="brandId" data-line="${l.id}" style="flex:1; min-width:0;">${brandOptions(l.brandId)}</select>
+          <input type="number" min="1" data-line-field="qty" data-line="${l.id}" value="${l.qty}" style="width:56px; text-align:center; flex-shrink:0;">
+          ${lines.length > 1 ? `<button type="button" class="text-btn danger" data-del-line="${l.id}" style="flex-shrink:0;">${icon('x','icon-sm')}</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+  let uploading = false;
+  function photosHtml(){
+    return `
+      <div class="photo-grid">
+        ${photos.map((p, i) => `<div class="photo-item"><img src="${p}"><button class="photo-del" data-del-new-photo="${i}">${icon('x','icon-sm')}</button></div>`).join('')}
+        <label class="photo-add-tile ${uploading ? 'uploading' : ''}">
+          ${uploading ? '<span class="photo-add-spinner"></span>' : icon('camera','icon-sm')}
+          <input type="file" accept="image/*" multiple id="newVetementPhotoInput" style="display:none;" ${uploading ? 'disabled' : ''}>
+        </label>
+      </div>
+    `;
+  }
+
+  openModal(`
+    <h2>Ajouter un vêtement</h2>
+    <div class="field">
+      <label class="field-label">Photo(s) du lot</label>
+      <div id="newVetementPhotos">${photosHtml()}</div>
+    </div>
+    <div class="field">
+      <label class="field-label">Prix total du lot (€)</label>
+      <input type="number" min="0" step="0.01" id="newVetementPrice" placeholder="0,00">
+    </div>
+    <div class="field">
+      <label class="field-label">Articles sur cette photo</label>
+      <div id="newVetementLines" style="display:flex; flex-direction:column; gap:12px;">${linesHtml()}</div>
+      <button type="button" class="add-row-btn" id="btnAddLine" style="margin-top:10px;">${icon('plus','icon-sm')} Ajouter un article sur cette photo</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+
+  function bindPhotoEvents(){
+    const container = document.getElementById('newVetementPhotos');
+    container.innerHTML = photosHtml();
+    const input = document.getElementById('newVetementPhotoInput');
+    if(input) input.onchange = (e) => {
+      const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
+      e.target.value = '';
+      if(!files.length) return;
+      uploading = true;
+      bindPhotoEvents();
+      Promise.allSettled(files.map(compressImageFile)).then(results => {
+        let added = 0;
+        results.forEach(r => { if(r.status === 'fulfilled'){ photos.push(r.value); added++; } });
+        uploading = false;
+        bindPhotoEvents();
+        showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter cette photo.');
+      });
+    };
+    container.querySelectorAll('[data-del-new-photo]').forEach(btn => {
+      btn.onclick = () => { photos.splice(parseInt(btn.dataset.delNewPhoto, 10), 1); bindPhotoEvents(); };
+    });
+  }
+
+  function bindLineEvents(){
+    const container = document.getElementById('newVetementLines');
+    container.innerHTML = linesHtml();
+    container.querySelectorAll('[data-line-field]').forEach(el => {
+      el.onchange = () => {
+        const line = lines.find(l => l.id === el.dataset.line);
+        if(!line) return;
+        const field = el.dataset.lineField;
+        line[field] = field === 'qty' ? Math.max(1, parseInt(el.value, 10) || 1) : el.value;
+      };
+    });
+    container.querySelectorAll('[data-del-line]').forEach(btn => {
+      btn.onclick = () => { lines = lines.filter(l => l.id !== btn.dataset.delLine); bindLineEvents(); };
+    });
+  }
+
+  bindPhotoEvents();
+  bindLineEvents();
+
+  document.getElementById('btnAddLine').onclick = () => {
+    lines.push({ id:newId(), sizeId:firstSize.id || '', categoryId:firstCat.id || '', brandId:'', qty:1 });
+    bindLineEvents();
+  };
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const price = Math.max(0, parseFloat(document.getElementById('newVetementPrice').value) || 0);
+    const validLines = lines.filter(l => l.sizeId && l.categoryId);
+    if(!validLines.length){ showToast('Ajoutez au moins un article avec une taille et une catégorie'); return; }
+    const lot = {
+      id:newId(), photos: photos.slice(), price,
+      entries: validLines.map(l => ({ id:newId(), sizeId:l.sizeId, categoryId:l.categoryId, brandId:l.brandId || '', qty:l.qty }))
+    };
+    if(!Array.isArray(data.v2.lots)) data.v2.lots = [];
+    data.v2.lots.push(lot);
+    save(); closeModal(); render(); showToast('Vêtement ajouté');
+  };
+}
+
+function openManageV2Modal(){
+  function listHtml(items, delAttr){
+    return items.length ? items.map(i => `
+      <span class="chip-btn" style="cursor:default;">${escapeHtml(i.label)}
+        <button type="button" data-${delAttr}="${i.id}" style="border:none; background:none; cursor:pointer; margin-left:4px; padding:0; display:inline-flex;">${icon('x','icon-sm')}</button>
+      </span>
+    `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune pour l’instant</span>';
+  }
+  openModal(`
+    <h2>Tailles, catégories, marques</h2>
+    <div class="field">
+      <label class="field-label">Tailles</label>
+      <div id="v2SizesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+      <div style="display:flex; gap:8px;"><input type="text" id="newV2Size" placeholder="ex. 24 mois" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Size">Ajouter</button></div>
+    </div>
+    <div class="field">
+      <label class="field-label">Catégories</label>
+      <div id="v2CategoriesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+      <div style="display:flex; gap:8px;"><input type="text" id="newV2Category" placeholder="ex. Salopette" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Category">Ajouter</button></div>
+    </div>
+    <div class="field">
+      <label class="field-label">Marques</label>
+      <div id="v2BrandsList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+      <div style="display:flex; gap:8px;"><input type="text" id="newV2Brand" placeholder="ex. Petit Bateau" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Brand">Ajouter</button></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Fermer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+
+  function rebind(){
+    document.getElementById('v2SizesList').innerHTML = listHtml(data.v2.sizes, 'del-v2-size');
+    document.getElementById('v2CategoriesList').innerHTML = listHtml(data.v2.categories, 'del-v2-cat');
+    document.getElementById('v2BrandsList').innerHTML = listHtml(data.v2.brands, 'del-v2-brand');
+    document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => { data.v2.sizes = data.v2.sizes.filter(s => s.id !== b.dataset.delV2Size); save(); rebind(); });
+    document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => { data.v2.categories = data.v2.categories.filter(c => c.id !== b.dataset.delV2Cat); save(); rebind(); });
+    document.querySelectorAll('[data-del-v2-brand]').forEach(b => b.onclick = () => { data.v2.brands = data.v2.brands.filter(x => x.id !== b.dataset.delV2Brand); save(); rebind(); });
+  }
+  rebind();
+
+  document.getElementById('btnAddV2Size').onclick = () => {
+    const input = document.getElementById('newV2Size'); const label = input.value.trim();
+    if(!label){ showToast('Indiquez un nom'); return; }
+    data.v2.sizes.push({ id:newId(), label }); save(); input.value = ''; rebind();
+  };
+  document.getElementById('btnAddV2Category').onclick = () => {
+    const input = document.getElementById('newV2Category'); const label = input.value.trim();
+    if(!label){ showToast('Indiquez un nom'); return; }
+    data.v2.categories.push({ id:newId(), label }); save(); input.value = ''; rebind();
+  };
+  document.getElementById('btnAddV2Brand').onclick = () => {
+    const input = document.getElementById('newV2Brand'); const label = input.value.trim();
+    if(!label){ showToast('Indiquez un nom'); return; }
+    data.v2.brands.push({ id:newId(), label }); save(); input.value = ''; rebind();
   };
 }
 
