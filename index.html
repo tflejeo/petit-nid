@@ -312,7 +312,7 @@
     width:64px; height:64px; border-radius:var(--r-sm); border:1.5px dashed var(--muted-2);
     display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff; flex-shrink:0;
   }
-  .item-thumb-wrap{position:relative; flex-shrink:0;}
+  .item-thumb-wrap{position:relative; flex-shrink:0; border:none; background:none; padding:0; cursor:pointer;}
   .item-thumb-count{
     position:absolute; bottom:-4px; right:-4px; background:var(--ink); color:#fff;
     font-size:9px; font-weight:800; border-radius:999px; padding:1px 4px; line-height:1.4; min-width:14px; text-align:center;
@@ -349,6 +349,11 @@
     background:rgba(0,0,0,0.35); padding:6px 14px; border-radius:999px;
   }
   .lightbox-count{color:#fff; font-size:12px; font-weight:700; opacity:0.85;}
+  .lightbox-hide-toggle{
+    display:flex; align-items:center; gap:7px; color:#fff; font-size:12.5px; font-weight:700;
+    background:rgba(0,0,0,0.35); padding:6px 12px; border-radius:999px; cursor:pointer;
+  }
+  .lightbox-hide-toggle input{width:15px; height:15px; accent-color:var(--sage-dark);}
 
   /* Vinted likes: reaction picker + comment thread */
   .vlike-description{
@@ -897,6 +902,14 @@ function allItemPhotos(it){
   return out;
 }
 
+function itemPhotoLightboxItems(it, photos){
+  return photos.map(src => ({
+    src,
+    caption: it.name,
+    hideToggle: { it, src }
+  }));
+}
+
 function denseArrayFrom(raw){
   if(Array.isArray(raw)) return raw;
   if(raw && typeof raw === 'object'){
@@ -967,6 +980,7 @@ function normalizeData(d){
         delete it.price;
         normalizeItemPurchases(it);
         it.crossSections = Array.isArray(it.crossSections) ? it.crossSections.filter(Boolean) : [];
+        it.hiddenPhotos = Array.isArray(it.hiddenPhotos) ? it.hiddenPhotos.filter(Boolean) : [];
       });
     });
   });
@@ -1445,6 +1459,7 @@ function collectAllPhotos(){
     cat.sections.forEach(sec => {
       sec.items.forEach(it => {
         allItemPhotos(it).forEach(src => {
+          if((it.hiddenPhotos || []).includes(src)) return;
           out.push({ src, itemName: it.name, catName: cat.name, secLabel: sec.label, catId: cat.id, secId: sec.id, itemId: it.id });
         });
       });
@@ -2786,7 +2801,7 @@ function renderItemHtml(cat, sec, it){
   const thumbPhotos = allItemPhotos(it);
   let html = `<div class="item-row ${done ? 'done' : ''}" data-item-row="${it.id}">
     <span class="status-dot status-${status}"></span>
-    ${thumbPhotos.length ? `<span class="item-thumb-wrap"><img class="item-thumb" src="${thumbPhotos[0]}" alt="">${thumbPhotos.length > 1 ? `<span class="item-thumb-count">${thumbPhotos.length}</span>` : ''}</span>` : ''}
+    ${thumbPhotos.length ? `<button class="item-thumb-wrap" data-item-thumb="${it.id}" aria-label="Voir les photos"><img class="item-thumb" src="${thumbPhotos[0]}" alt="">${thumbPhotos.length > 1 ? `<span class="item-thumb-count">${thumbPhotos.length}</span>` : ''}</button>` : ''}
     <div class="item-main" data-item-toggle="${it.id}">
       <div class="item-name-row">
         <span class="item-name">${escapeHtml(it.name)}</span>
@@ -2943,6 +2958,12 @@ function bindItemEvents(cat, sec, it){
   const mainEl = row.querySelector(`[data-item-toggle="${it.id}"]`);
   if(mainEl) mainEl.onclick = () => { ui.expandedItems[it.id] = !ui.expandedItems[it.id]; render(); };
 
+  const thumbBtn = row.querySelector(`[data-item-thumb="${it.id}"]`);
+  if(thumbBtn) thumbBtn.onclick = (e) => {
+    e.stopPropagation();
+    openLightbox(itemPhotoLightboxItems(it, allItemPhotos(it)), 0);
+  };
+
   const inc = row.querySelector(`[data-inc="${it.id}"]`);
   if(inc) inc.onclick = () => { it.acquired++; save(); render(); };
   const dec = row.querySelector(`[data-dec="${it.id}"]`);
@@ -3021,7 +3042,7 @@ function bindItemEvents(cat, sec, it){
     imgEl.onclick = () => {
       const p = (it.purchases || []).find(x => x.id === imgEl.dataset.purchase);
       const idx = parseInt(imgEl.dataset.index, 10);
-      openLightbox((p && p.photos) || [], idx);
+      openLightbox(itemPhotoLightboxItems(it, (p && p.photos) || []), idx);
     };
   });
 
@@ -3034,7 +3055,7 @@ function bindItemEvents(cat, sec, it){
   });
 
   expand.querySelectorAll('[data-zoom-extra-photo]').forEach(imgEl => {
-    imgEl.onclick = () => openLightbox(it.extraPhotos, parseInt(imgEl.dataset.index, 10));
+    imgEl.onclick = () => openLightbox(itemPhotoLightboxItems(it, it.extraPhotos), parseInt(imgEl.dataset.index, 10));
   });
 
   expand.querySelectorAll('[data-cross-toggle]').forEach(checkbox => {
@@ -3137,6 +3158,12 @@ function openLightbox(photos, startIndex){
         <div class="lightbox-footer">
           ${cur.caption ? `<div class="lightbox-caption">${escapeHtml(cur.caption)}</div>` : ''}
           ${items.length > 1 ? `<div class="lightbox-count">${idx + 1} / ${items.length}</div>` : ''}
+          ${cur.hideToggle ? `
+            <label class="lightbox-hide-toggle">
+              <input type="checkbox" id="lbHideToggle" ${(cur.hideToggle.it.hiddenPhotos || []).includes(cur.hideToggle.src) ? 'checked' : ''}>
+              Masquer sur la galerie photo
+            </label>
+          ` : ''}
           ${cur.onGoto ? `<button class="btn btn-primary" id="lbGoto">Voir l’article</button>` : ''}
         </div>
       </div>
@@ -3224,6 +3251,16 @@ function openLightbox(photos, startIndex){
     }, { passive:true });
 
     if(cur.onGoto) document.getElementById('lbGoto').onclick = () => { close(); cur.onGoto(); };
+    if(cur.hideToggle){
+      const cb = document.getElementById('lbHideToggle');
+      if(cb) cb.onchange = () => {
+        const { it, src } = cur.hideToggle;
+        if(!Array.isArray(it.hiddenPhotos)) it.hiddenPhotos = [];
+        if(cb.checked){ if(!it.hiddenPhotos.includes(src)) it.hiddenPhotos.push(src); }
+        else { it.hiddenPhotos = it.hiddenPhotos.filter(s => s !== src); }
+        save();
+      };
+    }
   }
   draw();
 }
