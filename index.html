@@ -740,10 +740,16 @@ function seedKnownEmptyCategories(d){
 // vêtements bébé si elle a été supprimée par erreur, avec son contenu d'origine.
 const VETEMENTS_SECTION_ORDER = ['1 mois','3 mois','6 mois','9 mois','12 mois','18 mois','Sans taille'];
 function restoreThreeMoisSection(d){
-  if(d.threeMoisRestored) return false;
-  d.threeMoisRestored = true;
-  const cat = d.categories.find(c => c.name === 'Vêtements bébé — 1 à 18 mois');
-  if(!cat) return false;
+  if(d.threeMoisRestoredV2) return false;
+  // On identifie la catégorie par ses sections caractéristiques plutôt que par son nom,
+  // qui a pu être renommé par l'utilisateur (ex. "Vêtements bébé" au lieu du nom d'origine).
+  const cat = d.categories.find(c =>
+    Array.isArray(c.sections) &&
+    c.sections.some(s => s.label === '1 mois') &&
+    c.sections.some(s => s.label === '6 mois')
+  );
+  if(!cat) return false; // catégorie introuvable pour l'instant : on retentera au prochain sync
+  d.threeMoisRestoredV2 = true;
   if(cat.sections.some(s => s.label === '3 mois')) return false;
   const threeMoisData = [
     ['Body ML léger',4],['Body MC',5],['Pyjama ML léger',3],['Pyjama MC + jambes courtes',2],
@@ -1025,6 +1031,7 @@ let remoteDebounceTimer = null;
 let pronosRef = null;
 let adminRef = null;
 let resultRef = null;
+let backupRef = null;
 let pronosList = [];
 let birthResult = null;
 const ADMIN_UNLOCKED_KEY = 'petitNidAdminUnlocked_v1';
@@ -1096,6 +1103,7 @@ function initFirebase(){
       birthResult = snap.val() || null;
       if(ui.view === 'prono' && isAdminUnlocked) render();
     });
+    backupRef = firebase.database().ref('petitNidBackup');
     firebase.database().ref('.info/connected').on('value', snap => {
       updateConnectionBadge(snap.val() === true ? 'online' : 'offline');
     });
@@ -1922,7 +1930,7 @@ function openEnterPinModal(existingHash, onUnlocked){
   };
 }
 
-function exportDataBackup(){
+function downloadDataAsFile(){
   try{
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type:'application/json' });
@@ -1935,10 +1943,61 @@ function exportDataBackup(){
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('Sauvegarde téléchargée');
-  }catch(e){
-    showToast('Échec de l’export : ' + e.message);
-  }
+  }catch(e){ /* le stockage cloud reste le principal filet de sécurité */ }
+}
+
+function formatDateTime(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) +
+    ' à ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+}
+
+function saveBackupNow(){
+  if(!backupRef){ showToast('Connexion indisponible, réessayez plus tard.'); return; }
+  downloadDataAsFile();
+  backupRef.set({ snapshot: data, createdAt: Date.now() })
+    .then(() => { showToast('Sauvegarde enregistrée'); refreshBackupInfo(); })
+    .catch(err => showToast('Échec de la sauvegarde : ' + err.message));
+}
+
+function refreshBackupInfo(){
+  const el = document.getElementById('backupInfo');
+  const restoreBtn = document.getElementById('btnRestoreBackup');
+  if(!el) return; // le panneau des réglages a été fermé entre-temps
+  if(!backupRef){ el.textContent = 'Connexion indisponible.'; return; }
+  backupRef.child('createdAt').once('value').then(snap => {
+    const at = snap.val();
+    const elNow = document.getElementById('backupInfo');
+    const btnNow = document.getElementById('btnRestoreBackup');
+    if(!elNow) return;
+    if(at){
+      elNow.textContent = 'Dernière sauvegarde : ' + formatDateTime(at);
+      if(btnNow) btnNow.disabled = false;
+    } else {
+      elNow.textContent = 'Aucune sauvegarde pour le moment.';
+    }
+  }).catch(() => { const elNow = document.getElementById('backupInfo'); if(elNow) elNow.textContent = 'Impossible de vérifier la sauvegarde.'; });
+}
+
+function restoreFromBackup(){
+  if(!backupRef){ showToast('Connexion indisponible, réessayez plus tard.'); return; }
+  openConfirmModal(
+    'Restaurer la dernière sauvegarde ?',
+    'Toutes les données actuelles (listes, photos, prix, échographies, prono, tâches, likes Vinted) seront remplacées par celles de la dernière sauvegarde. Cette action est irréversible.',
+    () => {
+      backupRef.child('snapshot').once('value').then(snap => {
+        const snapshot = snap.val();
+        if(!snapshot){ showToast('Aucune sauvegarde disponible.'); closeModal(); return; }
+        data = normalizeData(snapshot);
+        save();
+        closeModal();
+        render();
+        showToast('Données restaurées');
+      }).catch(err => { showToast('Échec de la restauration : ' + err.message); closeModal(); });
+    },
+    'Restaurer',
+    'download'
+  );
 }
 
 function openSettingsPanel(){
@@ -1968,14 +2027,20 @@ function openSettingsPanel(){
     </div>
     <div class="field">
       <label class="field-label">Sauvegarde</label>
-      <button type="button" class="chip-btn" id="btnExportData" style="width:100%; justify-content:center;">${icon('download','icon-sm')} Exporter mes données (JSON)</button>
+      <div id="backupInfo" style="font-size:12.5px; color:var(--muted); margin-bottom:8px;">Vérification…</div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="chip-btn" id="btnSaveBackup" style="flex:1; justify-content:center;">${icon('download','icon-sm')} Sauvegarder les données</button>
+        <button type="button" class="chip-btn" id="btnRestoreBackup" style="flex:1; justify-content:center;" disabled>Restaurer</button>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Fermer</button>
       <button class="btn btn-primary" id="mSave">Enregistrer</button>
     </div>
   `);
-  document.getElementById('btnExportData').onclick = exportDataBackup;
+  document.getElementById('btnSaveBackup').onclick = saveBackupNow;
+  document.getElementById('btnRestoreBackup').onclick = restoreFromBackup;
+  refreshBackupInfo();
   updateConnectionBadge(lastConnectionState);
   document.getElementById('mCancel').onclick = closeModal;
   document.getElementById('mSave').onclick = () => {
@@ -3026,13 +3091,15 @@ function openModal(innerHtml){
   document.getElementById('overlayEl').addEventListener('mousedown', (e) => { if(e.target.id === 'overlayEl') closeModal(); });
 }
 
-function openConfirmModal(title, msg, onConfirm){
+function openConfirmModal(title, msg, onConfirm, confirmLabel, confirmIconName){
+  confirmLabel = confirmLabel || 'Supprimer';
+  confirmIconName = confirmIconName || 'trash';
   openModal(`
     <h2>${escapeHtml(title)}</h2>
     <p style="color:var(--muted); font-size:14px;">${escapeHtml(msg)}</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-danger" id="mConfirm">${icon('trash','icon-sm')} Supprimer</button>
+      <button class="btn btn-danger" id="mConfirm">${icon(confirmIconName,'icon-sm')} ${escapeHtml(confirmLabel)}</button>
     </div>
   `);
   document.getElementById('mCancel').onclick = closeModal;
