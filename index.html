@@ -268,6 +268,11 @@
   }
   .item-sub{font-size:12px; color:var(--muted); margin-top:1px; display:flex; align-items:center; gap:6px;}
   .link-dot{width:5px;height:5px;border-radius:50%; background:var(--muted-2);}
+  .crosslist-row{background:var(--sage-tint); border-radius:var(--r-sm); margin-bottom:6px; padding:10px 4px;}
+  .crosslist-tag{font-style:italic; color:var(--sage-dark); font-weight:600;}
+  .crosslist-checks{display:flex; flex-direction:column; gap:8px;}
+  .crosslist-check{display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink); cursor:pointer;}
+  .crosslist-check input{width:16px; height:16px; flex-shrink:0; accent-color:var(--sage-dark);}
 
   .stepper{display:flex; align-items:center; gap:2px; background:#F4EEE1; border-radius:999px; padding:3px; flex-shrink:0;}
   .stepper button{
@@ -621,7 +626,7 @@ function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0];
 function makeSection(label, period, list){
   return {
     id: newId(), label, period,
-    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', purchases: [], extraPhotos: [] }))
+    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', purchases: [], extraPhotos: [], crossSections: [] }))
   };
 }
 
@@ -834,6 +839,7 @@ function buildDefaultData(){
     categories:[vetements, puericulture, chambre, maternite],
     ultrasounds: [],
     vintedLikes: [],
+    synonyms: [],
     todos: [],
     headerTagline: 'votre liste de naissance',
     homeTodoCount: 3,
@@ -960,11 +966,15 @@ function normalizeData(d){
         }
         delete it.price;
         normalizeItemPurchases(it);
+        it.crossSections = Array.isArray(it.crossSections) ? it.crossSections.filter(Boolean) : [];
       });
     });
   });
   if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
   d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
+  if(!Array.isArray(d.synonyms)) d.synonyms = [];
+  d.synonyms.forEach(g => { g.terms = Array.isArray(g.terms) ? g.terms.filter(Boolean) : []; });
+  d.synonyms = d.synonyms.filter(g => g.terms.length >= 2);
   if(!Array.isArray(d.vintedLikes)) d.vintedLikes = [];
   d.vintedLikes.forEach(v => {
     if(!Array.isArray(v.photos)) v.photos = [];
@@ -1495,14 +1505,27 @@ function normalizeSearch(s){
   return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function searchItems(query){
+function expandSearchTerms(query){
   const q = normalizeSearch(query);
-  if(!q) return [];
+  const terms = new Set([q]);
+  (data.synonyms || []).forEach(group => {
+    const normTerms = (group.terms || []).map(normalizeSearch);
+    if(normTerms.some(t => t && (t.includes(q) || q.includes(t)))){
+      normTerms.forEach(t => { if(t) terms.add(t); });
+    }
+  });
+  return Array.from(terms);
+}
+
+function searchItems(query){
+  const terms = expandSearchTerms(query);
+  if(!terms.length || !terms[0]) return [];
   const results = [];
   data.categories.forEach(cat => {
     cat.sections.forEach(sec => {
       sec.items.forEach(it => {
-        if(normalizeSearch(it.name).includes(q)) results.push({ cat, sec, it });
+        const nName = normalizeSearch(it.name);
+        if(terms.some(t => t && nName.includes(t))) results.push({ cat, sec, it });
       });
     });
   });
@@ -2000,6 +2023,23 @@ function restoreFromBackup(){
   );
 }
 
+function renderSynonymListInto(container){
+  const groups = data.synonyms || [];
+  container.innerHTML = groups.length ? groups.map(g => `
+    <span class="chip-btn" style="cursor:default;">
+      ${escapeHtml(g.terms.join(' = '))}
+      <button type="button" data-del-synonym="${g.id}" style="border:none; background:none; cursor:pointer; margin-left:4px; padding:0; display:inline-flex;">${icon('x','icon-sm')}</button>
+    </span>
+  `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucun pour l’instant</span>';
+  container.querySelectorAll('[data-del-synonym]').forEach(btn => {
+    btn.onclick = () => {
+      data.synonyms = (data.synonyms || []).filter(g => g.id !== btn.dataset.delSynonym);
+      save();
+      renderSynonymListInto(container);
+    };
+  });
+}
+
 function openSettingsPanel(){
   openModal(`
     <h2>Paramètres</h2>
@@ -2026,6 +2066,15 @@ function openSettingsPanel(){
       <input type="number" min="0" max="20" id="sTodoCount" value="${data.homeTodoCount}">
     </div>
     <div class="field">
+      <label class="field-label">Synonymes de recherche</label>
+      <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Ex. « turbulette, gigoteuse » pour que l’un trouve aussi l’autre.</p>
+      <div id="synonymList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="newSynonymInput" placeholder="ex. turbulette, gigoteuse" style="flex:1;">
+        <button type="button" class="chip-btn" id="btnAddSynonym">Ajouter</button>
+      </div>
+    </div>
+    <div class="field">
       <label class="field-label">Sauvegarde</label>
       <div id="backupInfo" style="font-size:12.5px; color:var(--muted); margin-bottom:8px;">Vérification…</div>
       <div style="display:flex; gap:8px;">
@@ -2038,6 +2087,17 @@ function openSettingsPanel(){
       <button class="btn btn-primary" id="mSave">Enregistrer</button>
     </div>
   `);
+  renderSynonymListInto(document.getElementById('synonymList'));
+  document.getElementById('btnAddSynonym').onclick = () => {
+    const input = document.getElementById('newSynonymInput');
+    const terms = input.value.split(',').map(s => s.trim()).filter(Boolean);
+    if(terms.length < 2){ showToast('Indiquez au moins deux termes équivalents, séparés par des virgules'); return; }
+    if(!Array.isArray(data.synonyms)) data.synonyms = [];
+    data.synonyms.push({ id:newId(), terms });
+    save();
+    input.value = '';
+    renderSynonymListInto(document.getElementById('synonymList'));
+  };
   document.getElementById('btnSaveBackup').onclick = saveBackupNow;
   document.getElementById('btnRestoreBackup').onclick = restoreFromBackup;
   refreshBackupInfo();
@@ -2634,9 +2694,60 @@ function isSecCollapsed(sec){
   return ui.collapsedSections[sec.id] !== false;
 }
 
+function collectCrossListedItems(cat, sec){
+  const out = [];
+  cat.sections.forEach(otherSec => {
+    if(otherSec.id === sec.id) return;
+    otherSec.items.forEach(it => {
+      if((it.crossSections || []).includes(sec.id)) out.push({ homeSec: otherSec, it });
+    });
+  });
+  return out;
+}
+
+function renderCrossListedRow(homeSec, it){
+  const status = itemStatus(it.target, it.acquired);
+  const key = homeSec.id + '::' + it.id;
+  return `<div class="item-row crosslist-row" data-cross-row="${key}">
+    <span class="status-dot status-${status}"></span>
+    <div class="item-main" data-cross-goto="${key}" data-cross-home="${homeSec.id}" data-cross-item="${it.id}">
+      <div class="item-name-row"><span class="item-name">${escapeHtml(it.name)}</span></div>
+      <div class="item-sub"><span>${it.acquired} / ${it.target}</span><span class="link-dot"></span><span class="crosslist-tag">${icon('link','icon-sm')} depuis « ${escapeHtml(homeSec.label)} »</span></div>
+    </div>
+    <div class="stepper">
+      <button data-cross-dec="${key}" data-cross-item="${it.id}" ${it.acquired<=0?'disabled':''}>${icon('minus','icon-sm')}</button>
+      <span class="count">${it.acquired}</span>
+      <button data-cross-inc="${key}" data-cross-item="${it.id}">${icon('plus','icon-sm')}</button>
+    </div>
+  </div>`;
+}
+
+function bindCrossListedEvents(cat, sec){
+  const crossListed = collectCrossListedItems(cat, sec);
+  crossListed.forEach(({ homeSec, it }) => {
+    const key = homeSec.id + '::' + it.id;
+    const row = document.querySelector(`[data-cross-row="${CSS.escape(key)}"]`);
+    if(!row) return;
+    const inc = row.querySelector(`[data-cross-inc="${CSS.escape(key)}"]`);
+    const dec = row.querySelector(`[data-cross-dec="${CSS.escape(key)}"]`);
+    if(inc) inc.onclick = () => { it.acquired++; syncAcquiredFromPurchases(it); save(); render(); };
+    if(dec) dec.onclick = () => { it.acquired = clamp(it.acquired - 1, 0, 9999); syncAcquiredFromPurchases(it); save(); render(); };
+    const mainEl = row.querySelector(`[data-cross-goto="${CSS.escape(key)}"]`);
+    if(mainEl) mainEl.onclick = () => {
+      ui.collapsedSections[homeSec.id] = false;
+      ui.expandedItems[it.id] = true;
+      saveUi();
+      render();
+      const target = document.querySelector(`[data-item-row="${it.id}"]`);
+      if(target) target.scrollIntoView({ behavior:'smooth', block:'center' });
+    };
+  });
+}
+
 function renderSectionHtml(cat, sec){
   const t = sectionTotals(sec);
   const collapsed = isSecCollapsed(sec);
+  const crossListed = collectCrossListedItems(cat, sec);
   return `
     <div class="section-card" data-sec-card="${sec.id}">
       <div class="section-head ${collapsed ? '' : 'open'}" data-sec-toggle="${sec.id}">
@@ -2655,6 +2766,10 @@ function renderSectionHtml(cat, sec){
       <div class="section-body ${collapsed ? '' : 'open'}" data-sec-body="${sec.id}">
         ${sec.items.map(it => renderItemHtml(cat, sec, it)).join('')}
         <button class="add-row-btn" data-add-item="${sec.id}">${icon('plus','icon-sm')} Ajouter un article</button>
+        ${crossListed.length ? `
+          <div class="field-label" style="margin:14px 0 6px;">Également utile ici</div>
+          ${crossListed.map(({homeSec, it}) => renderCrossListedRow(homeSec, it)).join('')}
+        ` : ''}
         <div class="expand-actions" style="margin-top:10px;">
           <button class="text-btn muted" data-rename-sec="${sec.id}">${icon('pencil','icon-sm')} Renommer la section</button>
           <button class="text-btn danger" data-del-sec="${sec.id}">${icon('trash','icon-sm')} Supprimer</button>
@@ -2772,6 +2887,19 @@ function renderItemHtml(cat, sec, it){
         <label class="field-label">Note</label>
         <textarea data-field="note" data-item="${it.id}" placeholder="Taille, couleur, magasin…">${escapeHtml(it.note)}</textarea>
       </div>
+      ${cat.sections.length > 1 ? `
+        <div class="field">
+          <label class="field-label">Afficher aussi dans</label>
+          <div class="crosslist-checks">
+            ${cat.sections.filter(s => s.id !== sec.id).map(s => `
+              <label class="crosslist-check">
+                <input type="checkbox" data-cross-toggle="${it.id}" data-cross-target="${s.id}" ${(it.crossSections||[]).includes(s.id) ? 'checked' : ''}>
+                ${escapeHtml(s.label)}
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
       <div class="expand-actions">
         <button class="text-btn danger" data-del-item="${it.id}">${icon('trash','icon-sm')} Supprimer l’article</button>
         <button class="text-btn muted" data-close-item="${it.id}">Fermer</button>
@@ -2805,6 +2933,7 @@ function bindSectionEvents(cat, sec){
   };
 
   sec.items.forEach(it => bindItemEvents(cat, sec, it));
+  bindCrossListedEvents(cat, sec);
 }
 
 function bindItemEvents(cat, sec, it){
@@ -2906,6 +3035,19 @@ function bindItemEvents(cat, sec, it){
 
   expand.querySelectorAll('[data-zoom-extra-photo]').forEach(imgEl => {
     imgEl.onclick = () => openLightbox(it.extraPhotos, parseInt(imgEl.dataset.index, 10));
+  });
+
+  expand.querySelectorAll('[data-cross-toggle]').forEach(checkbox => {
+    checkbox.onchange = () => {
+      const targetSecId = checkbox.dataset.crossTarget;
+      if(!Array.isArray(it.crossSections)) it.crossSections = [];
+      if(checkbox.checked){
+        if(!it.crossSections.includes(targetSecId)) it.crossSections.push(targetSecId);
+      } else {
+        it.crossSections = it.crossSections.filter(id => id !== targetSecId);
+      }
+      save(); render();
+    };
   });
 
   const delItem = expand.querySelector(`[data-del-item="${it.id}"]`);
@@ -3241,7 +3383,7 @@ function openAddItemModal(cat, sec){
     if(!name){ showToast('Donnez un nom à l’article'); return; }
     const target = clamp(parseInt(document.getElementById('itTarget').value||'0',10), 0, 9999);
     const acquired = clamp(parseInt(document.getElementById('itAcquired').value||'0',10), 0, 9999);
-    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', purchases:[], extraPhotos:[] });
+    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', purchases:[], extraPhotos:[], crossSections:[] });
     ui.collapsedSections[sec.id] = false; saveUi();
     save(); closeModal(); render(); showToast('Article ajouté');
   };
