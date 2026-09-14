@@ -301,7 +301,13 @@
   .v2-char-target-row{display:flex; align-items:center; gap:8px;}
   .v2-char-target-label{flex:1; font-size:13.5px; color:var(--ink); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .v2-char-target-count{font-size:13px; color:var(--muted); font-weight:700; flex-shrink:0;}
-  input.v2-char-target-input{width:40px; flex-shrink:0; text-align:center; padding:8px 2px; font-size:13px;}
+  input.v2-char-target-input{
+    width:34px !important; flex-shrink:0; text-align:center; padding:8px 2px !important; font-size:13px;
+    -moz-appearance:textfield;
+  }
+  input.v2-char-target-input::-webkit-outer-spin-button, input.v2-char-target-input::-webkit-inner-spin-button{
+    -webkit-appearance:none; margin:0;
+  }
   .v2-group-heading{font-size:11.5px; font-weight:800; color:var(--sage-dark); text-transform:uppercase; letter-spacing:0.3px; margin:12px 0 4px;}
   .v2-manage-section{border-bottom:1px solid var(--border); padding:4px 0;}
   .v2-manage-section:last-of-type{border-bottom:none;}
