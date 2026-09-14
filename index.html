@@ -316,12 +316,6 @@
   .v2-line-header .chev{color:var(--muted); flex-shrink:0; transition:transform 0.2s ease;}
   .v2-line-header .chev.open{transform:rotate(180deg);}
   .v2-line-body{padding:12px;}
-  .v2-title-thumbs{display:flex; margin-left:8px;}
-  .v2-title-thumb{
-    width:26px; height:26px; border-radius:7px; object-fit:cover; border:1.5px solid #fff;
-    box-shadow:0 1px 3px rgba(0,0,0,0.15); margin-left:-8px;
-  }
-  .v2-title-thumb:first-child{margin-left:0;}
   .crosslist-check input{width:16px; height:16px; flex-shrink:0; accent-color:var(--sage-dark);}
 
   .stepper{display:flex; align-items:center; gap:2px; background:#F4EEE1; border-radius:999px; padding:3px; flex-shrink:0;}
@@ -3067,25 +3061,6 @@ function renderSearchStateV2(){
   });
 }
 
-function v2PhotosForSize(sizeId){
-  const out = [];
-  (data.v2.lots || []).forEach(lot => {
-    const has = (lot.entries || []).some(e => (e.sizeIds || []).includes(sizeId));
-    if(has && lot.photos && lot.photos[0]) out.push(lot.photos[0]);
-  });
-  return out.slice(0, 3);
-}
-function v2PhotosForCategory(categoryId){
-  const out = [];
-  (data.v2.lots || []).forEach(lot => {
-    const has = (lot.entries || []).some(e => e.categoryId === categoryId);
-    if(has && lot.photos && lot.photos[0]) out.push(lot.photos[0]);
-  });
-  return out.slice(0, 3);
-}
-function v2TitleThumbsHtml(photos){
-  return photos.length ? `<span class="v2-title-thumbs">${photos.map(p => `<img src="${p}" class="v2-title-thumb">`).join('')}</span>` : '';
-}
 
 function renderV2SizeCard(size){
   const t = v2SizeTotals(size.id);
@@ -3096,7 +3071,7 @@ function renderV2SizeCard(size){
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-size-toggle="${size.id}">
         <div class="section-info">
-          <div class="section-title-row"><span class="section-title">${escapeHtml(size.label)}</span>${v2TitleThumbsHtml(v2PhotosForSize(size.id))}</div>
+          <div class="section-title-row"><span class="section-title">${escapeHtml(size.label)}</span></div>
           <div class="section-progress"><div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div></div>
         </div>
         <span class="section-count">${t.acquired}/${t.target}</span>
@@ -3119,7 +3094,7 @@ function renderV2CategoryCard(cat){
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-cat-card-toggle="${cat.id}">
         <div class="section-info">
-          <div class="section-title-row"><span class="section-title">${escapeHtml(cat.label)}</span>${v2TitleThumbsHtml(v2PhotosForCategory(cat.id))}</div>
+          <div class="section-title-row"><span class="section-title">${escapeHtml(cat.label)}</span></div>
           <div class="section-progress"><div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div></div>
         </div>
         <span class="section-count">${t.acquired}/${t.target}</span>
@@ -3148,6 +3123,15 @@ function renderV2QuickAdd(mode, fixedId, options){
   `;
 }
 
+function v2PhotoRefsForPair(sizeId, categoryId){
+  const out = [];
+  (data.v2.lots || []).forEach(lot => {
+    const has = (lot.entries || []).some(e => e.categoryId === categoryId && (e.sizeIds || []).includes(sizeId));
+    if(has) (lot.photos || []).forEach(src => { if(src) out.push({ lot, src }); });
+  });
+  return out;
+}
+
 function renderV2PairRow(sizeId, categoryId, label){
   const acquired = v2AcquiredFor(sizeId, categoryId);
   const target = v2TargetFor(sizeId, categoryId);
@@ -3155,8 +3139,10 @@ function renderV2PairRow(sizeId, categoryId, label){
   const key = sizeId + '::' + categoryId;
   const expanded = !!ui.expandedItems['v2-' + key];
   const entries = v2EntriesFor(sizeId, categoryId);
+  const photoRefs = v2PhotoRefsForPair(sizeId, categoryId);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
+    ${photoRefs.length ? `<button class="item-thumb-wrap" data-v2-pair-thumb="${key}" aria-label="Voir les photos"><img class="item-thumb" src="${photoRefs[0].src}" alt="">${photoRefs.length > 1 ? `<span class="item-thumb-count">${photoRefs.length}</span>` : ''}</button>` : ''}
     <div class="item-main" data-v2-cat-toggle="${key}">
       <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span></div>
       <div class="item-sub"><span>${acquired} / ${target}</span></div>
@@ -3296,6 +3282,21 @@ function bindListsV2Events(photoRefs){
       else { if(!Array.isArray(data.v2.targets)) data.v2.targets = []; data.v2.targets.push({ sizeId, categoryId, target: val }); }
       save(); render();
     });
+  });
+
+  document.querySelectorAll('[data-v2-pair-thumb]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const [sizeId, categoryId] = btn.dataset.v2PairThumb.split('::');
+      const refs = v2PhotoRefsForPair(sizeId, categoryId);
+      if(refs.length){
+        openLightbox(refs.map(r => ({
+          src: r.src,
+          gotoLabel: 'Modifier',
+          onGoto: () => openVetementModal(r.lot)
+        })), 0);
+      }
+    };
   });
 
   document.querySelectorAll('[data-v2-zoom-lot]').forEach(imgEl => {
