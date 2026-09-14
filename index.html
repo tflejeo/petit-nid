@@ -2920,8 +2920,7 @@ function renderListsV2(){
   const groupBy = data.v2.groupBy || 'size';
   main.innerHTML = `
     <button class="add-row-btn" id="btnAddVetement" style="margin:2px 0 12px;">${icon('plus','icon-sm')} Ajouter un vêtement</button>
-    <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
-      <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? 'Catégorie' : 'Taille'}</button>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
       <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Tailles / catégories / marques</button>
     </div>
     ${photoRefs.length ? `
@@ -2937,6 +2936,9 @@ function renderListsV2(){
         `).join('')}
       </div>
     ` : ''}
+    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+      <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? 'Catégorie' : 'Taille'}</button>
+    </div>
     <div id="v2GroupList">
       ${groupBy === 'category'
         ? (data.v2.categories || []).map(cat => renderV2CategoryCard(cat)).join('')
@@ -3180,13 +3182,13 @@ function bindListsV2Events(photoRefs){
 function openVetementModal(existingLot){
   const isNew = !existingLot;
   let photos = isNew ? [] : (existingLot.photos || []).map(src => ({ src, hidden: (existingLot.hiddenPhotos || []).includes(src) }));
-  const firstCat = (data.v2.categories && data.v2.categories[0]) || {};
   let lines = isNew
-    ? [{ id:newId(), sizeIds: [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{}, expanded:true }]
+    ? [{ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, expanded:true }]
     : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues), expanded:false }));
 
   function catOptions(selected){
-    return (data.v2.categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
+    return `<option value="" ${selected ? '' : 'selected'}>Choisir une catégorie…</option>` +
+      (data.v2.categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
   }
   function brandOptions(selected){
     return `<option value="">Marque —</option>` + (data.v2.brands || []).map(b => `<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHtml(b.label)}</option>`).join('');
@@ -3356,7 +3358,7 @@ function openVetementModal(existingLot){
 
   document.getElementById('btnAddLine').onclick = () => {
     lines.forEach(l => { l.expanded = false; });
-    lines.push({ id:newId(), sizeIds: [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{}, expanded:true });
+    lines.push({ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, expanded:true });
     bindLineEvents();
   };
   const cancelBtn = document.getElementById('mCancel');
