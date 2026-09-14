@@ -316,6 +316,12 @@
   .v2-line-header .chev{color:var(--muted); flex-shrink:0; transition:transform 0.2s ease;}
   .v2-line-header .chev.open{transform:rotate(180deg);}
   .v2-line-body{padding:12px;}
+  .v2-title-thumbs{display:flex; margin-left:8px;}
+  .v2-title-thumb{
+    width:26px; height:26px; border-radius:7px; object-fit:cover; border:1.5px solid #fff;
+    box-shadow:0 1px 3px rgba(0,0,0,0.15); margin-left:-8px;
+  }
+  .v2-title-thumb:first-child{margin-left:0;}
   .crosslist-check input{width:16px; height:16px; flex-shrink:0; accent-color:var(--sage-dark);}
 
   .stepper{display:flex; align-items:center; gap:2px; background:#F4EEE1; border-radius:999px; padding:3px; flex-shrink:0;}
@@ -989,6 +995,7 @@ let lastKnownVintedPhotoCount = countVintedPhotos(data);
 // `ui` is per-device navigation state (current screen, open sections) — never synced.
 let ui = loadUi();
 let searchQuery = '';
+let searchQueryV2 = '';
 let uiIsFresh = !localStorage.getItem(UI_STORAGE_KEY);
 if(uiIsFresh && data.categories[0] && data.categories[0].sections[0]){
   ui.collapsedSections[data.categories[0].sections[0].id] = false;
@@ -2893,6 +2900,53 @@ function v2CategoryTotals(categoryId){
 function isV2SizeCollapsed(sizeId){ return ui.collapsedSections['v2-' + sizeId] !== false; }
 function isV2CategoryCollapsed(categoryId){ return ui.collapsedSections['v2c-' + categoryId] !== false; }
 
+function v2GlobalTotals(){
+  let acquired = 0, target = 0;
+  (data.v2.targets || []).forEach(t => { target += t.target; acquired += Math.min(v2AcquiredFor(t.sizeId, t.categoryId), t.target); });
+  const pct = target > 0 ? Math.round((acquired / target) * 100) : 0;
+  return { acquired, target, pct };
+}
+
+function budgetTotalsV2(){
+  let spent = 0;
+  const perCategory = {};
+  (data.v2.lots || []).forEach(lot => {
+    const price = Number(lot.price) || 0;
+    spent += price;
+    const totalQty = (lot.entries || []).reduce((s, e) => s + (Number(e.qty) || 0), 0);
+    if(totalQty > 0 && price > 0){
+      const perUnit = price / totalQty;
+      (lot.entries || []).forEach(e => {
+        if(!perCategory[e.categoryId]) perCategory[e.categoryId] = { spent:0, qty:0 };
+        perCategory[e.categoryId].spent += perUnit * (Number(e.qty) || 0);
+        perCategory[e.categoryId].qty += Number(e.qty) || 0;
+      });
+    }
+  });
+  let projected = 0;
+  (data.v2.targets || []).forEach(t => {
+    const cd = perCategory[t.categoryId];
+    if(cd && cd.qty > 0) projected += (cd.spent / cd.qty) * t.target;
+  });
+  return { spent, projected };
+}
+
+function searchItemsV2(query){
+  const terms = expandSearchTerms(query);
+  if(!terms.length || !terms[0]) return [];
+  const results = [];
+  (data.v2.categories || []).forEach(cat => {
+    const nName = normalizeSearch(cat.label);
+    if(!terms.some(t => t && nName.includes(t))) return;
+    (data.v2.sizes || []).forEach(size => {
+      if(v2TargetFor(size.id, cat.id) > 0 || v2EntriesFor(size.id, cat.id).length > 0){
+        results.push({ size, cat });
+      }
+    });
+  });
+  return results;
+}
+
 function collectV2LotPhotoRefs(){
   const out = [];
   (data.v2.lots || []).forEach(lot => (lot.photos || []).forEach(src => { if(src) out.push({ lot, src }); }));
@@ -2918,34 +2972,119 @@ function renderListsV2(){
   const main = document.getElementById('mainContent');
   const photoRefs = collectV2LotPhotoRefs();
   const groupBy = data.v2.groupBy || 'size';
+  const g = v2GlobalTotals();
+  const budget = budgetTotalsV2();
   main.innerHTML = `
-    <button class="add-row-btn" id="btnAddVetement" style="margin:2px 0 12px;">${icon('plus','icon-sm')} Ajouter un vêtement</button>
-    <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
-      <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Tailles / catégories / marques</button>
-    </div>
-    ${photoRefs.length ? `
-      <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <span>Vos photos</span>
-        <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${data.v2.photoSort === 'size' ? 'Par taille' : 'Plus récentes'}</button>
+    <button class="btn btn-primary" id="btnAddVetement" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter un vêtement</button>
+    <div class="search-wrap">
+      <div class="search-input-wrap">
+        ${icon('search','icon-sm')}
+        <input type="search" id="searchInputV2" placeholder="Rechercher un article dans toutes les listes…" value="${escapeAttr(searchQueryV2)}">
+        ${searchQueryV2 ? `<button class="search-clear" id="btnClearSearchV2">${icon('x','icon-sm')}</button>` : ''}
       </div>
-      <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:16px;">
-        ${photoRefs.map((r, i) => `
-          <button class="gallery-item" data-v2-edit-photo="${i}">
-            <img src="${r.src}" alt="" style="width:110px; height:110px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
-          </button>
-        `).join('')}
-      </div>
-    ` : ''}
-    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-      <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? 'Catégorie' : 'Taille'}</button>
     </div>
-    <div id="v2GroupList">
-      ${groupBy === 'category'
-        ? (data.v2.categories || []).map(cat => renderV2CategoryCard(cat)).join('')
-        : (data.v2.sizes || []).map(size => renderV2SizeCard(size)).join('')}
+    <div id="searchResultsV2"></div>
+    <div id="v2MainContentWrap">
+      <div class="progress-block" style="margin-top:2px; margin-bottom:16px;">
+        <div class="progress-head">
+          <span class="label">Achats</span>
+          <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
+        </div>
+        <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
+        ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
+        <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Paramétrage</button>
+      </div>
+      ${photoRefs.length ? `
+        <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <span>Vos photos</span>
+          <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${data.v2.photoSort === 'size' ? 'Par taille' : 'Plus récentes'}</button>
+        </div>
+        <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:16px; gap:6px;">
+          ${photoRefs.map((r, i) => `
+            <button class="gallery-item" data-v2-edit-photo="${i}">
+              <img src="${r.src}" alt="" style="width:110px; height:110px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+      <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+        <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? 'Catégorie' : 'Taille'}</button>
+      </div>
+      <div id="v2GroupList">
+        ${groupBy === 'category'
+          ? (data.v2.categories || []).map(cat => renderV2CategoryCard(cat)).join('')
+          : (data.v2.sizes || []).map(size => renderV2SizeCard(size)).join('')}
+      </div>
     </div>
   `;
   bindListsV2Events(photoRefs);
+  renderSearchStateV2();
+}
+
+function renderSearchStateV2(){
+  const resultsEl = document.getElementById('searchResultsV2');
+  const wrap = document.getElementById('v2MainContentWrap');
+  if(!resultsEl || !wrap) return;
+  const q = searchQueryV2.trim();
+  if(!q){ resultsEl.innerHTML = ''; wrap.style.display = ''; return; }
+  wrap.style.display = 'none';
+  const results = searchItemsV2(q);
+  if(results.length === 0){
+    resultsEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun article ne correspond à « ${escapeHtml(q)} ».</div></div>`;
+    return;
+  }
+  resultsEl.innerHTML =
+    `<div class="section-heading" style="margin-top:6px;">${results.length} résultat${results.length > 1 ? 's' : ''}</div>` +
+    results.map(({ size, cat }) => {
+      const acquired = v2AcquiredFor(size.id, cat.id);
+      const target = v2TargetFor(size.id, cat.id);
+      const status = itemStatus(target, acquired);
+      return `<button class="search-result-row" data-v2-goto-pair data-goto-size="${size.id}" data-goto-cat="${cat.id}">
+        <span class="status-dot status-${status}"></span>
+        <div class="search-result-main">
+          <div class="item-name">${escapeHtml(cat.label)}</div>
+          <div class="search-result-breadcrumb">${escapeHtml(size.label)}</div>
+        </div>
+        <span class="search-result-count">${acquired}/${target}</span>
+      </button>`;
+    }).join('');
+  resultsEl.querySelectorAll('[data-v2-goto-pair]').forEach(btn => {
+    btn.onclick = () => {
+      const sizeId = btn.dataset.gotoSize, catId = btn.dataset.gotoCat;
+      const groupBy = data.v2.groupBy || 'size';
+      if(groupBy === 'category') ui.collapsedSections['v2c-' + catId] = false;
+      else ui.collapsedSections['v2-' + sizeId] = false;
+      ui.expandedItems['v2-' + sizeId + '::' + catId] = true;
+      searchQueryV2 = '';
+      saveUi();
+      render();
+      const rowKey = sizeId + '::' + catId;
+      const target = document.querySelector(`[data-v2-cat-row="${CSS.escape(rowKey)}"]`);
+      if(target) target.scrollIntoView({ behavior:'smooth', block:'center' });
+    };
+  });
+}
+
+function v2PhotosForSize(sizeId){
+  const out = [];
+  (data.v2.lots || []).forEach(lot => {
+    const has = (lot.entries || []).some(e => (e.sizeIds || []).includes(sizeId));
+    if(has && lot.photos && lot.photos[0]) out.push(lot.photos[0]);
+  });
+  return out.slice(0, 3);
+}
+function v2PhotosForCategory(categoryId){
+  const out = [];
+  (data.v2.lots || []).forEach(lot => {
+    const has = (lot.entries || []).some(e => e.categoryId === categoryId);
+    if(has && lot.photos && lot.photos[0]) out.push(lot.photos[0]);
+  });
+  return out.slice(0, 3);
+}
+function v2TitleThumbsHtml(photos){
+  return photos.length ? `<span class="v2-title-thumbs">${photos.map(p => `<img src="${p}" class="v2-title-thumb">`).join('')}</span>` : '';
 }
 
 function renderV2SizeCard(size){
@@ -2957,7 +3096,7 @@ function renderV2SizeCard(size){
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-size-toggle="${size.id}">
         <div class="section-info">
-          <div class="section-title-row"><span class="section-title">${escapeHtml(size.label)}</span></div>
+          <div class="section-title-row"><span class="section-title">${escapeHtml(size.label)}</span>${v2TitleThumbsHtml(v2PhotosForSize(size.id))}</div>
           <div class="section-progress"><div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div></div>
         </div>
         <span class="section-count">${t.acquired}/${t.target}</span>
@@ -2980,7 +3119,7 @@ function renderV2CategoryCard(cat){
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-cat-card-toggle="${cat.id}">
         <div class="section-info">
-          <div class="section-title-row"><span class="section-title">${escapeHtml(cat.label)}</span></div>
+          <div class="section-title-row"><span class="section-title">${escapeHtml(cat.label)}</span>${v2TitleThumbsHtml(v2PhotosForCategory(cat.id))}</div>
           <div class="section-progress"><div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div></div>
         </div>
         <span class="section-count">${t.acquired}/${t.target}</span>
@@ -3068,6 +3207,11 @@ function bindListsV2Events(photoRefs){
   if(addBtn) addBtn.onclick = () => openVetementModal(null);
   const manageBtn = document.getElementById('btnManageV2');
   if(manageBtn) manageBtn.onclick = openManageV2Modal;
+
+  const searchInput = document.getElementById('searchInputV2');
+  if(searchInput) searchInput.addEventListener('input', () => { searchQueryV2 = searchInput.value; renderSearchStateV2(); });
+  const clearBtn = document.getElementById('btnClearSearchV2');
+  if(clearBtn) clearBtn.onclick = () => { searchQueryV2 = ''; render(); };
 
   document.querySelectorAll('[data-v2-quickadd-size]').forEach(row => {
     const sizeId = row.dataset.v2QuickaddSize;
