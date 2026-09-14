@@ -292,16 +292,16 @@
     display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--border);
     border-radius:var(--r-sm); padding:10px 12px; cursor:pointer;
   }
-  .v2-entry-tags{display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;}
+  .v2-entry-tags-inline{display:flex; flex-wrap:wrap; gap:4px; flex-shrink:0; max-width:38%;}
   .v2-tag{
     display:inline-block; font-size:10.5px; font-weight:800; color:var(--sage-dark);
     background:var(--sage-tint); padding:2px 8px; border-radius:999px;
   }
   .v2-char-target-list{display:flex; flex-direction:column; gap:8px;}
   .v2-char-target-row{display:flex; align-items:center; gap:8px;}
-  .v2-char-target-label{flex:1; font-size:13.5px; color:var(--ink); min-width:0;}
+  .v2-char-target-label{flex:1; font-size:13.5px; color:var(--ink); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .v2-char-target-count{font-size:13px; color:var(--muted); font-weight:700; flex-shrink:0;}
-  .v2-char-target-input{width:56px; flex-shrink:0; text-align:center; padding:8px 2px;}
+  input.v2-char-target-input{width:40px; flex-shrink:0; text-align:center; padding:8px 2px; font-size:13px;}
   .v2-group-heading{font-size:11.5px; font-weight:800; color:var(--sage-dark); text-transform:uppercase; letter-spacing:0.3px; margin:12px 0 4px;}
   .v2-manage-section{border-bottom:1px solid var(--border); padding:4px 0;}
   .v2-manage-section:last-of-type{border-bottom:none;}
@@ -3472,6 +3472,15 @@ function renderV2PairRow(sizeId, categoryId, label){
       html += `<div class="field">
         <label class="field-label">Objectifs par ${escapeHtml(mainChar.label)}</label>
         <div class="v2-char-target-list">
+          ${(() => {
+            const indiffTarget = v2TargetEntriesFor(sizeId, categoryId).find(t => !t.charId);
+            const indiffAcquired = entries.reduce((s, { entry }) => s + ((entry.charValues && entry.charValues[mainChar.id]) ? 0 : (Number(entry.qty) || 0)), 0);
+            return `<div class="v2-char-target-row">
+              <span class="v2-char-target-label">Indifférent</span>
+              <span class="v2-char-target-count">${indiffAcquired} /</span>
+              <input type="number" min="0" class="v2-char-target-input" data-v2-target="${key}" value="${indiffTarget ? indiffTarget.target : 0}">
+            </div>`;
+          })()}
           ${mainChar.values.map(v => {
             const vTarget = v2TargetForValue(sizeId, categoryId, mainChar.id, v.id);
             const vAcquired = v2AcquiredForValue(sizeId, categoryId, mainChar.id, v.id);
@@ -3528,8 +3537,8 @@ function renderV2EntryRow(lot, entry){
         <div class="unit-photo-thumb"><img src="${lot.photos[0]}" data-v2-zoom-lot="${lot.id}"></div>
       ` : ''}
     </div>
+    ${tags.length ? `<div class="v2-entry-tags-inline">${tags.map(t => `<span class="v2-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
     <div style="flex:1; font-size:13px; color:var(--ink); min-width:0;">
-      ${tags.length ? `<div class="v2-entry-tags">${tags.map(t => `<span class="v2-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
       ${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}${lot.price ? ' · lot ' + formatPrice(lot.price) : ''}
     </div>
     <button class="text-btn danger" data-v2-del-entry="${entry.id}" data-v2-lot="${lot.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
@@ -3923,7 +3932,7 @@ function openManageV2Modal(){
           <div class="field" style="flex:1;"><label class="field-label">Nom du 2ᵉ filtre (ex. Catégorie)</label><input type="text" id="v2CategoryLabel" value="${escapeAttr(list.categoryLabel)}"></div>
         </div>
         <button type="button" class="chip-btn" id="btnSaveV2General" style="margin-bottom:10px;">Enregistrer ces noms</button>
-        <button type="button" class="chip-btn" id="btnPullV1Categories" style="margin-bottom:10px;">${icon('download','icon-sm')} Récupérer les catégories depuis « Mes listes »</button>
+        <button type="button" class="chip-btn" id="btnPullV1Categories" style="margin-bottom:10px;">${icon('download','icon-sm')} Récupérer sections, catégories et objectifs depuis « Mes listes »</button>
         ${(data.v2lists || []).length > 1 ? `<button type="button" class="chip-btn danger" id="btnDeleteV2List">${icon('trash','icon-sm')} Supprimer cette liste</button>` : ''}
       </div>
     </div>
@@ -3974,19 +3983,40 @@ function openManageV2Modal(){
     const norm = s => (s || '').trim().toLowerCase();
     const key = Object.keys(seeds).find(k => norm(k) === norm(list.name));
     if(!key){ showToast('Aucune liste « ' + list.name + ' » trouvée dans Mes listes'); return; }
-    const existing = new Set((list.categories || []).map(c => norm(c.label)));
-    let added = 0;
+    if(!Array.isArray(list.sizes)) list.sizes = [];
+    if(!Array.isArray(list.categories)) list.categories = [];
+    if(!Array.isArray(list.targets)) list.targets = [];
+    const sizeByLabel = new Map(list.sizes.map(s => [norm(s.label), s]));
+    const catByLabel = new Map(list.categories.map(c => [norm(c.label), c]));
+    let addedSizes = 0, addedCats = 0, addedTargets = 0;
     seeds[key].forEach(([sectionLabel, period, items]) => {
-      items.forEach(([itemName]) => {
-        if(!existing.has(norm(itemName))){
-          existing.add(norm(itemName));
-          list.categories.push({ id:newId(), label:itemName });
-          added++;
+      let sizeObj = sizeByLabel.get(norm(sectionLabel));
+      if(!sizeObj){
+        sizeObj = { id:newId(), label:sectionLabel };
+        list.sizes.push(sizeObj);
+        sizeByLabel.set(norm(sectionLabel), sizeObj);
+        addedSizes++;
+      }
+      items.forEach(([itemName, targetQty]) => {
+        let catObj = catByLabel.get(norm(itemName));
+        if(!catObj){
+          catObj = { id:newId(), label:itemName };
+          list.categories.push(catObj);
+          catByLabel.set(norm(itemName), catObj);
+          addedCats++;
+        }
+        const hasTarget = list.targets.some(t => t.sizeId === sizeObj.id && t.categoryId === catObj.id && !t.charId);
+        if(!hasTarget){
+          list.targets.push({ sizeId:sizeObj.id, categoryId:catObj.id, target: Math.max(1, parseInt(targetQty, 10) || 1) });
+          addedTargets++;
         }
       });
     });
-    if(added > 0){ save(); showToast(added + ' catégorie(s) ajoutée(s)'); closeModal(); openManageV2Modal(); }
-    else showToast('Rien de nouveau à récupérer');
+    if(addedSizes || addedCats || addedTargets){
+      save();
+      showToast(`${addedSizes} section(s), ${addedCats} catégorie(s), ${addedTargets} objectif(s) ajoutés`);
+      closeModal(); openManageV2Modal();
+    } else showToast('Rien de nouveau à récupérer');
   };
   const deleteListBtn = document.getElementById('btnDeleteV2List');
   if(deleteListBtn) deleteListBtn.onclick = () => openConfirmModal(
