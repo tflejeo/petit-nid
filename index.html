@@ -854,8 +854,7 @@ function restoreThreeMoisSection(d){
 // listes initiales correspondantes — un point de départ à nettoyer/organiser ensuite.
 // Ne touche jamais une liste V2 déjà personnalisée (catégories non vides).
 function v2SeedCategoriesFromV1(d){
-  if(d.v2CategoriesSeeded) return false;
-  d.v2CategoriesSeeded = true;
+  if(d.v2CategoriesSeededV2) return false;
   if(!Array.isArray(d.v2lists)) return false;
   const seeds = defaultCategorySeeds();
   let changed = false;
@@ -875,6 +874,7 @@ function v2SeedCategoriesFromV1(d){
     });
     changed = true;
   });
+  d.v2CategoriesSeededV2 = true;
   return changed;
 }
 
@@ -1181,6 +1181,14 @@ function normalizeV2(d){
     }
   }
   delete d.v2;
+  // Répare les comptes migrés depuis l'ancien format à liste unique, qui n'avaient
+  // reçu que « Vêtements bébé » sans les nouvelles listes par défaut.
+  if(!d.v2DefaultListsEnsured){
+    ['Puériculture', 'Chambre', 'Valise de maternité'].forEach(name => {
+      if(!d.v2lists.some(l => l && l.name === name)) d.v2lists.push(buildEmptyV2List(name));
+    });
+    d.v2DefaultListsEnsured = true;
+  }
   d.v2lists = denseArrayFrom(d.v2lists).filter(Boolean).map(normalizeV2List);
 }
 
