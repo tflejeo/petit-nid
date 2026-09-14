@@ -876,7 +876,26 @@ function buildDefaultV2(){
     });
   });
   const brands = ['Petit Bateau','Vertbaudet','Jacadi'].map(label => ({ id:newId(), label }));
-  return { sizes, categories, brands, targets, lots: [], characteristics: [], groupBy: 'size', photoSort: 'date' };
+  return {
+    id:newId(), name:'Vêtements bébé', sizeLabel:'Taille', categoryLabel:'Catégorie',
+    sizes, categories, brands, targets, lots: [], characteristics: [], groupBy: 'size', photoSort: 'date'
+  };
+}
+
+function buildEmptyV2List(name){
+  return {
+    id:newId(), name, sizeLabel:'Filtre A', categoryLabel:'Catégorie',
+    sizes:[], categories:[], brands:[], targets:[], lots:[], characteristics:[], groupBy:'size', photoSort:'date'
+  };
+}
+
+function buildDefaultV2Lists(){
+  return [
+    buildDefaultV2(),
+    buildEmptyV2List('Puériculture'),
+    buildEmptyV2List('Chambre'),
+    buildEmptyV2List('Valise de maternité')
+  ];
 }
 
 function buildDefaultData(){
@@ -955,7 +974,7 @@ function buildDefaultData(){
     homeTodoCount: 3,
     sizeFruit: '',
     sizeAnimal: '',
-    v2: buildDefaultV2()
+    v2lists: buildDefaultV2Lists()
   };
 }
 
@@ -1072,9 +1091,11 @@ function syncAcquiredFromPurchases(it){
   }
 }
 
-function normalizeV2(d){
-  if(!d.v2 || typeof d.v2 !== 'object') d.v2 = buildDefaultV2();
-  const v2 = d.v2;
+function normalizeV2List(v2){
+  v2.id = v2.id || newId();
+  v2.name = v2.name || 'Liste';
+  v2.sizeLabel = v2.sizeLabel || 'Taille';
+  v2.categoryLabel = v2.categoryLabel || 'Catégorie';
   v2.sizes = denseArrayFrom(v2.sizes).filter(Boolean);
   v2.categories = denseArrayFrom(v2.categories).filter(Boolean);
   v2.brands = denseArrayFrom(v2.brands).filter(Boolean);
@@ -1106,6 +1127,26 @@ function normalizeV2(d){
     });
     return lot;
   });
+  return v2;
+}
+
+function normalizeV2(d){
+  if(!Array.isArray(d.v2lists) || !d.v2lists.length){
+    // migration depuis l'ancien format à liste unique, ou toute première initialisation
+    if(d.v2 && typeof d.v2 === 'object'){
+      d.v2lists = [Object.assign({ name:'Vêtements bébé', sizeLabel:'Taille', categoryLabel:'Catégorie' }, d.v2)];
+    } else {
+      d.v2lists = buildDefaultV2Lists();
+    }
+  }
+  delete d.v2;
+  d.v2lists = denseArrayFrom(d.v2lists).filter(Boolean).map(normalizeV2List);
+}
+
+function activeV2List(){
+  if(!Array.isArray(data.v2lists) || !data.v2lists.length) return null;
+  if(!ui.activeV2ListId) return null;
+  return data.v2lists.find(l => l.id === ui.activeV2ListId) || null;
 }
 
 function normalizeData(d){
@@ -1176,17 +1217,18 @@ function loadUi(){
     return {
       view: (parsed && parsed.view) || 'dashboard',
       activeCategoryId: (parsed && parsed.activeCategoryId) || null,
+      activeV2ListId: (parsed && parsed.activeV2ListId) || null,
       collapsedSections: (parsed && parsed.collapsedSections) || {},
       expandedItems: {}
     };
   }catch(e){
-    return { view:'dashboard', activeCategoryId:null, collapsedSections:{}, expandedItems:{} };
+    return { view:'dashboard', activeCategoryId:null, activeV2ListId:null, collapsedSections:{}, expandedItems:{} };
   }
 }
 function saveUi(){
   try{
     localStorage.setItem(UI_STORAGE_KEY, JSON.stringify({
-      view: ui.view, activeCategoryId: ui.activeCategoryId, collapsedSections: ui.collapsedSections
+      view: ui.view, activeCategoryId: ui.activeCategoryId, activeV2ListId: ui.activeV2ListId, collapsedSections: ui.collapsedSections
     }));
   }catch(e){}
 }
@@ -1619,10 +1661,12 @@ function collectAllPhotos(){
 
 function collectV2GalleryPhotos(){
   const out = [];
-  (data.v2.lots || []).forEach(lot => (lot.photos || []).forEach(src => {
-    if((lot.hiddenPhotos || []).includes(src)) return;
-    out.push({ src, lot });
-  }));
+  (data.v2lists || []).forEach(list => {
+    (list.lots || []).forEach(lot => (lot.photos || []).forEach(src => {
+      if((lot.hiddenPhotos || []).includes(src)) return;
+      out.push({ src, lot });
+    }));
+  });
   return out;
 }
 
@@ -2840,44 +2884,44 @@ function openEditVintedLikeModal(v){
 }
 
 /* ---------- Mes listes V2 ---------- */
-function v2SizeLabel(id){ const s = (data.v2.sizes||[]).find(x=>x.id===id); return s ? s.label : '—'; }
-function v2CategoryLabel(id){ const c = (data.v2.categories||[]).find(x=>x.id===id); return c ? c.label : '—'; }
-function v2BrandLabel(id){ if(!id) return ''; const b = (data.v2.brands||[]).find(x=>x.id===id); return b ? b.label : ''; }
+function v2SizeLabel(id){ const s = (activeV2List().sizes||[]).find(x=>x.id===id); return s ? s.label : '—'; }
+function v2CategoryLabel(id){ const c = (activeV2List().categories||[]).find(x=>x.id===id); return c ? c.label : '—'; }
+function v2BrandLabel(id){ if(!id) return ''; const b = (activeV2List().brands||[]).find(x=>x.id===id); return b ? b.label : ''; }
 
 function v2AcquiredFor(sizeId, categoryId){
   let n = 0;
-  (data.v2.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+  (activeV2List().lots || []).forEach(lot => (lot.entries || []).forEach(e => {
     if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId) n += Number(e.qty) || 0;
   }));
   return n;
 }
 function v2TargetFor(sizeId, categoryId){
-  const t = (data.v2.targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
+  const t = (activeV2List().targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
   return t ? t.target : 0;
 }
 function v2EntriesFor(sizeId, categoryId){
   const out = [];
-  (data.v2.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+  (activeV2List().lots || []).forEach(lot => (lot.entries || []).forEach(e => {
     if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId) out.push({ lot, entry:e });
   }));
   return out;
 }
 function v2CategoriesForSize(sizeId){
-  return (data.v2.categories || []).filter(c => v2TargetFor(sizeId, c.id) > 0 || v2EntriesFor(sizeId, c.id).length > 0);
+  return (activeV2List().categories || []).filter(c => v2TargetFor(sizeId, c.id) > 0 || v2EntriesFor(sizeId, c.id).length > 0);
 }
 function v2SizesForCategory(categoryId){
-  return (data.v2.sizes || []).filter(s => v2TargetFor(s.id, categoryId) > 0 || v2EntriesFor(s.id, categoryId).length > 0);
+  return (activeV2List().sizes || []).filter(s => v2TargetFor(s.id, categoryId) > 0 || v2EntriesFor(s.id, categoryId).length > 0);
 }
 function v2CategoriesNotInSize(sizeId){
   const shown = new Set(v2CategoriesForSize(sizeId).map(c => c.id));
-  return (data.v2.categories || []).filter(c => !shown.has(c.id));
+  return (activeV2List().categories || []).filter(c => !shown.has(c.id));
 }
 function v2SizesNotInCategory(categoryId){
   const shown = new Set(v2SizesForCategory(categoryId).map(s => s.id));
-  return (data.v2.sizes || []).filter(s => !shown.has(s.id));
+  return (activeV2List().sizes || []).filter(s => !shown.has(s.id));
 }
 function v2CharacteristicsForCategory(categoryId){
-  return (data.v2.characteristics || []).filter(c => (c.categoryIds || []).includes(categoryId));
+  return (activeV2List().characteristics || []).filter(c => (c.categoryIds || []).includes(categoryId));
 }
 function v2SizeTotals(sizeId){
   let acquired = 0, target = 0;
@@ -2894,9 +2938,23 @@ function v2CategoryTotals(categoryId){
 function isV2SizeCollapsed(sizeId){ return ui.collapsedSections['v2-' + sizeId] !== false; }
 function isV2CategoryCollapsed(categoryId){ return ui.collapsedSections['v2c-' + categoryId] !== false; }
 
+function v2GlobalTotalsForList(list){
+  let acquired = 0, target = 0;
+  (list.targets || []).forEach(t => {
+    let a = 0;
+    (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+      if((e.sizeIds || []).includes(t.sizeId) && e.categoryId === t.categoryId) a += Number(e.qty) || 0;
+    }));
+    target += t.target;
+    acquired += Math.min(a, t.target);
+  });
+  const pct = target > 0 ? Math.round((acquired / target) * 100) : 0;
+  return { acquired, target, pct };
+}
+
 function v2GlobalTotals(){
   let acquired = 0, target = 0;
-  (data.v2.targets || []).forEach(t => { target += t.target; acquired += Math.min(v2AcquiredFor(t.sizeId, t.categoryId), t.target); });
+  (activeV2List().targets || []).forEach(t => { target += t.target; acquired += Math.min(v2AcquiredFor(t.sizeId, t.categoryId), t.target); });
   const pct = target > 0 ? Math.round((acquired / target) * 100) : 0;
   return { acquired, target, pct };
 }
@@ -2904,7 +2962,7 @@ function v2GlobalTotals(){
 function budgetTotalsV2(){
   let spent = 0;
   const perCategory = {};
-  (data.v2.lots || []).forEach(lot => {
+  (activeV2List().lots || []).forEach(lot => {
     const price = Number(lot.price) || 0;
     spent += price;
     const totalQty = (lot.entries || []).reduce((s, e) => s + (Number(e.qty) || 0), 0);
@@ -2918,7 +2976,7 @@ function budgetTotalsV2(){
     }
   });
   let projected = 0;
-  (data.v2.targets || []).forEach(t => {
+  (activeV2List().targets || []).forEach(t => {
     const cd = perCategory[t.categoryId];
     if(cd && cd.qty > 0) projected += (cd.spent / cd.qty) * t.target;
   });
@@ -2929,10 +2987,10 @@ function searchItemsV2(query){
   const terms = expandSearchTerms(query);
   if(!terms.length || !terms[0]) return [];
   const results = [];
-  (data.v2.categories || []).forEach(cat => {
+  (activeV2List().categories || []).forEach(cat => {
     const nName = normalizeSearch(cat.label);
     if(!terms.some(t => t && nName.includes(t))) return;
-    (data.v2.sizes || []).forEach(size => {
+    (activeV2List().sizes || []).forEach(size => {
       if(v2TargetFor(size.id, cat.id) > 0 || v2EntriesFor(size.id, cat.id).length > 0){
         results.push({ size, cat });
       }
@@ -2943,13 +3001,13 @@ function searchItemsV2(query){
 
 function collectV2LotPhotoRefs(){
   const out = [];
-  (data.v2.lots || []).forEach(lot => (lot.photos || []).forEach(src => { if(src) out.push({ lot, src }); }));
-  const sortMode = data.v2.photoSort || 'date';
+  (activeV2List().lots || []).forEach(lot => (lot.photos || []).forEach(src => { if(src) out.push({ lot, src }); }));
+  const sortMode = activeV2List().photoSort || 'date';
   if(sortMode === 'date'){
     out.reverse(); // les lots sont ajoutés à la suite : inverser fait remonter les plus récents en premier
   } else {
     const sizeIndex = {};
-    (data.v2.sizes || []).forEach((s, i) => { sizeIndex[s.id] = i; });
+    (activeV2List().sizes || []).forEach((s, i) => { sizeIndex[s.id] = i; });
     const minSizeIdx = (lot) => {
       let m = Infinity;
       (lot.entries || []).forEach(e => (e.sizeIds || []).forEach(sid => {
@@ -2962,18 +3020,69 @@ function collectV2LotPhotoRefs(){
   return out;
 }
 
+function renderV2ListPicker(){
+  const main = document.getElementById('mainContent');
+  const lists = data.v2lists || [];
+  main.innerHTML = `
+    <div class="section-heading" style="margin-top:2px;">Choisissez une liste</div>
+    <div class="cat-grid" id="v2ListGrid">
+      ${lists.map(l => {
+        const t = v2GlobalTotalsForList(l);
+        return `<button class="cat-card" data-v2-select-list="${l.id}">
+          <div class="cat-icon" style="background:var(--sage-dark);">${icon('box','icon-lg')}</div>
+          <div>
+            <div class="cat-name">${escapeHtml(l.name)}</div>
+            <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
+          </div>
+          <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
+        </button>`;
+      }).join('')}
+      <button class="cat-card add-card" id="btnAddV2List">${icon('plus','icon-lg')}<span>Nouvelle liste</span></button>
+    </div>
+  `;
+  document.querySelectorAll('[data-v2-select-list]').forEach(btn => {
+    btn.onclick = () => { ui.activeV2ListId = btn.dataset.v2SelectList; saveUi(); render(); };
+  });
+  document.getElementById('btnAddV2List').onclick = () => {
+    openModal(`
+      <h2>Nouvelle liste</h2>
+      <div class="field"><label class="field-label">Nom</label><input type="text" id="newV2ListName" placeholder="ex. Jouets"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="mCancel">Annuler</button>
+        <button class="btn btn-primary" id="mSave">Créer</button>
+      </div>
+    `);
+    document.getElementById('mCancel').onclick = closeModal;
+    document.getElementById('mSave').onclick = () => {
+      const name = document.getElementById('newV2ListName').value.trim();
+      if(!name){ showToast('Donnez un nom à la liste'); return; }
+      const list = buildEmptyV2List(name);
+      if(!Array.isArray(data.v2lists)) data.v2lists = [];
+      data.v2lists.push(list);
+      ui.activeV2ListId = list.id;
+      save(); saveUi(); closeModal(); render(); showToast('Liste créée');
+    };
+  };
+}
+
 function renderListsV2(){
+  const list = activeV2List();
+  if(!list){ renderV2ListPicker(); return; }
   const main = document.getElementById('mainContent');
   const photoRefs = collectV2LotPhotoRefs();
-  const groupBy = data.v2.groupBy || 'size';
+  const groupBy = list.groupBy || 'size';
   const g = v2GlobalTotals();
   const budget = budgetTotalsV2();
   main.innerHTML = `
-    <button class="btn btn-primary" id="btnAddVetement" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter un vêtement</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
+      <h2 style="font-family:var(--font-display); font-weight:600; font-size:19px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(list.name)}</h2>
+      <button class="text-btn muted" id="btnChangeV2List" style="flex-shrink:0;">${icon('chevronLeft','icon-sm')} Changer de liste</button>
+    </div>
+    <button class="btn btn-primary" id="btnAddVetement" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter un article</button>
     <div class="search-wrap">
       <div class="search-input-wrap">
         ${icon('search','icon-sm')}
-        <input type="search" id="searchInputV2" placeholder="Rechercher un article dans toutes les listes…" value="${escapeAttr(searchQueryV2)}">
+        <input type="search" id="searchInputV2" placeholder="Rechercher un article dans cette liste…" value="${escapeAttr(searchQueryV2)}">
         ${searchQueryV2 ? `<button class="search-clear" id="btnClearSearchV2">${icon('x','icon-sm')}</button>` : ''}
       </div>
     </div>
@@ -2993,7 +3102,7 @@ function renderListsV2(){
       ${photoRefs.length ? `
         <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <span>Vos photos</span>
-          <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${data.v2.photoSort === 'size' ? 'Par taille' : 'Plus récentes'}</button>
+          <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${list.photoSort === 'size' ? 'Par ' + list.sizeLabel.toLowerCase() : 'Plus récentes'}</button>
         </div>
         <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:16px; gap:6px;">
           ${photoRefs.map((r, i) => `
@@ -3004,15 +3113,16 @@ function renderListsV2(){
         </div>
       ` : ''}
       <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-        <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? 'Catégorie' : 'Taille'}</button>
+        <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? list.categoryLabel : list.sizeLabel}</button>
       </div>
       <div id="v2GroupList">
         ${groupBy === 'category'
-          ? (data.v2.categories || []).map(cat => renderV2CategoryCard(cat)).join('')
-          : (data.v2.sizes || []).map(size => renderV2SizeCard(size)).join('')}
+          ? (list.categories || []).map(cat => renderV2CategoryCard(cat)).join('')
+          : (list.sizes || []).map(size => renderV2SizeCard(size)).join('')}
       </div>
     </div>
   `;
+  document.getElementById('btnChangeV2List').onclick = () => { ui.activeV2ListId = null; saveUi(); render(); };
   bindListsV2Events(photoRefs);
   renderSearchStateV2();
 }
@@ -3047,7 +3157,7 @@ function renderSearchStateV2(){
   resultsEl.querySelectorAll('[data-v2-goto-pair]').forEach(btn => {
     btn.onclick = () => {
       const sizeId = btn.dataset.gotoSize, catId = btn.dataset.gotoCat;
-      const groupBy = data.v2.groupBy || 'size';
+      const groupBy = activeV2List().groupBy || 'size';
       if(groupBy === 'category') ui.collapsedSections['v2c-' + catId] = false;
       else ui.collapsedSections['v2-' + sizeId] = false;
       ui.expandedItems['v2-' + sizeId + '::' + catId] = true;
@@ -3109,8 +3219,9 @@ function renderV2CategoryCard(cat){
 }
 
 function renderV2QuickAdd(mode, fixedId, options){
+  const list = activeV2List();
   const attr = mode === 'size' ? 'data-v2-quickadd-size' : 'data-v2-quickadd-cat';
-  const placeholder = mode === 'size' ? 'Ajouter une catégorie…' : 'Ajouter une taille…';
+  const placeholder = mode === 'size' ? `Ajouter : ${list.categoryLabel}…` : `Ajouter : ${list.sizeLabel}…`;
   return `
     <div class="v2-quickadd" ${attr}="${fixedId}">
       <select class="v2-quickadd-select">
@@ -3125,7 +3236,7 @@ function renderV2QuickAdd(mode, fixedId, options){
 
 function v2PhotoRefsForPair(sizeId, categoryId){
   const out = [];
-  (data.v2.lots || []).forEach(lot => {
+  (activeV2List().lots || []).forEach(lot => {
     const has = (lot.entries || []).some(e => e.categoryId === categoryId && (e.sizeIds || []).includes(sizeId));
     if(has) (lot.photos || []).forEach(src => { if(src) out.push({ lot, src }); });
   });
@@ -3206,8 +3317,8 @@ function bindListsV2Events(photoRefs){
       const targetInput = row.querySelector('.v2-quickadd-target');
       if(!select.value){ showToast('Choisissez une catégorie'); return; }
       const val = clamp(parseInt(targetInput.value, 10) || 0, 0, 999);
-      if(!Array.isArray(data.v2.targets)) data.v2.targets = [];
-      data.v2.targets.push({ sizeId, categoryId: select.value, target: val });
+      if(!Array.isArray(activeV2List().targets)) activeV2List().targets = [];
+      activeV2List().targets.push({ sizeId, categoryId: select.value, target: val });
       save(); render();
     };
   });
@@ -3219,20 +3330,20 @@ function bindListsV2Events(photoRefs){
       const targetInput = row.querySelector('.v2-quickadd-target');
       if(!select.value){ showToast('Choisissez une taille'); return; }
       const val = clamp(parseInt(targetInput.value, 10) || 0, 0, 999);
-      if(!Array.isArray(data.v2.targets)) data.v2.targets = [];
-      data.v2.targets.push({ sizeId: select.value, categoryId, target: val });
+      if(!Array.isArray(activeV2List().targets)) activeV2List().targets = [];
+      activeV2List().targets.push({ sizeId: select.value, categoryId, target: val });
       save(); render();
     };
   });
 
   const groupBtn = document.getElementById('btnToggleV2Group');
   if(groupBtn) groupBtn.onclick = () => {
-    data.v2.groupBy = (data.v2.groupBy === 'category') ? 'size' : 'category';
+    activeV2List().groupBy = (activeV2List().groupBy === 'category') ? 'size' : 'category';
     save(); render();
   };
   const photoSortBtn = document.getElementById('btnToggleV2PhotoSort');
   if(photoSortBtn) photoSortBtn.onclick = () => {
-    data.v2.photoSort = (data.v2.photoSort === 'size') ? 'date' : 'size';
+    activeV2List().photoSort = (activeV2List().photoSort === 'size') ? 'date' : 'size';
     save(); render();
   };
 
@@ -3277,9 +3388,9 @@ function bindListsV2Events(photoRefs){
     input.addEventListener('change', () => {
       const [sizeId, categoryId] = input.dataset.v2Target.split('::');
       const val = clamp(parseInt(input.value, 10) || 0, 0, 999);
-      let t = (data.v2.targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
+      let t = (activeV2List().targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
       if(t) t.target = val;
-      else { if(!Array.isArray(data.v2.targets)) data.v2.targets = []; data.v2.targets.push({ sizeId, categoryId, target: val }); }
+      else { if(!Array.isArray(activeV2List().targets)) activeV2List().targets = []; activeV2List().targets.push({ sizeId, categoryId, target: val }); }
       save(); render();
     });
   });
@@ -3301,7 +3412,7 @@ function bindListsV2Events(photoRefs){
 
   document.querySelectorAll('[data-v2-zoom-lot]').forEach(imgEl => {
     imgEl.onclick = () => {
-      const lot = (data.v2.lots || []).find(l => l.id === imgEl.dataset.v2ZoomLot);
+      const lot = (activeV2List().lots || []).find(l => l.id === imgEl.dataset.v2ZoomLot);
       if(lot && lot.photos && lot.photos.length){
         openLightbox(lot.photos.map(src => ({
           src,
@@ -3314,10 +3425,10 @@ function bindListsV2Events(photoRefs){
 
   document.querySelectorAll('[data-v2-del-entry]').forEach(btn => {
     btn.onclick = () => openConfirmModal('Supprimer cet article ?', 'Cette ligne sera retirée du lot (les autres articles du même lot ne sont pas affectés).', () => {
-      const lot = (data.v2.lots || []).find(l => l.id === btn.dataset.v2Lot);
+      const lot = (activeV2List().lots || []).find(l => l.id === btn.dataset.v2Lot);
       if(lot){
         lot.entries = lot.entries.filter(e => e.id !== btn.dataset.v2DelEntry);
-        if(lot.entries.length === 0) data.v2.lots = data.v2.lots.filter(l => l.id !== lot.id);
+        if(lot.entries.length === 0) activeV2List().lots = activeV2List().lots.filter(l => l.id !== lot.id);
       }
       save(); closeModal(); render(); showToast('Article supprimé');
     });
@@ -3326,20 +3437,21 @@ function bindListsV2Events(photoRefs){
 
 function openVetementModal(existingLot){
   const isNew = !existingLot;
+  const list = activeV2List();
   let photos = isNew ? [] : (existingLot.photos || []).map(src => ({ src, hidden: (existingLot.hiddenPhotos || []).includes(src) }));
   let lines = isNew
     ? [{ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, expanded:true }]
     : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues), expanded:false }));
 
   function catOptions(selected){
-    return `<option value="" ${selected ? '' : 'selected'}>Choisir une catégorie…</option>` +
-      (data.v2.categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
+    return `<option value="" ${selected ? '' : 'selected'}>Choisir : ${escapeHtml(list.categoryLabel)}…</option>` +
+      (activeV2List().categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
   }
   function brandOptions(selected){
-    return `<option value="">Marque —</option>` + (data.v2.brands || []).map(b => `<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHtml(b.label)}</option>`).join('');
+    return `<option value="">Marque —</option>` + (activeV2List().brands || []).map(b => `<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHtml(b.label)}</option>`).join('');
   }
   function sizeChips(line){
-    return (data.v2.sizes || []).map(s => `<button type="button" class="chip-toggle ${line.sizeIds.includes(s.id) ? 'selected' : ''}" data-line-size="${line.id}" data-size-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
+    return (activeV2List().sizes || []).map(s => `<button type="button" class="chip-toggle ${line.sizeIds.includes(s.id) ? 'selected' : ''}" data-line-size="${line.id}" data-size-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
   }
   function charPickersHtml(line){
     const chars = v2CharacteristicsForCategory(line.categoryId);
@@ -3354,8 +3466,8 @@ function openVetementModal(existingLot){
     `).join('');
   }
   function lineSummary(l){
-    const catLabel = l.categoryId ? v2CategoryLabel(l.categoryId) : 'Catégorie non choisie';
-    const sizesLabel = l.sizeIds.length ? l.sizeIds.map(id => v2SizeLabel(id)).join(', ') : 'Taille non choisie';
+    const catLabel = l.categoryId ? v2CategoryLabel(l.categoryId) : `${list.categoryLabel} non choisi(e)`;
+    const sizesLabel = l.sizeIds.length ? l.sizeIds.map(id => v2SizeLabel(id)).join(', ') : `${list.sizeLabel} non choisi(e)`;
     const brandLabel = l.brandId ? v2BrandLabel(l.brandId) : '';
     return `${catLabel} · ${sizesLabel}${brandLabel ? ' · ' + brandLabel : ''} · Qté ${l.qty}`;
   }
@@ -3367,7 +3479,7 @@ function openVetementModal(existingLot){
           <span class="chev ${l.expanded ? 'open' : ''}">${icon('chevronDown','icon-sm')}</span>
         </button>
         <div class="v2-line-body" style="display:${l.expanded ? 'block' : 'none'};">
-          <div class="field-label" style="margin-bottom:4px;">Tailles</div>
+          <div class="field-label" style="margin-bottom:4px;">${escapeHtml(list.sizeLabel)}</div>
           <div class="v2-size-chips">${sizeChips(l)}</div>
           <div style="margin-top:8px;">
             <select data-line-field="categoryId" data-line="${l.id}" style="width:100%;">${catOptions(l.categoryId)}</select>
@@ -3404,7 +3516,7 @@ function openVetementModal(existingLot){
   }
 
   openModal(`
-    <h2>${isNew ? 'Ajouter un vêtement' : 'Modifier ce lot'}</h2>
+    <h2>${isNew ? 'Ajouter un article' : 'Modifier ce lot'}</h2>
     <div class="field">
       <label class="field-label">Photo(s) du lot</label>
       <div id="newVetementPhotos">${photosHtml()}</div>
@@ -3510,7 +3622,7 @@ function openVetementModal(existingLot){
   if(cancelBtn) cancelBtn.onclick = closeModal;
   const deleteBtn = document.getElementById('btnDeleteLot');
   if(deleteBtn) deleteBtn.onclick = () => openConfirmModal('Supprimer ce lot ?', 'La ou les photos et tous les articles de ce lot seront définitivement supprimés.', () => {
-    data.v2.lots = data.v2.lots.filter(l => l.id !== existingLot.id);
+    activeV2List().lots = activeV2List().lots.filter(l => l.id !== existingLot.id);
     save(); closeModal(); render(); showToast('Lot supprimé');
   });
   document.getElementById('mSave').onclick = () => {
@@ -3521,8 +3633,8 @@ function openVetementModal(existingLot){
     const hiddenSrcs = photos.filter(p => p.hidden).map(p => p.src);
     const entries = validLines.map(l => ({ id:l.id, sizeIds:l.sizeIds.slice(), categoryId:l.categoryId, brandId:l.brandId || '', qty:l.qty, charValues: Object.assign({}, l.charValues) }));
     if(isNew){
-      if(!Array.isArray(data.v2.lots)) data.v2.lots = [];
-      data.v2.lots.push({ id:newId(), photos:photoSrcs, hiddenPhotos:hiddenSrcs, price, entries });
+      if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
+      activeV2List().lots.push({ id:newId(), photos:photoSrcs, hiddenPhotos:hiddenSrcs, price, entries });
     } else {
       existingLot.photos = photoSrcs;
       existingLot.hiddenPhotos = hiddenSrcs;
@@ -3534,6 +3646,7 @@ function openVetementModal(existingLot){
 }
 
 function openManageV2Modal(){
+  const list = activeV2List();
   function listHtml(items, delAttr){
     return items.length ? items.map(i => `
       <span class="chip-btn" style="cursor:default;">${escapeHtml(i.label)}
@@ -3550,16 +3663,28 @@ function openManageV2Modal(){
     `;
   }
   openModal(`
-    <h2>Tailles, catégories, marques</h2>
+    <h2>Paramétrage — ${escapeHtml(list.name)}</h2>
     <div class="v2-manage-section">
-      ${sectionHeader('sizes', 'Tailles')}
+      ${sectionHeader('general', 'Général')}
+      <div class="v2-manage-body" data-manage-body="general" style="display:none;">
+        <div class="field"><label class="field-label">Nom de la liste</label><input type="text" id="v2ListName" value="${escapeAttr(list.name)}"></div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label class="field-label">Nom du 1er filtre (ex. Taille)</label><input type="text" id="v2SizeLabel" value="${escapeAttr(list.sizeLabel)}"></div>
+          <div class="field" style="flex:1;"><label class="field-label">Nom du 2ᵉ filtre (ex. Catégorie)</label><input type="text" id="v2CategoryLabel" value="${escapeAttr(list.categoryLabel)}"></div>
+        </div>
+        <button type="button" class="chip-btn" id="btnSaveV2General" style="margin-bottom:10px;">Enregistrer ces noms</button>
+        ${(data.v2lists || []).length > 1 ? `<button type="button" class="chip-btn danger" id="btnDeleteV2List">${icon('trash','icon-sm')} Supprimer cette liste</button>` : ''}
+      </div>
+    </div>
+    <div class="v2-manage-section">
+      ${sectionHeader('sizes', list.sizeLabel)}
       <div class="v2-manage-body" data-manage-body="sizes" style="display:none;">
         <div id="v2SizesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
         <div style="display:flex; gap:8px;"><input type="text" id="newV2Size" placeholder="ex. 24 mois" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Size">Ajouter</button></div>
       </div>
     </div>
     <div class="v2-manage-section">
-      ${sectionHeader('categories', 'Catégories')}
+      ${sectionHeader('categories', list.categoryLabel)}
       <div class="v2-manage-body" data-manage-body="categories" style="display:none;">
         <div id="v2CategoriesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
         <div style="display:flex; gap:8px;"><input type="text" id="newV2Category" placeholder="ex. Salopette" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Category">Ajouter</button></div>
@@ -3575,7 +3700,7 @@ function openManageV2Modal(){
     <div class="v2-manage-section">
       ${sectionHeader('chars', 'Caractéristiques')}
       <div class="v2-manage-body" data-manage-body="chars" style="display:none;">
-        <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Associez des valeurs (ex. manches courtes/longues) à une ou plusieurs catégories, pour voir des étiquettes dans vos listes.</p>
+        <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Associez des valeurs (ex. manches courtes/longues) à une ou plusieurs valeurs de « ${escapeHtml(list.categoryLabel)} », pour voir des étiquettes dans vos listes.</p>
         <div id="v2CharsList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;"></div>
         <button type="button" class="chip-btn" id="btnAddV2Char">${icon('plus','icon-sm')} Ajouter une caractéristique</button>
       </div>
@@ -3585,6 +3710,24 @@ function openManageV2Modal(){
     </div>
   `);
   document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('btnSaveV2General').onclick = () => {
+    const name = document.getElementById('v2ListName').value.trim();
+    const sizeLabel = document.getElementById('v2SizeLabel').value.trim();
+    const categoryLabel = document.getElementById('v2CategoryLabel').value.trim();
+    if(!name || !sizeLabel || !categoryLabel){ showToast('Tous les champs sont requis'); return; }
+    list.name = name; list.sizeLabel = sizeLabel; list.categoryLabel = categoryLabel;
+    save(); closeModal(); render(); showToast('Paramètres enregistrés');
+  };
+  const deleteListBtn = document.getElementById('btnDeleteV2List');
+  if(deleteListBtn) deleteListBtn.onclick = () => openConfirmModal(
+    'Supprimer cette liste ?',
+    `« ${list.name} » et tout son contenu (photos, articles, objectifs) seront définitivement supprimés.`,
+    () => {
+      data.v2lists = data.v2lists.filter(l => l.id !== list.id);
+      ui.activeV2ListId = null;
+      save(); saveUi(); closeModal(); render(); showToast('Liste supprimée');
+    }
+  );
   document.querySelectorAll('[data-manage-toggle]').forEach(btn => {
     btn.onclick = () => {
       const body = document.querySelector(`[data-manage-body="${btn.dataset.manageToggle}"]`);
@@ -3595,7 +3738,7 @@ function openManageV2Modal(){
   });
 
   function charsListHtml(){
-    const chars = data.v2.characteristics || [];
+    const chars = activeV2List().characteristics || [];
     return chars.length ? chars.map(c => `
       <button type="button" class="v2-char-card" data-edit-char="${c.id}">
         <div style="font-weight:800; font-size:13px; color:var(--ink);">${escapeHtml(c.label)}</div>
@@ -3607,15 +3750,15 @@ function openManageV2Modal(){
   }
 
   function rebind(){
-    document.getElementById('v2SizesList').innerHTML = listHtml(data.v2.sizes, 'del-v2-size');
-    document.getElementById('v2CategoriesList').innerHTML = listHtml(data.v2.categories, 'del-v2-cat');
-    document.getElementById('v2BrandsList').innerHTML = listHtml(data.v2.brands, 'del-v2-brand');
+    document.getElementById('v2SizesList').innerHTML = listHtml(activeV2List().sizes, 'del-v2-size');
+    document.getElementById('v2CategoriesList').innerHTML = listHtml(activeV2List().categories, 'del-v2-cat');
+    document.getElementById('v2BrandsList').innerHTML = listHtml(activeV2List().brands, 'del-v2-brand');
     document.getElementById('v2CharsList').innerHTML = charsListHtml();
-    document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => { data.v2.sizes = data.v2.sizes.filter(s => s.id !== b.dataset.delV2Size); save(); rebind(); });
-    document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => { data.v2.categories = data.v2.categories.filter(c => c.id !== b.dataset.delV2Cat); save(); rebind(); });
-    document.querySelectorAll('[data-del-v2-brand]').forEach(b => b.onclick = () => { data.v2.brands = data.v2.brands.filter(x => x.id !== b.dataset.delV2Brand); save(); rebind(); });
+    document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => { activeV2List().sizes = activeV2List().sizes.filter(s => s.id !== b.dataset.delV2Size); save(); rebind(); });
+    document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => { activeV2List().categories = activeV2List().categories.filter(c => c.id !== b.dataset.delV2Cat); save(); rebind(); });
+    document.querySelectorAll('[data-del-v2-brand]').forEach(b => b.onclick = () => { activeV2List().brands = activeV2List().brands.filter(x => x.id !== b.dataset.delV2Brand); save(); rebind(); });
     document.querySelectorAll('[data-edit-char]').forEach(b => b.onclick = () => {
-      const ch = data.v2.characteristics.find(c => c.id === b.dataset.editChar);
+      const ch = activeV2List().characteristics.find(c => c.id === b.dataset.editChar);
       openEditCharacteristicModal(ch);
     });
   }
@@ -3626,17 +3769,17 @@ function openManageV2Modal(){
   document.getElementById('btnAddV2Size').onclick = () => {
     const input = document.getElementById('newV2Size'); const label = input.value.trim();
     if(!label){ showToast('Indiquez un nom'); return; }
-    data.v2.sizes.push({ id:newId(), label }); save(); input.value = ''; rebind();
+    activeV2List().sizes.push({ id:newId(), label }); save(); input.value = ''; rebind();
   };
   document.getElementById('btnAddV2Category').onclick = () => {
     const input = document.getElementById('newV2Category'); const label = input.value.trim();
     if(!label){ showToast('Indiquez un nom'); return; }
-    data.v2.categories.push({ id:newId(), label }); save(); input.value = ''; rebind();
+    activeV2List().categories.push({ id:newId(), label }); save(); input.value = ''; rebind();
   };
   document.getElementById('btnAddV2Brand').onclick = () => {
     const input = document.getElementById('newV2Brand'); const label = input.value.trim();
     if(!label){ showToast('Indiquez un nom'); return; }
-    data.v2.brands.push({ id:newId(), label }); save(); input.value = ''; rebind();
+    activeV2List().brands.push({ id:newId(), label }); save(); input.value = ''; rebind();
   };
 }
 
@@ -3654,7 +3797,7 @@ function openEditCharacteristicModal(existingChar){
     `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune valeur</span>';
   }
   function catChecksHtml(){
-    return (data.v2.categories || []).map(c => `
+    return (activeV2List().categories || []).map(c => `
       <label class="crosslist-check"><input type="checkbox" data-char-cat="${c.id}" ${categoryIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.label)}</label>
     `).join('');
   }
@@ -3713,7 +3856,7 @@ function openEditCharacteristicModal(existingChar){
     'Supprimer cette caractéristique ?',
     'Elle sera retirée, ainsi que les valeurs déjà choisies sur vos articles pour celle-ci.',
     () => {
-      data.v2.characteristics = data.v2.characteristics.filter(c => c.id !== existingChar.id);
+      activeV2List().characteristics = activeV2List().characteristics.filter(c => c.id !== existingChar.id);
       save(); closeModal(); openManageV2Modal();
     }
   );
@@ -3722,8 +3865,8 @@ function openEditCharacteristicModal(existingChar){
     if(!lbl){ showToast('Indiquez un nom'); return; }
     if(!values.length){ showToast('Ajoutez au moins une valeur'); return; }
     if(isNew){
-      if(!Array.isArray(data.v2.characteristics)) data.v2.characteristics = [];
-      data.v2.characteristics.push({ id:newId(), label:lbl, values, categoryIds });
+      if(!Array.isArray(activeV2List().characteristics)) activeV2List().characteristics = [];
+      activeV2List().characteristics.push({ id:newId(), label:lbl, values, categoryIds });
     } else {
       existingChar.label = lbl;
       existingChar.values = values;
