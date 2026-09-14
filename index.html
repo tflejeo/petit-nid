@@ -284,6 +284,14 @@
   .v2-photo-controls{display:flex; flex-direction:column; gap:6px; flex:1; min-width:0;}
   .v2-hide-check{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--muted); cursor:pointer;}
   .v2-hide-check input{width:15px; height:15px; accent-color:var(--sage-dark); flex-shrink:0;}
+  .v2-quickadd{display:flex; gap:6px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);}
+  .v2-quickadd select{flex:1; min-width:0; padding:9px 8px; border:1px solid var(--border); border-radius:var(--r-sm); font-size:13px; font-family:var(--font-body); background:#fff;}
+  .v2-quickadd .v2-quickadd-target{width:56px; flex-shrink:0; text-align:center; padding:9px 2px;}
+  .v2-quickadd-btn{flex-shrink:0; white-space:nowrap;}
+  .v2-char-card{
+    display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--border);
+    border-radius:var(--r-sm); padding:10px 12px; cursor:pointer;
+  }
   .crosslist-check input{width:16px; height:16px; flex-shrink:0; accent-color:var(--sage-dark);}
 
   .stepper{display:flex; align-items:center; gap:2px; background:#F4EEE1; border-radius:999px; padding:3px; flex-shrink:0;}
@@ -835,7 +843,7 @@ function buildDefaultV2(){
     });
   });
   const brands = ['Petit Bateau','Vertbaudet','Jacadi'].map(label => ({ id:newId(), label }));
-  return { sizes, categories, brands, targets, lots: [], groupBy: 'size' };
+  return { sizes, categories, brands, targets, lots: [], characteristics: [], groupBy: 'size' };
 }
 
 function buildDefaultData(){
@@ -1038,6 +1046,12 @@ function normalizeV2(d){
   v2.brands = denseArrayFrom(v2.brands).filter(Boolean);
   v2.groupBy = (v2.groupBy === 'category') ? 'category' : 'size';
   v2.targets = denseArrayFrom(v2.targets).filter(Boolean).map(t => ({ sizeId:t.sizeId, categoryId:t.categoryId, target: Math.max(0, parseInt(t.target,10) || 0) }));
+  v2.characteristics = denseArrayFrom(v2.characteristics).filter(Boolean).map(c => ({
+    id: c.id || newId(),
+    label: c.label || '',
+    values: denseArrayFrom(c.values).filter(Boolean).map(v => ({ id:v.id || newId(), label:v.label || '' })),
+    categoryIds: denseArrayFrom(c.categoryIds).filter(Boolean)
+  }));
   v2.lots = denseArrayFrom(v2.lots).filter(Boolean).map(lot => {
     lot.id = lot.id || newId();
     lot.photos = denseArrayFrom(lot.photos).filter(Boolean);
@@ -1051,7 +1065,8 @@ function normalizeV2(d){
         sizeIds,
         categoryId: e.categoryId || '',
         brandId: e.brandId || '',
-        qty: Math.max(1, parseInt(e.qty,10) || 1)
+        qty: Math.max(1, parseInt(e.qty,10) || 1),
+        charValues: (e.charValues && typeof e.charValues === 'object') ? e.charValues : {}
       };
     });
     return lot;
@@ -2818,6 +2833,35 @@ function v2CategoriesForSize(sizeId){
 function v2SizesForCategory(categoryId){
   return (data.v2.sizes || []).filter(s => v2TargetFor(s.id, categoryId) > 0 || v2EntriesFor(s.id, categoryId).length > 0);
 }
+function v2CategoriesNotInSize(sizeId){
+  const shown = new Set(v2CategoriesForSize(sizeId).map(c => c.id));
+  return (data.v2.categories || []).filter(c => !shown.has(c.id));
+}
+function v2SizesNotInCategory(categoryId){
+  const shown = new Set(v2SizesForCategory(categoryId).map(s => s.id));
+  return (data.v2.sizes || []).filter(s => !shown.has(s.id));
+}
+function v2CharacteristicsForCategory(categoryId){
+  return (data.v2.characteristics || []).filter(c => (c.categoryIds || []).includes(categoryId));
+}
+function v2BreakdownFor(sizeId, categoryId){
+  const chars = v2CharacteristicsForCategory(categoryId);
+  if(!chars.length) return [];
+  return chars.map(ch => {
+    const counts = {};
+    ch.values.forEach(v => { counts[v.id] = 0; });
+    (data.v2.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+      if(e.categoryId === categoryId && (e.sizeIds || []).includes(sizeId)){
+        const valId = e.charValues && e.charValues[ch.id];
+        if(valId && counts[valId] !== undefined) counts[valId] += Number(e.qty) || 0;
+      }
+    }));
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    if(total === 0) return null;
+    const text = ch.values.map(v => `${counts[v.id]} ${v.label.toLowerCase()}`).join(', ');
+    return text;
+  }).filter(Boolean);
+}
 function v2SizeTotals(sizeId){
   let acquired = 0, target = 0;
   v2CategoriesForSize(sizeId).forEach(c => { acquired += v2AcquiredFor(sizeId, c.id); target += v2TargetFor(sizeId, c.id); });
@@ -2873,6 +2917,7 @@ function renderV2SizeCard(size){
   const t = v2SizeTotals(size.id);
   const collapsed = isV2SizeCollapsed(size.id);
   const cats = v2CategoriesForSize(size.id);
+  const remaining = v2CategoriesNotInSize(size.id);
   return `
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-size-toggle="${size.id}">
@@ -2885,6 +2930,7 @@ function renderV2SizeCard(size){
       </div>
       <div class="section-body ${collapsed ? '' : 'open'}">
         ${cats.length ? cats.map(cat => renderV2PairRow(size.id, cat.id, cat.label)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:4px;">Aucun objectif ni article pour cette taille pour l’instant.</p>`}
+        ${remaining.length ? renderV2QuickAdd('size', size.id, remaining) : ''}
       </div>
     </div>
   `;
@@ -2894,6 +2940,7 @@ function renderV2CategoryCard(cat){
   const t = v2CategoryTotals(cat.id);
   const collapsed = isV2CategoryCollapsed(cat.id);
   const sizes = v2SizesForCategory(cat.id);
+  const remaining = v2SizesNotInCategory(cat.id);
   return `
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-cat-card-toggle="${cat.id}">
@@ -2906,7 +2953,23 @@ function renderV2CategoryCard(cat){
       </div>
       <div class="section-body ${collapsed ? '' : 'open'}">
         ${sizes.length ? sizes.map(size => renderV2PairRow(size.id, cat.id, size.label)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:4px;">Aucun objectif ni article pour cette catégorie pour l’instant.</p>`}
+        ${remaining.length ? renderV2QuickAdd('category', cat.id, remaining) : ''}
       </div>
+    </div>
+  `;
+}
+
+function renderV2QuickAdd(mode, fixedId, options){
+  const attr = mode === 'size' ? 'data-v2-quickadd-size' : 'data-v2-quickadd-cat';
+  const placeholder = mode === 'size' ? 'Ajouter une catégorie…' : 'Ajouter une taille…';
+  return `
+    <div class="v2-quickadd" ${attr}="${fixedId}">
+      <select class="v2-quickadd-select">
+        <option value="">${placeholder}</option>
+        ${options.map(o => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join('')}
+      </select>
+      <input type="number" min="0" class="v2-quickadd-target" placeholder="Objectif" value="1">
+      <button type="button" class="chip-btn v2-quickadd-btn">${icon('plus','icon-sm')} Ajouter</button>
     </div>
   `;
 }
@@ -2918,11 +2981,12 @@ function renderV2PairRow(sizeId, categoryId, label){
   const key = sizeId + '::' + categoryId;
   const expanded = !!ui.expandedItems['v2-' + key];
   const entries = v2EntriesFor(sizeId, categoryId);
+  const breakdown = v2BreakdownFor(sizeId, categoryId);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
       <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span></div>
-      <div class="item-sub"><span>${acquired} / ${target}</span></div>
+      <div class="item-sub"><span>${acquired} / ${target}</span>${breakdown.length ? '<span class="link-dot"></span><span>' + escapeHtml(breakdown.join(' · ')) + '</span>' : ''}</div>
     </div>
   </div>`;
   if(expanded){
@@ -2957,6 +3021,33 @@ function bindListsV2Events(photoRefs){
   if(addBtn) addBtn.onclick = () => openVetementModal(null);
   const manageBtn = document.getElementById('btnManageV2');
   if(manageBtn) manageBtn.onclick = openManageV2Modal;
+
+  document.querySelectorAll('[data-v2-quickadd-size]').forEach(row => {
+    const sizeId = row.dataset.v2QuickaddSize;
+    row.querySelector('.v2-quickadd-btn').onclick = () => {
+      const select = row.querySelector('.v2-quickadd-select');
+      const targetInput = row.querySelector('.v2-quickadd-target');
+      if(!select.value){ showToast('Choisissez une catégorie'); return; }
+      const val = clamp(parseInt(targetInput.value, 10) || 0, 0, 999);
+      if(!Array.isArray(data.v2.targets)) data.v2.targets = [];
+      data.v2.targets.push({ sizeId, categoryId: select.value, target: val });
+      save(); render();
+    };
+  });
+
+  document.querySelectorAll('[data-v2-quickadd-cat]').forEach(row => {
+    const categoryId = row.dataset.v2QuickaddCat;
+    row.querySelector('.v2-quickadd-btn').onclick = () => {
+      const select = row.querySelector('.v2-quickadd-select');
+      const targetInput = row.querySelector('.v2-quickadd-target');
+      if(!select.value){ showToast('Choisissez une taille'); return; }
+      const val = clamp(parseInt(targetInput.value, 10) || 0, 0, 999);
+      if(!Array.isArray(data.v2.targets)) data.v2.targets = [];
+      data.v2.targets.push({ sizeId: select.value, categoryId, target: val });
+      save(); render();
+    };
+  });
+
   const groupBtn = document.getElementById('btnToggleV2Group');
   if(groupBtn) groupBtn.onclick = () => {
     data.v2.groupBy = (data.v2.groupBy === 'category') ? 'size' : 'category';
@@ -3032,8 +3123,8 @@ function openVetementModal(existingLot){
   const firstSize = (data.v2.sizes && data.v2.sizes[0]) || {};
   const firstCat = (data.v2.categories && data.v2.categories[0]) || {};
   let lines = isNew
-    ? [{ id:newId(), sizeIds: firstSize.id ? [firstSize.id] : [], categoryId:firstCat.id || '', brandId:'', qty:1 }]
-    : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty }));
+    ? [{ id:newId(), sizeIds: firstSize.id ? [firstSize.id] : [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{} }]
+    : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues) }));
 
   function catOptions(selected){
     return (data.v2.categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
@@ -3044,6 +3135,18 @@ function openVetementModal(existingLot){
   function sizeChips(line){
     return (data.v2.sizes || []).map(s => `<button type="button" class="chip-toggle ${line.sizeIds.includes(s.id) ? 'selected' : ''}" data-line-size="${line.id}" data-size-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
   }
+  function charPickersHtml(line){
+    const chars = v2CharacteristicsForCategory(line.categoryId);
+    if(!chars.length) return '';
+    return chars.map(ch => `
+      <div style="margin-top:8px;">
+        <div class="field-label" style="margin-bottom:4px;">${escapeHtml(ch.label)}</div>
+        <div class="v2-size-chips">
+          ${ch.values.map(v => `<button type="button" class="chip-toggle ${(line.charValues||{})[ch.id]===v.id ? 'selected' : ''}" data-line-char="${line.id}" data-char-id="${ch.id}" data-value-id="${v.id}">${escapeHtml(v.label)}</button>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
   function linesHtml(){
     return lines.map(l => `
       <div class="v2-line-row" data-line="${l.id}">
@@ -3052,6 +3155,7 @@ function openVetementModal(existingLot){
         <div style="margin-top:8px;">
           <select data-line-field="categoryId" data-line="${l.id}" style="width:100%;">${catOptions(l.categoryId)}</select>
         </div>
+        ${charPickersHtml(l)}
         <div style="display:flex; gap:8px; margin-top:6px;">
           <select data-line-field="brandId" data-line="${l.id}" style="flex:1; min-width:0;">${brandOptions(l.brandId)}</select>
           <input type="number" min="1" data-line-field="qty" data-line="${l.id}" value="${l.qty}" style="width:56px; text-align:center; flex-shrink:0;">
@@ -3140,6 +3244,7 @@ function openVetementModal(existingLot){
         if(!line) return;
         const field = el.dataset.lineField;
         line[field] = field === 'qty' ? Math.max(1, parseInt(el.value, 10) || 1) : el.value;
+        if(field === 'categoryId') bindLineEvents();
       };
     });
     container.querySelectorAll('[data-line-size]').forEach(btn => {
@@ -3152,6 +3257,16 @@ function openVetementModal(existingLot){
         bindLineEvents();
       };
     });
+    container.querySelectorAll('[data-line-char]').forEach(btn => {
+      btn.onclick = () => {
+        const line = lines.find(l => l.id === btn.dataset.lineChar);
+        if(!line) return;
+        if(!line.charValues) line.charValues = {};
+        const charId = btn.dataset.charId, valueId = btn.dataset.valueId;
+        line.charValues[charId] = (line.charValues[charId] === valueId) ? undefined : valueId;
+        bindLineEvents();
+      };
+    });
     container.querySelectorAll('[data-del-line]').forEach(btn => {
       btn.onclick = () => { lines = lines.filter(l => l.id !== btn.dataset.delLine); bindLineEvents(); };
     });
@@ -3161,7 +3276,7 @@ function openVetementModal(existingLot){
   bindLineEvents();
 
   document.getElementById('btnAddLine').onclick = () => {
-    lines.push({ id:newId(), sizeIds: firstSize.id ? [firstSize.id] : [], categoryId:firstCat.id || '', brandId:'', qty:1 });
+    lines.push({ id:newId(), sizeIds: firstSize.id ? [firstSize.id] : [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{} });
     bindLineEvents();
   };
   const cancelBtn = document.getElementById('mCancel');
@@ -3177,7 +3292,7 @@ function openVetementModal(existingLot){
     if(!validLines.length){ showToast('Ajoutez au moins un article avec une taille et une catégorie'); return; }
     const photoSrcs = photos.map(p => p.src);
     const hiddenSrcs = photos.filter(p => p.hidden).map(p => p.src);
-    const entries = validLines.map(l => ({ id:l.id, sizeIds:l.sizeIds.slice(), categoryId:l.categoryId, brandId:l.brandId || '', qty:l.qty }));
+    const entries = validLines.map(l => ({ id:l.id, sizeIds:l.sizeIds.slice(), categoryId:l.categoryId, brandId:l.brandId || '', qty:l.qty, charValues: Object.assign({}, l.charValues) }));
     if(isNew){
       if(!Array.isArray(data.v2.lots)) data.v2.lots = [];
       data.v2.lots.push({ id:newId(), photos:photoSrcs, hiddenPhotos:hiddenSrcs, price, entries });
@@ -3216,21 +3331,46 @@ function openManageV2Modal(){
       <div id="v2BrandsList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
       <div style="display:flex; gap:8px;"><input type="text" id="newV2Brand" placeholder="ex. Petit Bateau" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Brand">Ajouter</button></div>
     </div>
+    <div class="field">
+      <label class="field-label">Caractéristiques (ex. Manche, Période)</label>
+      <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Associez des valeurs (ex. manches courtes/longues) à une ou plusieurs catégories, pour voir la répartition dans vos listes.</p>
+      <div id="v2CharsList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;"></div>
+      <button type="button" class="chip-btn" id="btnAddV2Char">${icon('plus','icon-sm')} Ajouter une caractéristique</button>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Fermer</button>
     </div>
   `);
   document.getElementById('mCancel').onclick = closeModal;
 
+  function charsListHtml(){
+    const chars = data.v2.characteristics || [];
+    return chars.length ? chars.map(c => `
+      <button type="button" class="v2-char-card" data-edit-char="${c.id}">
+        <div style="font-weight:800; font-size:13px; color:var(--ink);">${escapeHtml(c.label)}</div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">
+          ${c.values.map(v => escapeHtml(v.label)).join(', ') || 'Aucune valeur'} — ${(c.categoryIds||[]).length} catégorie(s)
+        </div>
+      </button>
+    `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune pour l’instant</span>';
+  }
+
   function rebind(){
     document.getElementById('v2SizesList').innerHTML = listHtml(data.v2.sizes, 'del-v2-size');
     document.getElementById('v2CategoriesList').innerHTML = listHtml(data.v2.categories, 'del-v2-cat');
     document.getElementById('v2BrandsList').innerHTML = listHtml(data.v2.brands, 'del-v2-brand');
+    document.getElementById('v2CharsList').innerHTML = charsListHtml();
     document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => { data.v2.sizes = data.v2.sizes.filter(s => s.id !== b.dataset.delV2Size); save(); rebind(); });
     document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => { data.v2.categories = data.v2.categories.filter(c => c.id !== b.dataset.delV2Cat); save(); rebind(); });
     document.querySelectorAll('[data-del-v2-brand]').forEach(b => b.onclick = () => { data.v2.brands = data.v2.brands.filter(x => x.id !== b.dataset.delV2Brand); save(); rebind(); });
+    document.querySelectorAll('[data-edit-char]').forEach(b => b.onclick = () => {
+      const ch = data.v2.characteristics.find(c => c.id === b.dataset.editChar);
+      openEditCharacteristicModal(ch);
+    });
   }
   rebind();
+
+  document.getElementById('btnAddV2Char').onclick = () => openEditCharacteristicModal(null);
 
   document.getElementById('btnAddV2Size').onclick = () => {
     const input = document.getElementById('newV2Size'); const label = input.value.trim();
@@ -3246,6 +3386,99 @@ function openManageV2Modal(){
     const input = document.getElementById('newV2Brand'); const label = input.value.trim();
     if(!label){ showToast('Indiquez un nom'); return; }
     data.v2.brands.push({ id:newId(), label }); save(); input.value = ''; rebind();
+  };
+}
+
+function openEditCharacteristicModal(existingChar){
+  const isNew = !existingChar;
+  let label = isNew ? '' : existingChar.label;
+  let values = isNew ? [] : existingChar.values.map(v => ({ ...v }));
+  let categoryIds = isNew ? [] : (existingChar.categoryIds || []).slice();
+
+  function valuesHtml(){
+    return values.length ? values.map((v, i) => `
+      <span class="chip-btn" style="cursor:default;">${escapeHtml(v.label)}
+        <button type="button" data-del-value="${i}" style="border:none; background:none; cursor:pointer; margin-left:4px; padding:0; display:inline-flex;">${icon('x','icon-sm')}</button>
+      </span>
+    `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune valeur</span>';
+  }
+  function catChecksHtml(){
+    return (data.v2.categories || []).map(c => `
+      <label class="crosslist-check"><input type="checkbox" data-char-cat="${c.id}" ${categoryIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.label)}</label>
+    `).join('');
+  }
+
+  openModal(`
+    <h2>${isNew ? 'Nouvelle caractéristique' : 'Modifier la caractéristique'}</h2>
+    <div class="field">
+      <label class="field-label">Nom</label>
+      <input type="text" id="charLabel" placeholder="ex. Manche" value="${escapeAttr(label)}">
+    </div>
+    <div class="field">
+      <label class="field-label">Valeurs possibles</label>
+      <div id="charValuesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${valuesHtml()}</div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="newCharValue" placeholder="ex. Manches longues" style="flex:1;">
+        <button type="button" class="chip-btn" id="btnAddCharValue">Ajouter</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label">Catégories concernées</label>
+      <div class="crosslist-checks" id="charCatsList">${catChecksHtml()}</div>
+    </div>
+    <div class="modal-actions">
+      ${!isNew ? `<button type="button" class="btn btn-danger" id="btnDeleteChar">${icon('trash','icon-sm')} Supprimer</button>` : `<button class="btn btn-secondary" id="mCancel">Annuler</button>`}
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+
+  function refreshValues(){ document.getElementById('charValuesList').innerHTML = valuesHtml(); bindValueDeletes(); }
+  function bindValueDeletes(){
+    document.querySelectorAll('[data-del-value]').forEach(btn => {
+      btn.onclick = () => { values.splice(parseInt(btn.dataset.delValue, 10), 1); refreshValues(); };
+    });
+  }
+  bindValueDeletes();
+
+  document.getElementById('btnAddCharValue').onclick = () => {
+    const input = document.getElementById('newCharValue');
+    const l = input.value.trim();
+    if(!l){ showToast('Indiquez une valeur'); return; }
+    values.push({ id:newId(), label:l });
+    input.value = '';
+    refreshValues();
+  };
+  document.querySelectorAll('[data-char-cat]').forEach(cb => {
+    cb.onchange = () => {
+      const id = cb.dataset.charCat;
+      if(cb.checked){ if(!categoryIds.includes(id)) categoryIds.push(id); }
+      else { categoryIds = categoryIds.filter(x => x !== id); }
+    };
+  });
+  const cancelBtn = document.getElementById('mCancel');
+  if(cancelBtn) cancelBtn.onclick = closeModal;
+  const deleteBtn = document.getElementById('btnDeleteChar');
+  if(deleteBtn) deleteBtn.onclick = () => openConfirmModal(
+    'Supprimer cette caractéristique ?',
+    'Elle sera retirée, ainsi que les valeurs déjà choisies sur vos articles pour celle-ci.',
+    () => {
+      data.v2.characteristics = data.v2.characteristics.filter(c => c.id !== existingChar.id);
+      save(); closeModal(); openManageV2Modal();
+    }
+  );
+  document.getElementById('mSave').onclick = () => {
+    const lbl = document.getElementById('charLabel').value.trim();
+    if(!lbl){ showToast('Indiquez un nom'); return; }
+    if(!values.length){ showToast('Ajoutez au moins une valeur'); return; }
+    if(isNew){
+      if(!Array.isArray(data.v2.characteristics)) data.v2.characteristics = [];
+      data.v2.characteristics.push({ id:newId(), label:lbl, values, categoryIds });
+    } else {
+      existingChar.label = lbl;
+      existingChar.values = values;
+      existingChar.categoryIds = categoryIds;
+    }
+    save(); closeModal(); openManageV2Modal(); showToast(isNew ? 'Caractéristique ajoutée' : 'Caractéristique modifiée');
   };
 }
 
