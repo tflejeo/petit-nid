@@ -292,6 +292,30 @@
     display:block; width:100%; text-align:left; background:#fff; border:1px solid var(--border);
     border-radius:var(--r-sm); padding:10px 12px; cursor:pointer;
   }
+  .v2-entry-tags{display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px;}
+  .v2-tag{
+    display:inline-block; font-size:10.5px; font-weight:800; color:var(--sage-dark);
+    background:var(--sage-tint); padding:2px 8px; border-radius:999px;
+  }
+  .v2-manage-section{border-bottom:1px solid var(--border); padding:4px 0;}
+  .v2-manage-section:last-of-type{border-bottom:none;}
+  .v2-manage-toggle{
+    width:100%; display:flex; justify-content:space-between; align-items:center;
+    background:none; border:none; padding:10px 2px; cursor:pointer;
+    font-family:var(--font-body); font-weight:800; font-size:14px; color:var(--ink);
+  }
+  .v2-manage-toggle .chev{color:var(--muted); transition:transform 0.2s ease; flex-shrink:0;}
+  .v2-manage-toggle.open .chev{transform:rotate(180deg);}
+  .v2-manage-body{padding:4px 2px 14px;}
+  .v2-line-card{border:1px solid var(--border); border-radius:var(--r-sm); overflow:hidden;}
+  .v2-line-header{
+    width:100%; display:flex; justify-content:space-between; align-items:center; gap:8px;
+    background:#FBF8EF; border:none; padding:11px 12px; cursor:pointer; text-align:left;
+  }
+  .v2-line-summary{font-size:13px; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .v2-line-header .chev{color:var(--muted); flex-shrink:0; transition:transform 0.2s ease;}
+  .v2-line-header .chev.open{transform:rotate(180deg);}
+  .v2-line-body{padding:12px;}
   .crosslist-check input{width:16px; height:16px; flex-shrink:0; accent-color:var(--sage-dark);}
 
   .stepper{display:flex; align-items:center; gap:2px; background:#F4EEE1; border-radius:999px; padding:3px; flex-shrink:0;}
@@ -651,6 +675,7 @@ const ICONS = {
   search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14.5" r="1.2"/>',
   bell:'<path d="M6 8a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M9.5 20a2.5 2.5 0 005 0"/>',
+  sort:'<path d="M7 16l5 5 5-5"/><path d="M7 8l5-5 5 5"/><path d="M12 3v18"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>',
   trophy:'<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4"/>'
 };
@@ -2853,24 +2878,6 @@ function v2SizesNotInCategory(categoryId){
 function v2CharacteristicsForCategory(categoryId){
   return (data.v2.characteristics || []).filter(c => (c.categoryIds || []).includes(categoryId));
 }
-function v2BreakdownFor(sizeId, categoryId){
-  const chars = v2CharacteristicsForCategory(categoryId);
-  if(!chars.length) return [];
-  return chars.map(ch => {
-    const counts = {};
-    ch.values.forEach(v => { counts[v.id] = 0; });
-    (data.v2.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
-      if(e.categoryId === categoryId && (e.sizeIds || []).includes(sizeId)){
-        const valId = e.charValues && e.charValues[ch.id];
-        if(valId && counts[valId] !== undefined) counts[valId] += Number(e.qty) || 0;
-      }
-    }));
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    if(total === 0) return null;
-    const text = ch.values.map(v => `${counts[v.id]} ${v.label.toLowerCase()}`).join(', ');
-    return text;
-  }).filter(Boolean);
-}
 function v2SizeTotals(sizeId){
   let acquired = 0, target = 0;
   v2CategoriesForSize(sizeId).forEach(c => { acquired += v2AcquiredFor(sizeId, c.id); target += v2TargetFor(sizeId, c.id); });
@@ -2914,13 +2921,13 @@ function renderListsV2(){
   main.innerHTML = `
     <button class="add-row-btn" id="btnAddVetement" style="margin:2px 0 12px;">${icon('plus','icon-sm')} Ajouter un vêtement</button>
     <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
-      <button class="chip-btn" id="btnToggleV2Group">${icon('gear','icon-sm')} Trier par : ${groupBy === 'category' ? 'Catégorie' : 'Taille'}</button>
+      <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? 'Catégorie' : 'Taille'}</button>
       <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Tailles / catégories / marques</button>
     </div>
     ${photoRefs.length ? `
       <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
         <span>Vos photos</span>
-        <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('gear','icon-sm')} ${data.v2.photoSort === 'size' ? 'Par taille' : 'Plus récentes'}</button>
+        <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${data.v2.photoSort === 'size' ? 'Par taille' : 'Plus récentes'}</button>
       </div>
       <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:16px;">
         ${photoRefs.map((r, i) => `
@@ -3007,12 +3014,11 @@ function renderV2PairRow(sizeId, categoryId, label){
   const key = sizeId + '::' + categoryId;
   const expanded = !!ui.expandedItems['v2-' + key];
   const entries = v2EntriesFor(sizeId, categoryId);
-  const breakdown = v2BreakdownFor(sizeId, categoryId);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
       <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span></div>
-      <div class="item-sub"><span>${acquired} / ${target}</span>${breakdown.length ? '<span class="link-dot"></span><span>' + escapeHtml(breakdown.join(' · ')) + '</span>' : ''}</div>
+      <div class="item-sub"><span>${acquired} / ${target}</span></div>
     </div>
   </div>`;
   if(expanded){
@@ -3027,8 +3033,20 @@ function renderV2PairRow(sizeId, categoryId, label){
   return html;
 }
 
+function v2EntryCharTags(entry){
+  const tags = [];
+  v2CharacteristicsForCategory(entry.categoryId).forEach(ch => {
+    const valId = entry.charValues && entry.charValues[ch.id];
+    if(!valId) return;
+    const val = ch.values.find(v => v.id === valId);
+    if(val) tags.push(val.label);
+  });
+  return tags;
+}
+
 function renderV2EntryRow(lot, entry){
   const brand = v2BrandLabel(entry.brandId);
+  const tags = v2EntryCharTags(entry);
   return `<div class="unit-row" data-v2-entry-row="${entry.id}">
     <div class="unit-photos">
       ${(lot.photos && lot.photos[0]) ? `
@@ -3036,6 +3054,7 @@ function renderV2EntryRow(lot, entry){
       ` : ''}
     </div>
     <div style="flex:1; font-size:13px; color:var(--ink); min-width:0;">
+      ${tags.length ? `<div class="v2-entry-tags">${tags.map(t => `<span class="v2-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
       ${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}${lot.price ? ' · lot ' + formatPrice(lot.price) : ''}
     </div>
     <button class="text-btn danger" data-v2-del-entry="${entry.id}" data-v2-lot="${lot.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
@@ -3161,11 +3180,10 @@ function bindListsV2Events(photoRefs){
 function openVetementModal(existingLot){
   const isNew = !existingLot;
   let photos = isNew ? [] : (existingLot.photos || []).map(src => ({ src, hidden: (existingLot.hiddenPhotos || []).includes(src) }));
-  const firstSize = (data.v2.sizes && data.v2.sizes[0]) || {};
   const firstCat = (data.v2.categories && data.v2.categories[0]) || {};
   let lines = isNew
-    ? [{ id:newId(), sizeIds: firstSize.id ? [firstSize.id] : [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{} }]
-    : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues) }));
+    ? [{ id:newId(), sizeIds: [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{}, expanded:true }]
+    : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues), expanded:false }));
 
   function catOptions(selected){
     return (data.v2.categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
@@ -3188,19 +3206,31 @@ function openVetementModal(existingLot){
       </div>
     `).join('');
   }
+  function lineSummary(l){
+    const catLabel = l.categoryId ? v2CategoryLabel(l.categoryId) : 'Catégorie non choisie';
+    const sizesLabel = l.sizeIds.length ? l.sizeIds.map(id => v2SizeLabel(id)).join(', ') : 'Taille non choisie';
+    const brandLabel = l.brandId ? v2BrandLabel(l.brandId) : '';
+    return `${catLabel} · ${sizesLabel}${brandLabel ? ' · ' + brandLabel : ''} · Qté ${l.qty}`;
+  }
   function linesHtml(){
     return lines.map(l => `
-      <div class="v2-line-row" data-line="${l.id}">
-        <div class="field-label" style="margin-bottom:4px;">Tailles</div>
-        <div class="v2-size-chips">${sizeChips(l)}</div>
-        <div style="margin-top:8px;">
-          <select data-line-field="categoryId" data-line="${l.id}" style="width:100%;">${catOptions(l.categoryId)}</select>
-        </div>
-        ${charPickersHtml(l)}
-        <div style="display:flex; gap:8px; margin-top:6px;">
-          <select data-line-field="brandId" data-line="${l.id}" style="flex:1; min-width:0;">${brandOptions(l.brandId)}</select>
-          <input type="number" min="1" data-line-field="qty" data-line="${l.id}" value="${l.qty}" style="width:56px; text-align:center; flex-shrink:0;">
-          ${lines.length > 1 ? `<button type="button" class="text-btn danger" data-del-line="${l.id}" style="flex-shrink:0;">${icon('x','icon-sm')}</button>` : ''}
+      <div class="v2-line-card" data-line="${l.id}">
+        <button type="button" class="v2-line-header" data-line-toggle="${l.id}">
+          <span class="v2-line-summary">${escapeHtml(lineSummary(l))}</span>
+          <span class="chev ${l.expanded ? 'open' : ''}">${icon('chevronDown','icon-sm')}</span>
+        </button>
+        <div class="v2-line-body" style="display:${l.expanded ? 'block' : 'none'};">
+          <div class="field-label" style="margin-bottom:4px;">Tailles</div>
+          <div class="v2-size-chips">${sizeChips(l)}</div>
+          <div style="margin-top:8px;">
+            <select data-line-field="categoryId" data-line="${l.id}" style="width:100%;">${catOptions(l.categoryId)}</select>
+          </div>
+          ${charPickersHtml(l)}
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <select data-line-field="brandId" data-line="${l.id}" style="flex:1; min-width:0;">${brandOptions(l.brandId)}</select>
+            <input type="number" min="1" data-line-field="qty" data-line="${l.id}" value="${l.qty}" style="width:56px; text-align:center; flex-shrink:0;">
+            ${lines.length > 1 ? `<button type="button" class="text-btn danger" data-del-line="${l.id}" style="flex-shrink:0;">${icon('x','icon-sm')}</button>` : ''}
+          </div>
         </div>
       </div>
     `).join('');
@@ -3279,6 +3309,14 @@ function openVetementModal(existingLot){
   function bindLineEvents(){
     const container = document.getElementById('newVetementLines');
     container.innerHTML = linesHtml();
+    container.querySelectorAll('[data-line-toggle]').forEach(btn => {
+      btn.onclick = () => {
+        const line = lines.find(l => l.id === btn.dataset.lineToggle);
+        if(!line) return;
+        line.expanded = !line.expanded;
+        bindLineEvents();
+      };
+    });
     container.querySelectorAll('[data-line-field]').forEach(el => {
       el.onchange = () => {
         const line = lines.find(l => l.id === el.dataset.line);
@@ -3317,7 +3355,8 @@ function openVetementModal(existingLot){
   bindLineEvents();
 
   document.getElementById('btnAddLine').onclick = () => {
-    lines.push({ id:newId(), sizeIds: firstSize.id ? [firstSize.id] : [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{} });
+    lines.forEach(l => { l.expanded = false; });
+    lines.push({ id:newId(), sizeIds: [], categoryId:firstCat.id || '', brandId:'', qty:1, charValues:{}, expanded:true });
     bindLineEvents();
   };
   const cancelBtn = document.getElementById('mCancel');
@@ -3355,34 +3394,58 @@ function openManageV2Modal(){
       </span>
     `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune pour l’instant</span>';
   }
+  function sectionHeader(key, title){
+    return `
+      <button type="button" class="v2-manage-toggle" data-manage-toggle="${key}">
+        <span>${title}</span>
+        <span class="chev">${icon('chevronDown','icon-sm')}</span>
+      </button>
+    `;
+  }
   openModal(`
     <h2>Tailles, catégories, marques</h2>
-    <div class="field">
-      <label class="field-label">Tailles</label>
-      <div id="v2SizesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
-      <div style="display:flex; gap:8px;"><input type="text" id="newV2Size" placeholder="ex. 24 mois" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Size">Ajouter</button></div>
+    <div class="v2-manage-section">
+      ${sectionHeader('sizes', 'Tailles')}
+      <div class="v2-manage-body" data-manage-body="sizes" style="display:none;">
+        <div id="v2SizesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px;"><input type="text" id="newV2Size" placeholder="ex. 24 mois" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Size">Ajouter</button></div>
+      </div>
     </div>
-    <div class="field">
-      <label class="field-label">Catégories</label>
-      <div id="v2CategoriesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
-      <div style="display:flex; gap:8px;"><input type="text" id="newV2Category" placeholder="ex. Salopette" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Category">Ajouter</button></div>
+    <div class="v2-manage-section">
+      ${sectionHeader('categories', 'Catégories')}
+      <div class="v2-manage-body" data-manage-body="categories" style="display:none;">
+        <div id="v2CategoriesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px;"><input type="text" id="newV2Category" placeholder="ex. Salopette" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Category">Ajouter</button></div>
+      </div>
     </div>
-    <div class="field">
-      <label class="field-label">Marques</label>
-      <div id="v2BrandsList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
-      <div style="display:flex; gap:8px;"><input type="text" id="newV2Brand" placeholder="ex. Petit Bateau" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Brand">Ajouter</button></div>
+    <div class="v2-manage-section">
+      ${sectionHeader('brands', 'Marques')}
+      <div class="v2-manage-body" data-manage-body="brands" style="display:none;">
+        <div id="v2BrandsList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px;"><input type="text" id="newV2Brand" placeholder="ex. Petit Bateau" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Brand">Ajouter</button></div>
+      </div>
     </div>
-    <div class="field">
-      <label class="field-label">Caractéristiques (ex. Manche, Période)</label>
-      <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Associez des valeurs (ex. manches courtes/longues) à une ou plusieurs catégories, pour voir la répartition dans vos listes.</p>
-      <div id="v2CharsList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;"></div>
-      <button type="button" class="chip-btn" id="btnAddV2Char">${icon('plus','icon-sm')} Ajouter une caractéristique</button>
+    <div class="v2-manage-section">
+      ${sectionHeader('chars', 'Caractéristiques')}
+      <div class="v2-manage-body" data-manage-body="chars" style="display:none;">
+        <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Associez des valeurs (ex. manches courtes/longues) à une ou plusieurs catégories, pour voir des étiquettes dans vos listes.</p>
+        <div id="v2CharsList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;"></div>
+        <button type="button" class="chip-btn" id="btnAddV2Char">${icon('plus','icon-sm')} Ajouter une caractéristique</button>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Fermer</button>
     </div>
   `);
   document.getElementById('mCancel').onclick = closeModal;
+  document.querySelectorAll('[data-manage-toggle]').forEach(btn => {
+    btn.onclick = () => {
+      const body = document.querySelector(`[data-manage-body="${btn.dataset.manageToggle}"]`);
+      const isOpen = body.style.display !== 'none';
+      body.style.display = isOpen ? 'none' : 'block';
+      btn.classList.toggle('open', !isOpen);
+    };
+  });
 
   function charsListHtml(){
     const chars = data.v2.characteristics || [];
