@@ -285,7 +285,7 @@
   .v2-hide-check{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--muted); cursor:pointer;}
   .v2-hide-check input{width:15px; height:15px; accent-color:var(--sage-dark); flex-shrink:0;}
   .v2-quickadd{display:flex; gap:6px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);}
-  .v2-quickadd select{flex:1; min-width:0; padding:9px 8px; border:1px solid var(--border); border-radius:var(--r-sm); font-size:13px; font-family:var(--font-body); background:#fff;}
+  .v2-quickadd select{flex:1; min-width:0; padding:9px 26px 9px 8px; border:1px solid var(--border); border-radius:var(--r-sm); font-size:13px; font-family:var(--font-body); background-color:#fff;}
   .v2-quickadd .v2-quickadd-target{width:56px; flex-shrink:0; text-align:center; padding:9px 2px;}
   .v2-quickadd-btn{flex-shrink:0; white-space:nowrap;}
   .v2-char-card{
@@ -313,6 +313,14 @@
     width:100%; border:1px solid var(--border); border-radius:var(--r-sm); padding:9px 11px;
     font-family:var(--font-body); font-size:14px; color:var(--ink); background:#fff;
   }
+  select{
+    border:1px solid var(--border); border-radius:var(--r-sm); padding:9px 30px 9px 11px;
+    font-family:var(--font-body); font-size:14px; color:var(--ink); background-color:#fff;
+    -webkit-appearance:none; appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238C8171' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 8px center; background-size:16px;
+  }
+  select:focus{outline:2px solid var(--sage); outline-offset:1px;}
   textarea{resize:vertical; min-height:56px;}
   textarea:focus, input:focus{outline:2px solid var(--sage); outline-offset:1px;}
   .link-input-wrap{position:relative;}
@@ -843,7 +851,7 @@ function buildDefaultV2(){
     });
   });
   const brands = ['Petit Bateau','Vertbaudet','Jacadi'].map(label => ({ id:newId(), label }));
-  return { sizes, categories, brands, targets, lots: [], characteristics: [], groupBy: 'size' };
+  return { sizes, categories, brands, targets, lots: [], characteristics: [], groupBy: 'size', photoSort: 'date' };
 }
 
 function buildDefaultData(){
@@ -1045,6 +1053,7 @@ function normalizeV2(d){
   v2.categories = denseArrayFrom(v2.categories).filter(Boolean);
   v2.brands = denseArrayFrom(v2.brands).filter(Boolean);
   v2.groupBy = (v2.groupBy === 'category') ? 'category' : 'size';
+  v2.photoSort = (v2.photoSort === 'size') ? 'size' : 'date';
   v2.targets = denseArrayFrom(v2.targets).filter(Boolean).map(t => ({ sizeId:t.sizeId, categoryId:t.categoryId, target: Math.max(0, parseInt(t.target,10) || 0) }));
   v2.characteristics = denseArrayFrom(v2.characteristics).filter(Boolean).map(c => ({
     id: c.id || newId(),
@@ -2880,6 +2889,21 @@ function isV2CategoryCollapsed(categoryId){ return ui.collapsedSections['v2c-' +
 function collectV2LotPhotoRefs(){
   const out = [];
   (data.v2.lots || []).forEach(lot => (lot.photos || []).forEach(src => { if(src) out.push({ lot, src }); }));
+  const sortMode = data.v2.photoSort || 'date';
+  if(sortMode === 'date'){
+    out.reverse(); // les lots sont ajoutés à la suite : inverser fait remonter les plus récents en premier
+  } else {
+    const sizeIndex = {};
+    (data.v2.sizes || []).forEach((s, i) => { sizeIndex[s.id] = i; });
+    const minSizeIdx = (lot) => {
+      let m = Infinity;
+      (lot.entries || []).forEach(e => (e.sizeIds || []).forEach(sid => {
+        if(sizeIndex[sid] !== undefined) m = Math.min(m, sizeIndex[sid]);
+      }));
+      return m;
+    };
+    out.sort((a, b) => minSizeIdx(a.lot) - minSizeIdx(b.lot));
+  }
   return out;
 }
 
@@ -2894,12 +2918,14 @@ function renderListsV2(){
       <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Tailles / catégories / marques</button>
     </div>
     ${photoRefs.length ? `
-      <div class="section-heading" style="margin-top:0;">Vos photos</div>
+      <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <span>Vos photos</span>
+        <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('gear','icon-sm')} ${data.v2.photoSort === 'size' ? 'Par taille' : 'Plus récentes'}</button>
+      </div>
       <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:16px;">
         ${photoRefs.map((r, i) => `
           <button class="gallery-item" data-v2-edit-photo="${i}">
             <img src="${r.src}" alt="" style="width:110px; height:110px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
-            <div class="gallery-caption">Modifier</div>
           </button>
         `).join('')}
       </div>
@@ -3053,12 +3079,21 @@ function bindListsV2Events(photoRefs){
     data.v2.groupBy = (data.v2.groupBy === 'category') ? 'size' : 'category';
     save(); render();
   };
+  const photoSortBtn = document.getElementById('btnToggleV2PhotoSort');
+  if(photoSortBtn) photoSortBtn.onclick = () => {
+    data.v2.photoSort = (data.v2.photoSort === 'size') ? 'date' : 'size';
+    save(); render();
+  };
 
   if(photoRefs && photoRefs.length){
     document.querySelectorAll('[data-v2-edit-photo]').forEach(btn => {
       btn.onclick = () => {
-        const ref = photoRefs[parseInt(btn.dataset.v2EditPhoto, 10)];
-        if(ref) openVetementModal(ref.lot);
+        const idx = parseInt(btn.dataset.v2EditPhoto, 10);
+        openLightbox(photoRefs.map(r => ({
+          src: r.src,
+          gotoLabel: 'Modifier',
+          onGoto: () => openVetementModal(r.lot)
+        })), idx);
       };
     });
   }
@@ -3101,7 +3136,13 @@ function bindListsV2Events(photoRefs){
   document.querySelectorAll('[data-v2-zoom-lot]').forEach(imgEl => {
     imgEl.onclick = () => {
       const lot = (data.v2.lots || []).find(l => l.id === imgEl.dataset.v2ZoomLot);
-      if(lot && lot.photos && lot.photos.length) openLightbox(lot.photos, 0);
+      if(lot && lot.photos && lot.photos.length){
+        openLightbox(lot.photos.map(src => ({
+          src,
+          gotoLabel: 'Modifier',
+          onGoto: () => openVetementModal(lot)
+        })), 0);
+      }
     };
   });
 
@@ -3986,7 +4027,7 @@ function openLightbox(photos, startIndex){
               Masquer sur la galerie photo
             </label>
           ` : ''}
-          ${cur.onGoto ? `<button class="btn btn-primary" id="lbGoto">Voir l’article</button>` : ''}
+          ${cur.onGoto ? `<button class="btn btn-primary" id="lbGoto">${escapeHtml(cur.gotoLabel || 'Voir l’article')}</button>` : ''}
         </div>
       </div>
     `;
