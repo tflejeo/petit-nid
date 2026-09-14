@@ -297,6 +297,12 @@
     display:inline-block; font-size:10.5px; font-weight:800; color:var(--sage-dark);
     background:var(--sage-tint); padding:2px 8px; border-radius:999px;
   }
+  .v2-char-target-list{display:flex; flex-direction:column; gap:8px;}
+  .v2-char-target-row{display:flex; align-items:center; gap:8px;}
+  .v2-char-target-label{flex:1; font-size:13.5px; color:var(--ink); min-width:0;}
+  .v2-char-target-count{font-size:13px; color:var(--muted); font-weight:700; flex-shrink:0;}
+  .v2-char-target-input{width:56px; flex-shrink:0; text-align:center; padding:8px 2px;}
+  .v2-group-heading{font-size:11.5px; font-weight:800; color:var(--sage-dark); text-transform:uppercase; letter-spacing:0.3px; margin:12px 0 4px;}
   .v2-manage-section{border-bottom:1px solid var(--border); padding:4px 0;}
   .v2-manage-section:last-of-type{border-bottom:none;}
   .v2-manage-toggle{
@@ -1142,7 +1148,12 @@ function normalizeV2List(v2){
   v2.brands = denseArrayFrom(v2.brands).filter(Boolean);
   v2.groupBy = (v2.groupBy === 'category') ? 'category' : 'size';
   v2.photoSort = (v2.photoSort === 'size') ? 'size' : 'date';
-  v2.targets = denseArrayFrom(v2.targets).filter(Boolean).map(t => ({ sizeId:t.sizeId, categoryId:t.categoryId, target: Math.max(0, parseInt(t.target,10) || 0) }));
+  v2.targets = denseArrayFrom(v2.targets).filter(Boolean).map(t => {
+    const out = { sizeId:t.sizeId, categoryId:t.categoryId, target: Math.max(0, parseInt(t.target,10) || 0) };
+    if(t.charId) out.charId = t.charId;
+    if(t.valueId) out.valueId = t.valueId;
+    return out;
+  });
   v2.characteristics = denseArrayFrom(v2.characteristics).filter(Boolean).map(c => ({
     id: c.id || newId(),
     label: c.label || '',
@@ -2943,8 +2954,21 @@ function v2AcquiredFor(sizeId, categoryId){
   }));
   return n;
 }
+function v2TargetEntriesFor(sizeId, categoryId){
+  return (activeV2List().targets || []).filter(t => t.sizeId === sizeId && t.categoryId === categoryId);
+}
 function v2TargetFor(sizeId, categoryId){
-  const t = (activeV2List().targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
+  return v2TargetEntriesFor(sizeId, categoryId).reduce((s, t) => s + (t.target || 0), 0);
+}
+function v2AcquiredForValue(sizeId, categoryId, charId, valueId){
+  let n = 0;
+  (activeV2List().lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+    if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId && e.charValues && e.charValues[charId] === valueId) n += Number(e.qty) || 0;
+  }));
+  return n;
+}
+function v2TargetForValue(sizeId, categoryId, charId, valueId){
+  const t = (activeV2List().targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId && t.charId === charId && t.valueId === valueId);
   return t ? t.target : 0;
 }
 function v2EntriesFor(sizeId, categoryId){
@@ -3433,6 +3457,7 @@ function renderV2PairRow(sizeId, categoryId, label){
   const expanded = !!ui.expandedItems['v2-' + key];
   const entries = v2EntriesFor(sizeId, categoryId);
   const photoRefs = v2PhotoRefsForPair(sizeId, categoryId);
+  const mainChar = v2CharacteristicsForCategory(categoryId)[0] || null;
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
@@ -3442,13 +3467,43 @@ function renderV2PairRow(sizeId, categoryId, label){
     ${photoRefs.length ? renderV2RowThumbs(key, photoRefs) : ''}
   </div>`;
   if(expanded){
-    html += `<div class="item-expand">
-      <div class="field">
+    html += `<div class="item-expand">`;
+    if(mainChar){
+      html += `<div class="field">
+        <label class="field-label">Objectifs par ${escapeHtml(mainChar.label)}</label>
+        <div class="v2-char-target-list">
+          ${mainChar.values.map(v => {
+            const vTarget = v2TargetForValue(sizeId, categoryId, mainChar.id, v.id);
+            const vAcquired = v2AcquiredForValue(sizeId, categoryId, mainChar.id, v.id);
+            return `<div class="v2-char-target-row">
+              <span class="v2-char-target-label">${escapeHtml(v.label)}</span>
+              <span class="v2-char-target-count">${vAcquired} /</span>
+              <input type="number" min="0" class="v2-char-target-input" data-v2-char-target="${key}" data-char-id="${mainChar.id}" data-value-id="${v.id}" value="${vTarget}">
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+      mainChar.values.forEach(v => {
+        const groupEntries = entries.filter(({ entry }) => entry.charValues && entry.charValues[mainChar.id] === v.id);
+        if(groupEntries.length){
+          html += `<div class="v2-group-heading">${escapeHtml(v.label)}</div>`;
+          html += groupEntries.map(({ lot, entry }) => renderV2EntryRow(lot, entry)).join('');
+        }
+      });
+      const ungrouped = entries.filter(({ entry }) => !(entry.charValues && entry.charValues[mainChar.id]));
+      if(ungrouped.length){
+        html += `<div class="v2-group-heading">Non précisé</div>`;
+        html += ungrouped.map(({ lot, entry }) => renderV2EntryRow(lot, entry)).join('');
+      }
+      if(!entries.length) html += `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`;
+    } else {
+      html += `<div class="field">
         <label class="field-label">Objectif</label>
         <input type="number" min="0" data-v2-target="${key}" value="${target}">
       </div>
-      ${entries.length ? entries.map(({lot, entry}) => renderV2EntryRow(lot, entry)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`}
-    </div>`;
+      ${entries.length ? entries.map(({lot, entry}) => renderV2EntryRow(lot, entry)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`}`;
+    }
+    html += `</div>`;
   }
   return html;
 }
@@ -3570,9 +3625,21 @@ function bindListsV2Events(photoRefs){
     input.addEventListener('change', () => {
       const [sizeId, categoryId] = input.dataset.v2Target.split('::');
       const val = clamp(parseInt(input.value, 10) || 0, 0, 999);
-      let t = (activeV2List().targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId);
+      let t = (activeV2List().targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId && !t.charId);
       if(t) t.target = val;
       else { if(!Array.isArray(activeV2List().targets)) activeV2List().targets = []; activeV2List().targets.push({ sizeId, categoryId, target: val }); }
+      save(); render();
+    });
+  });
+
+  document.querySelectorAll('[data-v2-char-target]').forEach(input => {
+    input.addEventListener('change', () => {
+      const [sizeId, categoryId] = input.dataset.v2CharTarget.split('::');
+      const charId = input.dataset.charId, valueId = input.dataset.valueId;
+      const val = clamp(parseInt(input.value, 10) || 0, 0, 999);
+      let t = (activeV2List().targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId && t.charId === charId && t.valueId === valueId);
+      if(t) t.target = val;
+      else { if(!Array.isArray(activeV2List().targets)) activeV2List().targets = []; activeV2List().targets.push({ sizeId, categoryId, charId, valueId, target: val }); }
       save(); render();
     });
   });
@@ -3856,6 +3923,7 @@ function openManageV2Modal(){
           <div class="field" style="flex:1;"><label class="field-label">Nom du 2ᵉ filtre (ex. Catégorie)</label><input type="text" id="v2CategoryLabel" value="${escapeAttr(list.categoryLabel)}"></div>
         </div>
         <button type="button" class="chip-btn" id="btnSaveV2General" style="margin-bottom:10px;">Enregistrer ces noms</button>
+        <button type="button" class="chip-btn" id="btnPullV1Categories" style="margin-bottom:10px;">${icon('download','icon-sm')} Récupérer les catégories depuis « Mes listes »</button>
         ${(data.v2lists || []).length > 1 ? `<button type="button" class="chip-btn danger" id="btnDeleteV2List">${icon('trash','icon-sm')} Supprimer cette liste</button>` : ''}
       </div>
     </div>
@@ -3900,6 +3968,25 @@ function openManageV2Modal(){
     if(!name || !sizeLabel || !categoryLabel){ showToast('Tous les champs sont requis'); return; }
     list.name = name; list.sizeLabel = sizeLabel; list.categoryLabel = categoryLabel;
     save(); closeModal(); render(); showToast('Paramètres enregistrés');
+  };
+  document.getElementById('btnPullV1Categories').onclick = () => {
+    const seeds = defaultCategorySeeds();
+    const norm = s => (s || '').trim().toLowerCase();
+    const key = Object.keys(seeds).find(k => norm(k) === norm(list.name));
+    if(!key){ showToast('Aucune liste « ' + list.name + ' » trouvée dans Mes listes'); return; }
+    const existing = new Set((list.categories || []).map(c => norm(c.label)));
+    let added = 0;
+    seeds[key].forEach(([sectionLabel, period, items]) => {
+      items.forEach(([itemName]) => {
+        if(!existing.has(norm(itemName))){
+          existing.add(norm(itemName));
+          list.categories.push({ id:newId(), label:itemName });
+          added++;
+        }
+      });
+    });
+    if(added > 0){ save(); showToast(added + ' catégorie(s) ajoutée(s)'); closeModal(); openManageV2Modal(); }
+    else showToast('Rien de nouveau à récupérer');
   };
   const deleteListBtn = document.getElementById('btnDeleteV2List');
   if(deleteListBtn) deleteListBtn.onclick = () => openConfirmModal(
