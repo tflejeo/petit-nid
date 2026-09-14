@@ -390,11 +390,10 @@
     display:flex; align-items:center; justify-content:center;
   }
   .lightbox-imgwrap{
-    width:92vw; height:80vh; display:flex; align-items:center; justify-content:center;
-    overflow:hidden; touch-action:none;
+    width:92vw; height:80vh; position:relative; overflow:hidden; touch-action:none;
   }
   .lightbox-img{
-    max-width:100%; max-height:100%; border-radius:12px; object-fit:contain;
+    width:100%; height:100%; border-radius:12px; object-fit:contain; display:block;
     transform-origin:center center; will-change:transform; user-select:none; -webkit-user-drag:none;
   }
   .lightbox-close{
@@ -1037,9 +1036,10 @@ function newId(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().t
 
 // `data` is the shared content, synced to Firebase for both parents.
 let data = loadLocalData();
-seedKnownEmptyCategories(data);
-restoreThreeMoisSection(data);
-v2SeedCategoriesFromV1(data);
+const bootSeeded = seedKnownEmptyCategories(data);
+const bootRestored = restoreThreeMoisSection(data);
+const bootV2Seeded = v2SeedCategoriesFromV1(data);
+if(bootSeeded || bootRestored || bootV2Seeded) save();
 function countVintedPhotos(d){
   let n = 0;
   (d.vintedLikes || []).forEach(v => { n += (v.photos || []).length; });
@@ -2973,13 +2973,21 @@ function v2CharacteristicsForCategory(categoryId){
 }
 function v2SizeTotals(sizeId){
   let acquired = 0, target = 0;
-  v2CategoriesForSize(sizeId).forEach(c => { acquired += v2AcquiredFor(sizeId, c.id); target += v2TargetFor(sizeId, c.id); });
+  v2CategoriesForSize(sizeId).forEach(c => {
+    const t = v2TargetFor(sizeId, c.id);
+    target += t;
+    acquired += Math.min(v2AcquiredFor(sizeId, c.id), t);
+  });
   const pct = target > 0 ? Math.round((acquired / target) * 100) : 0;
   return { acquired, target, pct };
 }
 function v2CategoryTotals(categoryId){
   let acquired = 0, target = 0;
-  v2SizesForCategory(categoryId).forEach(s => { acquired += v2AcquiredFor(s.id, categoryId); target += v2TargetFor(s.id, categoryId); });
+  v2SizesForCategory(categoryId).forEach(s => {
+    const t = v2TargetFor(s.id, categoryId);
+    target += t;
+    acquired += Math.min(v2AcquiredFor(s.id, categoryId), t);
+  });
   const pct = target > 0 ? Math.round((acquired / target) * 100) : 0;
   return { acquired, target, pct };
 }
@@ -4569,11 +4577,16 @@ function openLightbox(photos, startIndex){
     //     double-tap pour zoomer, et balayage gauche/droite quand pas zoomé.
     let scale = 1, tx = 0, ty = 0;
     let pinchStartDist = null, pinchStartScale = 1;
-    let pinchOriginX = 0, pinchOriginY = 0;
     let panStartX = 0, panStartY = 0;
     let swipeStartX = null, swipeStartY = null;
     let lastTapTime = 0;
 
+    function clampPan(){
+      const maxX = (imgWrap.clientWidth * (scale - 1)) / 2;
+      const maxY = (imgWrap.clientHeight * (scale - 1)) / 2;
+      tx = clamp(tx, -maxX, maxX);
+      ty = clamp(ty, -maxY, maxY);
+    }
     function applyTransform(){
       imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
     }
@@ -4589,11 +4602,6 @@ function openLightbox(photos, startIndex){
       if(e.touches.length === 2){
         pinchStartDist = distance(e.touches[0], e.touches[1]);
         pinchStartScale = scale;
-        const rect = imgWrap.getBoundingClientRect();
-        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        pinchOriginX = (midX - (rect.left + rect.width / 2) - tx) / scale;
-        pinchOriginY = (midY - (rect.top + rect.height / 2) - ty) / scale;
         swipeStartX = null;
       } else if(e.touches.length === 1){
         if(scale > 1){
@@ -4611,16 +4619,13 @@ function openLightbox(photos, startIndex){
         e.preventDefault();
         const newDist = distance(e.touches[0], e.touches[1]);
         scale = clamp(pinchStartScale * (newDist / pinchStartDist), 1, 4);
-        const rect = imgWrap.getBoundingClientRect();
-        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        tx = midX - (rect.left + rect.width / 2) - pinchOriginX * scale;
-        ty = midY - (rect.top + rect.height / 2) - pinchOriginY * scale;
+        clampPan();
         applyTransform();
       } else if(e.touches.length === 1 && scale > 1){
         e.preventDefault();
         tx = e.touches[0].clientX - panStartX;
         ty = e.touches[0].clientY - panStartY;
+        clampPan();
         applyTransform();
       }
     }, { passive:false });
