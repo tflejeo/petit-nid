@@ -694,6 +694,7 @@ const ICONS = {
   bed:'<path d="M3 18v-6a2 2 0 012-2h14a2 2 0 012 2v6"/><path d="M3 18h18M7 10V7a2 2 0 012-2h6a2 2 0 012 2v3"/>',
   suitcase:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 13h18"/>',
   sparkle:'<path d="M12 3l1.8 4.6L18 9.2l-4.2 1.7L12 15l-1.8-4.1L6 9.2l4.2-1.6L12 3z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>',
+  bottle:'<rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 6h6l1 3v10.5a1.5 1.5 0 01-1.5 1.5h-5A1.5 1.5 0 018 19.5V9l1-3z"/><path d="M8 12.5h8"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
   wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14.5" r="1.2"/>',
@@ -751,7 +752,7 @@ function buildDefaultV2(){
 
 function buildEmptyV2List(name){
   return {
-    id:newId(), name, sizeLabel:'Catégorie', categoryLabel:'Article', mode:'catalog',
+    id:newId(), name, sizeLabel:'Catégorie', categoryLabel:'Article', mode:'catalog', icon:'box',
     sizes:[], categories:[], brands:[], targets:[], lots:[], characteristics:[], groupBy:'size', photoSort:'date'
   };
 }
@@ -838,6 +839,13 @@ function normalizeV2List(v2){
   if(v2.mode === 'catalog'){
     if(v2.sizeLabel === 'Filtre A') v2.sizeLabel = 'Catégorie';
     if(v2.categoryLabel === 'Catégorie') v2.categoryLabel = 'Article';
+  }
+  if(!v2.icon){
+    if(v2.name === 'Vêtements bébé') v2.icon = 'shirt';
+    else if(v2.name === 'Chambre') v2.icon = 'bed';
+    else if(v2.name === 'Valise de maternité') v2.icon = 'suitcase';
+    else if(v2.name === 'Puériculture') v2.icon = 'bottle';
+    else v2.icon = 'box';
   }
   v2.sizes = denseArrayFrom(v2.sizes).filter(Boolean);
   v2.categories = denseArrayFrom(v2.categories).filter(Boolean);
@@ -1252,7 +1260,7 @@ function renderCatGrid(container){
   lists.forEach(list => {
     const t = v2GlobalTotalsForList(list);
     html += `<button class="cat-card" data-goto-v2-list="${list.id}">
-      <div class="cat-icon" style="background:var(--sage-dark)">${icon('box', 'icon-lg')}</div>
+      <div class="cat-icon" style="background:var(--sage-dark)">${icon(list.icon || 'box', 'icon-lg')}</div>
       <div>
         <div class="cat-name">${escapeHtml(list.name)}</div>
         <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
@@ -2435,7 +2443,7 @@ function renderV2ListPicker(){
         ${lists.map(l => {
           const t = v2GlobalTotalsForList(l);
           return `<button class="cat-card" data-v2-select-list="${l.id}">
-            <div class="cat-icon" style="background:var(--sage-dark);">${icon('box','icon-lg')}</div>
+            <div class="cat-icon" style="background:var(--sage-dark);">${icon(l.icon || 'box','icon-lg')}</div>
             <div>
               <div class="cat-name">${escapeHtml(l.name)}</div>
               <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
@@ -2459,6 +2467,10 @@ function renderV2ListPicker(){
     openModal(`
       <h2>Nouvelle liste</h2>
       <div class="field"><label class="field-label">Nom</label><input type="text" id="newV2ListName" placeholder="ex. Jouets"></div>
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:4px 0 6px;">
+        <input type="checkbox" id="newV2ListVetements" style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
+        <span style="font-size:13px; color:var(--ink);">Liste de vêtements (ajout par photo, plusieurs tailles par article)</span>
+      </label>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="mCancel">Annuler</button>
         <button class="btn btn-primary" id="mSave">Créer</button>
@@ -2469,6 +2481,12 @@ function renderV2ListPicker(){
       const name = document.getElementById('newV2ListName').value.trim();
       if(!name){ showToast('Donnez un nom à la liste'); return; }
       const list = buildEmptyV2List(name);
+      if(document.getElementById('newV2ListVetements').checked){
+        list.mode = 'lots';
+        list.sizeLabel = 'Taille';
+        list.categoryLabel = 'Catégorie';
+        list.icon = 'shirt';
+      }
       if(!Array.isArray(data.v2lists)) data.v2lists = [];
       data.v2lists.push(list);
       ui.activeV2ListId = list.id;
@@ -2576,7 +2594,11 @@ function renderListsV2(){
           `).join('')}
         </div>
       ` : ''}
-      ${catalogMode ? '' : `
+      ${catalogMode ? `
+      <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+        <button class="chip-btn" id="btnCatalogAddSize">${icon('plus','icon-sm')} Nouvelle ${list.sizeLabel.toLowerCase()}</button>
+      </div>
+      ` : `
       <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
         <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? list.categoryLabel : list.sizeLabel}</button>
       </div>
@@ -2643,6 +2665,7 @@ function renderV2SizeCard(size){
   const collapsed = isV2SizeCollapsed(size.id);
   const cats = v2CategoriesForSize(size.id);
   const remaining = v2CategoriesNotInSize(size.id);
+  const showQuickAdd = v2IsCatalog(activeV2List()) || remaining.length;
   return `
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-size-toggle="${size.id}">
@@ -2655,7 +2678,7 @@ function renderV2SizeCard(size){
       </div>
       <div class="section-body ${collapsed ? '' : 'open'}">
         ${cats.length ? cats.map(cat => renderV2PairRow(size.id, cat.id, cat.label)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:4px;">Aucun objectif ni article pour cette taille pour l’instant.</p>`}
-        ${remaining.length ? renderV2QuickAdd('size', size.id, remaining) : ''}
+        ${showQuickAdd ? renderV2QuickAdd('size', size.id, remaining) : ''}
       </div>
     </div>
   `;
@@ -2686,6 +2709,15 @@ function renderV2CategoryCard(cat){
 
 function renderV2QuickAdd(mode, fixedId, options){
   const list = activeV2List();
+  if(mode === 'size' && v2IsCatalog(list)){
+    return `
+      <div class="v2-quickadd" data-v2-catalog-newcat="${fixedId}">
+        <input type="text" class="v2-quickadd-newcat-input" placeholder="Nouvel ${list.categoryLabel.toLowerCase()}…" style="flex:1; min-width:0;">
+        <input type="number" min="0" class="v2-quickadd-target" placeholder="Objectif" value="1">
+        <button type="button" class="chip-btn v2-quickadd-btn">${icon('plus','icon-sm')} Ajouter</button>
+      </div>
+    `;
+  }
   const attr = mode === 'size' ? 'data-v2-quickadd-size' : 'data-v2-quickadd-cat';
   const placeholder = mode === 'size' ? `Ajouter : ${list.categoryLabel}…` : `Ajouter : ${list.sizeLabel}…`;
   return `
@@ -2841,7 +2873,8 @@ function renderV2EntryRow(lot, entry, excludeCharId){
     </div>
     ${tags.length ? `<div class="v2-entry-tags-inline">${tags.map(t => `<span class="v2-tag">${escapeHtml(t.label)}</span>`).join('')}</div>` : ''}
     <div style="flex:1; font-size:12.5px; color:var(--ink); min-width:0;">
-      ${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}
+      <div>${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}</div>
+      ${entry.comment ? `<div style="color:var(--muted); font-style:italic; font-size:11.5px; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(entry.comment)}</div>` : ''}
     </div>
     <button class="text-btn danger" data-v2-del-entry="${entry.id}" data-v2-lot="${lot.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
   </div>`;
@@ -3010,10 +3043,51 @@ function bindListsV2Events(photoRefs){
   });
 
   if(v2IsCatalog(activeV2List())){
+    const addSizeBtn = document.getElementById('btnCatalogAddSize');
+    if(addSizeBtn) addSizeBtn.onclick = () => {
+      const list = activeV2List();
+      openModal(`
+        <h2>Nouvelle ${list.sizeLabel.toLowerCase()}</h2>
+        <div class="field"><label class="field-label">Nom</label><input type="text" id="newCatalogSizeName" placeholder="ex. Transport"></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="mCancel">Annuler</button>
+          <button class="btn btn-primary" id="mSave">Créer</button>
+        </div>
+      `);
+      document.getElementById('mCancel').onclick = closeModal;
+      document.getElementById('mSave').onclick = () => {
+        const label = document.getElementById('newCatalogSizeName').value.trim();
+        if(!label){ showToast('Donnez un nom'); return; }
+        if(!Array.isArray(list.sizes)) list.sizes = [];
+        const newSize = { id:newId(), label };
+        list.sizes.push(newSize);
+        ui.collapsedSections['v2-' + newSize.id] = false;
+        save(); saveUi(); closeModal(); render(); showToast(list.sizeLabel + ' créée');
+      };
+    };
     document.querySelectorAll('[data-v2-catalog-add]').forEach(btn => {
       btn.onclick = () => {
         const [sizeId, categoryId] = btn.dataset.v2CatalogAdd.split('::');
         openCatalogEntryModal(sizeId, categoryId, null);
+      };
+    });
+    document.querySelectorAll('[data-v2-catalog-newcat]').forEach(row => {
+      const sizeId = row.dataset.v2CatalogNewcat;
+      row.querySelector('.v2-quickadd-btn').onclick = () => {
+        const input = row.querySelector('.v2-quickadd-newcat-input');
+        const targetInput = row.querySelector('.v2-quickadd-target');
+        const label = input.value.trim();
+        if(!label){ showToast('Donnez un nom à l’article'); return; }
+        const val = clamp(parseInt(targetInput.value, 10) || 0, 0, 999);
+        const list = activeV2List();
+        if(!Array.isArray(list.categories)) list.categories = [];
+        let cat = list.categories.find(c => c.label.trim().toLowerCase() === label.toLowerCase());
+        if(!cat){ cat = { id:newId(), label }; list.categories.push(cat); }
+        if(!Array.isArray(list.targets)) list.targets = [];
+        let t = list.targets.find(t => t.sizeId === sizeId && t.categoryId === cat.id && !t.charId);
+        if(t) t.target = val;
+        else list.targets.push({ sizeId, categoryId: cat.id, target: val });
+        save(); render();
       };
     });
     document.querySelectorAll('[data-v2-entry-row]').forEach(row => {
@@ -3311,6 +3385,10 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
         <input type="number" min="0" step="0.01" id="catalogPrice" placeholder="0,00" value="${isNew ? '' : (existing.lot.price || '')}">
       </div>
     </div>
+    <div class="field">
+      <label class="field-label">Commentaire</label>
+      <textarea id="catalogComment" placeholder="Optionnel…" style="min-height:44px;">${isNew ? '' : escapeHtml(existing.entry.comment || '')}</textarea>
+    </div>
     <div class="modal-actions">
       ${!isNew ? `<button type="button" class="btn btn-danger" id="btnDeleteCatalogEntry">${icon('trash','icon-sm')} Supprimer</button>` : `<button class="btn btn-secondary" id="mCancel">Annuler</button>`}
       <button class="btn btn-primary" id="mSave">Enregistrer</button>
@@ -3367,17 +3445,19 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   document.getElementById('mSave').onclick = () => {
     const qtyVal = Math.max(1, parseInt(document.getElementById('catalogQty').value, 10) || 1);
     const priceVal = Math.max(0, parseFloat(document.getElementById('catalogPrice').value) || 0);
+    const commentVal = document.getElementById('catalogComment').value.trim();
     const photoSrcs = photos.map(p => p.src);
     if(isNew){
       if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
       activeV2List().lots.push({
         id:newId(), photos:photoSrcs, hiddenPhotos:[], price:priceVal,
-        entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:'', qty:qtyVal, charValues: Object.assign({}, charValues) }]
+        entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:'', qty:qtyVal, comment:commentVal, charValues: Object.assign({}, charValues) }]
       });
     } else {
       existing.lot.photos = photoSrcs;
       existing.lot.price = priceVal;
       existing.entry.qty = qtyVal;
+      existing.entry.comment = commentVal;
       existing.entry.charValues = Object.assign({}, charValues);
     }
     save(); closeModal(); render(); showToast(isNew ? 'Achat ajouté' : 'Achat mis à jour');
@@ -3412,6 +3492,10 @@ function openManageV2Modal(){
           <div class="field" style="flex:1;"><label class="field-label">Nom du 1er filtre (ex. Taille)</label><input type="text" id="v2SizeLabel" value="${escapeAttr(list.sizeLabel)}"></div>
           <div class="field" style="flex:1;"><label class="field-label">Nom du 2ᵉ filtre (ex. Catégorie)</label><input type="text" id="v2CategoryLabel" value="${escapeAttr(list.categoryLabel)}"></div>
         </div>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:2px 0 10px;">
+          <input type="checkbox" id="v2ListVetements" ${list.mode === 'lots' ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
+          <span style="font-size:13px; color:var(--ink);">Liste de vêtements (ajout par photo, plusieurs tailles par article)</span>
+        </label>
         <button type="button" class="chip-btn" id="btnSaveV2General" style="margin-bottom:10px;">Enregistrer ces noms</button>
         ${(data.v2lists || []).length > 1 ? `<button type="button" class="chip-btn danger" id="btnDeleteV2List">${icon('trash','icon-sm')} Supprimer cette liste</button>` : ''}
       </div>
@@ -3456,6 +3540,7 @@ function openManageV2Modal(){
     const categoryLabel = document.getElementById('v2CategoryLabel').value.trim();
     if(!name || !sizeLabel || !categoryLabel){ showToast('Tous les champs sont requis'); return; }
     list.name = name; list.sizeLabel = sizeLabel; list.categoryLabel = categoryLabel;
+    list.mode = document.getElementById('v2ListVetements').checked ? 'lots' : 'catalog';
     save(); closeModal(); render(); showToast('Paramètres enregistrés');
   };
   const deleteListBtn = document.getElementById('btnDeleteV2List');
