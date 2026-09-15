@@ -164,8 +164,8 @@
   .price-list-row input{flex:1;}
   .price-list-total{font-size:12.5px; font-weight:700; color:var(--sage-dark); margin-top:2px;}
   .unit-list{display:flex; flex-direction:column; gap:12px;}
-  .unit-row{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; padding-bottom:10px; border-bottom:1px solid #F2ECDE;}
-  .unit-row:last-child{border-bottom:none; padding-bottom:0;}
+  .unit-row{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; padding-bottom:7px; margin-bottom:7px; border-bottom:1px solid #F2ECDE;}
+  .unit-row:last-child{border-bottom:none; padding-bottom:0; margin-bottom:0;}
   .unit-header-row{padding-bottom:4px; border-bottom:none;}
   .unit-col-label{font-size:10.5px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px;}
   .unit-col-label:first-child{width:38px; text-align:center;}
@@ -176,7 +176,7 @@
   .unit-row input.unit-price-input{width:48px; flex-shrink:0; text-align:center; padding:9px 2px;}
   .unit-del-btn{flex-shrink:0; padding:4px !important; width:20px;}
   .unit-photos{display:flex; flex-wrap:nowrap; gap:5px; align-items:center; flex:1 1 auto; min-width:0;}
-  .unit-photo-thumb{position:relative; width:48px; height:48px; flex-shrink:0;}
+  .unit-photo-thumb{position:relative; width:40px; height:40px; flex-shrink:0;}
   .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
   .unit-photo-add-sm{
     width:40px; height:40px; border-radius:8px; border:1.5px dashed var(--muted-2); flex-shrink:0;
@@ -312,7 +312,19 @@
   input.v2-char-target-input::-webkit-outer-spin-button, input.v2-char-target-input::-webkit-inner-spin-button{
     -webkit-appearance:none; margin:0;
   }
-  .v2-group-heading{font-size:11.5px; font-weight:800; color:var(--sage-dark); text-transform:uppercase; letter-spacing:0.3px; margin:12px 0 4px;}
+  .v2-char-group{margin-top:6px;}
+  .v2-char-group:first-of-type{margin-top:0;}
+  .v2-group-heading-toggle{
+    width:100%; display:flex; justify-content:space-between; align-items:center; gap:8px;
+    background:none; border:none; padding:6px 2px; cursor:pointer;
+    font-family:var(--font-body); font-weight:800; font-size:11.5px; color:var(--sage-dark);
+    text-transform:uppercase; letter-spacing:0.3px;
+  }
+  .v2-group-heading-toggle .chev{color:var(--muted); flex-shrink:0; width:14px; height:14px; transition:transform 0.2s ease;}
+  .v2-group-heading-toggle.open .chev{transform:rotate(180deg);}
+  .v2-group-count{color:var(--muted); font-weight:700; text-transform:none; letter-spacing:0;}
+  .v2-char-group-body{display:none; padding-top:2px;}
+  .v2-char-group-body.open{display:block;}
   .v2-manage-section{border-bottom:1px solid var(--border); padding:4px 0;}
   .v2-manage-section:last-of-type{border-bottom:none;}
   .v2-manage-toggle{
@@ -1245,17 +1257,10 @@ function collectV2GalleryPhotos(){
   const out = [];
   (data.v2lists || []).forEach(list => {
     (list.lots || []).forEach(lot => {
-      const categoryLabels = [...new Set((lot.entries || []).map(e => {
-        const c = (list.categories || []).find(x => x.id === e.categoryId);
-        return c ? c.label : null;
-      }).filter(Boolean))];
-      const sizeLabels = [...new Set((lot.entries || []).flatMap(e => (e.sizeIds || [])).map(id => {
-        const s = (list.sizes || []).find(x => x.id === id);
-        return s ? s.label : null;
-      }).filter(Boolean))];
+      const tags = v2LotTags(list, lot);
       (lot.photos || []).forEach(src => {
         if((lot.hiddenPhotos || []).includes(src)) return;
-        out.push({ src, lot, categoryLabels, sizeLabels });
+        out.push({ src, lot, categoryLabels: tags.categoryLabels, sizeLabels: tags.sizeLabels });
       });
     });
   });
@@ -1271,10 +1276,7 @@ function renderV2PhotoGalleryDash(container){
       ${photos.map((p, i) => `
         <button class="gallery-item" data-v2-dash-gallery-index="${i}" style="width:152px;">
           <img src="${p.src}" alt="" style="width:152px; height:152px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
-          ${(p.categoryLabels.length || p.sizeLabels.length) ? `<div class="gallery-tags">
-            ${p.categoryLabels.map(l => `<span class="v2-tag">${escapeHtml(l)}</span>`).join('')}
-            ${p.sizeLabels.map(l => `<span class="v2-tag v2-tag-size">${escapeHtml(l)}</span>`).join('')}
-          </div>` : ''}
+          ${renderV2GalleryTags({ categoryLabels: p.categoryLabels, sizeLabels: p.sizeLabels }, 152)}
         </button>
       `).join('')}
     </div>
@@ -2162,6 +2164,24 @@ function openEditTodoModal(t){
 function v2SizeLabel(id){ const s = (activeV2List().sizes||[]).find(x=>x.id===id); return s ? s.label : '—'; }
 function v2CategoryLabel(id){ const c = (activeV2List().categories||[]).find(x=>x.id===id); return c ? c.label : '—'; }
 function v2BrandLabel(id){ if(!id) return ''; const b = (activeV2List().brands||[]).find(x=>x.id===id); return b ? b.label : ''; }
+function v2LotTags(list, lot){
+  const categoryLabels = [...new Set((lot.entries || []).map(e => {
+    const c = (list.categories || []).find(x => x.id === e.categoryId);
+    return c ? c.label : null;
+  }).filter(Boolean))];
+  const sizeLabels = [...new Set((lot.entries || []).flatMap(e => (e.sizeIds || [])).map(id => {
+    const s = (list.sizes || []).find(x => x.id === id);
+    return s ? s.label : null;
+  }).filter(Boolean))];
+  return { categoryLabels, sizeLabels };
+}
+function renderV2GalleryTags(tags, maxWidth){
+  if(!tags.categoryLabels.length && !tags.sizeLabels.length) return '';
+  return `<div class="gallery-tags" style="max-width:${maxWidth}px;">
+    ${tags.categoryLabels.map(l => `<span class="v2-tag">${escapeHtml(l)}</span>`).join('')}
+    ${tags.sizeLabels.map(l => `<span class="v2-tag v2-tag-size">${escapeHtml(l)}</span>`).join('')}
+  </div>`;
+}
 
 function v2AcquiredFor(sizeId, categoryId){
   let n = 0;
@@ -2533,8 +2553,9 @@ function renderListsV2(){
         </div>
         <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:16px; gap:6px;">
           ${photoRefs.map((r, i) => `
-            <button class="gallery-item" data-v2-edit-photo="${i}">
+            <button class="gallery-item" data-v2-edit-photo="${i}" style="width:110px;">
               <img src="${r.src}" alt="" style="width:110px; height:110px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
+              ${renderV2GalleryTags(v2LotTags(list, r.lot), 110)}
             </button>
           `).join('')}
         </div>
@@ -2740,14 +2761,12 @@ function renderV2PairRow(sizeId, categoryId, label){
       mainChar.values.forEach(v => {
         const groupEntries = entries.filter(({ entry }) => entry.charValues && entry.charValues[mainChar.id] === v.id);
         if(groupEntries.length){
-          html += `<div class="v2-group-heading">${escapeHtml(v.label)}</div>`;
-          html += groupEntries.map(({ lot, entry }) => renderV2EntryRow(lot, entry)).join('');
+          html += renderV2CharGroup('v2g-' + key + '::' + mainChar.id + '::' + v.id, v.label, groupEntries, mainChar.id);
         }
       });
       const ungrouped = entries.filter(({ entry }) => !(entry.charValues && entry.charValues[mainChar.id]));
       if(ungrouped.length){
-        html += `<div class="v2-group-heading">Non précisé</div>`;
-        html += ungrouped.map(({ lot, entry }) => renderV2EntryRow(lot, entry)).join('');
+        html += renderV2CharGroup('v2g-' + key + '::' + mainChar.id + '::ungrouped', 'Non précisé', ungrouped, mainChar.id);
       }
       if(!entries.length) html += `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`;
     } else {
@@ -2762,29 +2781,46 @@ function renderV2PairRow(sizeId, categoryId, label){
   return html;
 }
 
+function isV2CharGroupCollapsed(groupKey){
+  return ui.collapsedSections[groupKey] !== false;
+}
+
+function renderV2CharGroup(groupKey, label, groupEntries, excludeCharId){
+  const collapsed = isV2CharGroupCollapsed(groupKey);
+  return `<div class="v2-char-group">
+    <button type="button" class="v2-group-heading-toggle ${collapsed ? '' : 'open'}" data-v2-chargroup-toggle="${groupKey}">
+      <span>${escapeHtml(label)} <span class="v2-group-count">(${groupEntries.length})</span></span>
+      <span class="chev">${icon('chevronDown','icon-sm')}</span>
+    </button>
+    <div class="v2-char-group-body ${collapsed ? '' : 'open'}">
+      ${groupEntries.map(({ lot, entry }) => renderV2EntryRow(lot, entry, excludeCharId)).join('')}
+    </div>
+  </div>`;
+}
+
 function v2EntryCharTags(entry){
   const tags = [];
   v2CharacteristicsForCategory(entry.categoryId).forEach(ch => {
     const valId = entry.charValues && entry.charValues[ch.id];
     if(!valId) return;
     const val = ch.values.find(v => v.id === valId);
-    if(val) tags.push(val.label);
+    if(val) tags.push({ charId: ch.id, label: val.label });
   });
   return tags;
 }
 
-function renderV2EntryRow(lot, entry){
+function renderV2EntryRow(lot, entry, excludeCharId){
   const brand = v2BrandLabel(entry.brandId);
-  const tags = v2EntryCharTags(entry);
+  const tags = v2EntryCharTags(entry).filter(t => t.charId !== excludeCharId);
   return `<div class="unit-row" data-v2-entry-row="${entry.id}">
     <div class="unit-photos">
       ${(lot.photos && lot.photos[0]) ? `
         <div class="unit-photo-thumb"><img src="${lot.photos[0]}" data-v2-zoom-lot="${lot.id}"></div>
       ` : ''}
     </div>
-    ${tags.length ? `<div class="v2-entry-tags-inline">${tags.map(t => `<span class="v2-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
-    <div style="flex:1; font-size:13px; color:var(--ink); min-width:0;">
-      ${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}${lot.price ? ' · lot ' + formatPrice(lot.price) : ''}
+    ${tags.length ? `<div class="v2-entry-tags-inline">${tags.map(t => `<span class="v2-tag">${escapeHtml(t.label)}</span>`).join('')}</div>` : ''}
+    <div style="flex:1; font-size:12.5px; color:var(--ink); min-width:0;">
+      ${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}
     </div>
     <button class="text-btn danger" data-v2-del-entry="${entry.id}" data-v2-lot="${lot.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
   </div>`;
@@ -2878,6 +2914,14 @@ function bindListsV2Events(photoRefs){
       const key = 'v2-' + el.dataset.v2CatToggle;
       ui.expandedItems[key] = !ui.expandedItems[key];
       render();
+    };
+  });
+
+  document.querySelectorAll('[data-v2-chargroup-toggle]').forEach(el => {
+    el.onclick = () => {
+      const key = el.dataset.v2ChargroupToggle;
+      ui.collapsedSections[key] = !isV2CharGroupCollapsed(key);
+      saveUi(); render();
     };
   });
 
