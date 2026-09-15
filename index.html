@@ -310,9 +310,6 @@
     display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:4px; max-width:152px;
   }
   .v2-char-target-list{display:flex; flex-direction:column; gap:8px;}
-  .v2-char-target-row{display:flex; align-items:center; gap:8px;}
-  .v2-char-target-label{flex:1; font-size:13.5px; color:var(--ink); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .v2-char-target-count{font-size:13px; color:var(--muted); font-weight:700; flex-shrink:0;}
   input.v2-char-target-input{
     width:34px !important; flex-shrink:0; text-align:center; padding:8px 2px !important; font-size:13px;
     -moz-appearance:textfield;
@@ -328,6 +325,9 @@
     font-family:var(--font-body); font-weight:800; font-size:11.5px; color:var(--sage-dark);
     text-transform:uppercase; letter-spacing:0.3px;
   }
+  .v2-group-label{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .v2-group-target{display:flex; align-items:center; gap:6px; flex-shrink:0; cursor:default; text-transform:none;}
+  .v2-group-acquired{font-size:13px; color:var(--muted); font-weight:700;}
   .v2-group-heading-toggle .chev{color:var(--muted); flex-shrink:0; width:14px; height:14px; transition:transform 0.2s ease;}
   .v2-group-heading-toggle.open .chev{transform:rotate(180deg);}
   .v2-group-count{color:var(--muted); font-weight:700; text-transform:none; letter-spacing:0;}
@@ -2524,11 +2524,13 @@ function renderV2ListPicker(){
       <div class="cat-grid" id="v2ListGrid">
         ${lists.map(l => {
           const t = v2GlobalTotalsForList(l);
+          const b = budgetTotalsForV2List(l);
           return `<button class="cat-card" data-v2-select-list="${l.id}">
             <div class="cat-icon" style="background:${l.color || 'var(--sage-dark)'};">${icon(l.icon || 'box','icon-lg')}</div>
             <div>
               <div class="cat-name">${escapeHtml(l.name)}</div>
               <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
+              ${b.spent > 0 ? `<div class="cat-meta" style="display:flex; align-items:center; gap:4px; color:var(--sage-dark); font-weight:800; margin-top:1px;">${icon('wallet','icon-sm')} ${formatPrice(b.spent)}</div>` : ''}
             </div>
             <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
           </button>`;
@@ -2634,8 +2636,6 @@ function renderListsV2(){
   const catalogMode = v2IsCatalog(list);
   const photoRefs = catalogMode ? [] : collectV2LotPhotoRefs();
   const groupBy = catalogMode ? 'size' : (list.groupBy || 'size');
-  const g = v2GlobalTotals();
-  const budget = budgetTotalsV2();
   main.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
       <h2 style="font-family:var(--font-display); font-weight:600; font-size:19px; margin:0; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(list.name)}</h2>
@@ -2651,15 +2651,7 @@ function renderListsV2(){
     </div>
     <div id="searchResultsV2"></div>
     <div id="v2MainContentWrap">
-      <div class="progress-block" style="margin-top:2px; margin-bottom:16px;">
-        <div class="progress-head">
-          <span class="label">Achats</span>
-          <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
-        </div>
-        <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
-        ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
-      </div>
-      <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
+      <div style="display:flex; justify-content:flex-end; margin:2px 0 14px;">
         <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Paramétrage</button>
       </div>
       ${(!catalogMode && photoRefs.length) ? `
@@ -2667,7 +2659,7 @@ function renderListsV2(){
           <span>Vos photos</span>
           <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${list.photoSort === 'size' ? 'Par ' + list.sizeLabel.toLowerCase() : 'Plus récentes'}</button>
         </div>
-        <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:16px; gap:6px;">
+        <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:6px; gap:6px;">
           ${photoRefs.map((r, i) => `
             <button class="gallery-item" data-v2-edit-photo="${i}" style="width:110px;">
               <img src="${r.src}" alt="" style="width:110px; height:110px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
@@ -2677,7 +2669,7 @@ function renderListsV2(){
         </div>
       ` : ''}
       ${catalogMode ? '' : `
-      <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+      <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
         <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? list.categoryLabel : list.sizeLabel}</button>
       </div>
       `}
@@ -2846,11 +2838,15 @@ function v2CharPillColor(status){
 function renderV2RowCharSummary(rows){
   const withTarget = rows.filter(r => r.charId && r.target > 0);
   if(!withTarget.length) return '';
+  const MAX_PILLS = 3;
+  const shown = withTarget.slice(0, MAX_PILLS);
+  const extra = withTarget.length - shown.length;
   return `<div class="v2-row-char-summary">
-    ${withTarget.map(r => {
+    ${shown.map(r => {
       const color = v2CharPillColor(itemStatus(r.target, r.acquired));
       return `<span class="v2-row-char-pill" style="background:${color}">${escapeHtml(r.label)} ${r.acquired}/${r.target}</span>`;
     }).join('')}
+    ${extra > 0 ? `<span class="v2-row-char-pill" style="background:var(--muted-2);">+${extra}</span>` : ''}
   </div>`;
 }
 
@@ -2879,32 +2875,14 @@ function renderV2PairRow(sizeId, categoryId, label){
       html += `<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>`;
     }
     if(mainChar){
-      html += `<div class="field">
-        <label class="field-label">Objectifs par ${escapeHtml(mainChar.label)}</label>
-        <div class="v2-char-target-list">
-          ${charRows.map(r => {
-            const inputAttrs = r.charId
-              ? `data-v2-char-target="${key}" data-char-id="${r.charId}" data-value-id="${r.valueId}"`
-              : `data-v2-target="${key}"`;
-            return `<div class="v2-char-target-row">
-              <span class="v2-char-target-label">${escapeHtml(r.label)}</span>
-              <span class="v2-char-target-count">${r.acquired} /</span>
-              <input type="number" min="0" class="v2-char-target-input" ${inputAttrs} value="${r.target}">
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
+      const indiffRow = charRows.find(r => !r.charId);
+      const indiffEntries = entries.filter(({ entry }) => !(entry.charValues && entry.charValues[mainChar.id]));
+      html += renderV2CharGroup(key, 'v2g-' + key + '::' + mainChar.id + '::indiff', indiffRow, indiffEntries, mainChar.id);
       mainChar.values.forEach(v => {
+        const row = charRows.find(r => r.charId === mainChar.id && r.valueId === v.id);
         const groupEntries = entries.filter(({ entry }) => entry.charValues && entry.charValues[mainChar.id] === v.id);
-        if(groupEntries.length){
-          html += renderV2CharGroup('v2g-' + key + '::' + mainChar.id + '::' + v.id, v.label, groupEntries, mainChar.id);
-        }
+        html += renderV2CharGroup(key, 'v2g-' + key + '::' + mainChar.id + '::' + v.id, row, groupEntries, mainChar.id);
       });
-      const ungrouped = entries.filter(({ entry }) => !(entry.charValues && entry.charValues[mainChar.id]));
-      if(ungrouped.length){
-        html += renderV2CharGroup('v2g-' + key + '::' + mainChar.id + '::ungrouped', 'Non précisé', ungrouped, mainChar.id);
-      }
-      if(!entries.length) html += `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`;
     } else {
       html += `<div class="field">
         <label class="field-label">Objectif</label>
@@ -2918,18 +2896,25 @@ function renderV2PairRow(sizeId, categoryId, label){
 }
 
 function isV2CharGroupCollapsed(groupKey){
-  return ui.collapsedSections[groupKey] !== false;
+  return ui.collapsedSections[groupKey] === true;
 }
 
-function renderV2CharGroup(groupKey, label, groupEntries, excludeCharId){
+function renderV2CharGroup(pairKey, groupKey, row, groupEntries, excludeCharId){
   const collapsed = isV2CharGroupCollapsed(groupKey);
+  const inputAttrs = row.charId
+    ? `data-v2-char-target="${pairKey}" data-char-id="${row.charId}" data-value-id="${row.valueId}"`
+    : `data-v2-target="${pairKey}"`;
   return `<div class="v2-char-group">
-    <button type="button" class="v2-group-heading-toggle ${collapsed ? '' : 'open'}" data-v2-chargroup-toggle="${groupKey}">
-      <span>${escapeHtml(label)} <span class="v2-group-count">(${groupEntries.length})</span></span>
+    <div class="v2-group-heading-toggle ${collapsed ? '' : 'open'}" data-v2-chargroup-toggle="${groupKey}">
+      <span class="v2-group-label">${escapeHtml(row.label)}${groupEntries.length ? ` <span class="v2-group-count">(${groupEntries.length})</span>` : ''}</span>
+      <span class="v2-group-target" onclick="event.stopPropagation()">
+        <span class="v2-group-acquired">${row.acquired} /</span>
+        <input type="number" min="0" class="v2-char-target-input v2-group-target-input" ${inputAttrs} value="${row.target}">
+      </span>
       <span class="chev">${icon('chevronDown','icon-sm')}</span>
-    </button>
+    </div>
     <div class="v2-char-group-body ${collapsed ? '' : 'open'}">
-      ${groupEntries.map(({ lot, entry }) => renderV2EntryRow(lot, entry, excludeCharId)).join('')}
+      ${groupEntries.length ? groupEntries.map(({ lot, entry }) => renderV2EntryRow(lot, entry, excludeCharId)).join('') : `<p style="color:var(--muted); font-size:12px; margin:2px 0 0;">Aucun article ajouté pour l’instant.</p>`}
     </div>
   </div>`;
 }
