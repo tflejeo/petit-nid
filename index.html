@@ -299,7 +299,7 @@
   }
   .v2-tag-size{color:var(--muted); background:#F4EEE1;}
   .gallery-tags{
-    display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:6px; max-width:132px;
+    display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:4px; max-width:152px;
   }
   .v2-char-target-list{display:flex; flex-direction:column; gap:8px;}
   .v2-char-target-row{display:flex; align-items:center; gap:8px;}
@@ -826,6 +826,14 @@ function normalizeV2List(v2){
     if(t.valueId) out.valueId = t.valueId;
     return out;
   });
+  // Fusionne d'éventuels doublons (même taille/catégorie/caractéristique/valeur) issus
+  // d'un ancien bug d'ajout rapide qui créait une ligne au lieu de mettre à jour
+  // l'existante : on ne garde que la dernière valeur renseignée pour chaque couple.
+  {
+    const dedup = new Map();
+    v2.targets.forEach(t => dedup.set([t.sizeId, t.categoryId, t.charId || '', t.valueId || ''].join('::'), t));
+    v2.targets = Array.from(dedup.values());
+  }
   v2.characteristics = denseArrayFrom(v2.characteristics).filter(Boolean).map(c => ({
     id: c.id || newId(),
     label: c.label || '',
@@ -1261,8 +1269,8 @@ function renderV2PhotoGalleryDash(container){
     <div class="section-heading">Galerie photos <span style="color:var(--muted); font-weight:700; font-size:13px;">(${photos.length})</span></div>
     <div class="gallery-scroll" id="v2GalleryDashScroll">
       ${photos.map((p, i) => `
-        <button class="gallery-item" data-v2-dash-gallery-index="${i}">
-          <img src="${p.src}" alt="" style="width:132px; height:132px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
+        <button class="gallery-item" data-v2-dash-gallery-index="${i}" style="width:152px;">
+          <img src="${p.src}" alt="" style="width:152px; height:152px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
           ${(p.categoryLabels.length || p.sizeLabels.length) ? `<div class="gallery-tags">
             ${p.categoryLabels.map(l => `<span class="v2-tag">${escapeHtml(l)}</span>`).join('')}
             ${p.sizeLabels.map(l => `<span class="v2-tag v2-tag-size">${escapeHtml(l)}</span>`).join('')}
@@ -2799,9 +2807,12 @@ function bindListsV2Events(photoRefs){
       const select = row.querySelector('.v2-quickadd-select');
       const targetInput = row.querySelector('.v2-quickadd-target');
       if(!select.value){ showToast('Choisissez une catégorie'); return; }
+      const categoryId = select.value;
       const val = clamp(parseInt(targetInput.value, 10) || 0, 0, 999);
       if(!Array.isArray(activeV2List().targets)) activeV2List().targets = [];
-      activeV2List().targets.push({ sizeId, categoryId: select.value, target: val });
+      let t = activeV2List().targets.find(t => t.sizeId === sizeId && t.categoryId === categoryId && !t.charId);
+      if(t) t.target = val;
+      else activeV2List().targets.push({ sizeId, categoryId, target: val });
       save(); render();
     };
   });
@@ -2812,9 +2823,12 @@ function bindListsV2Events(photoRefs){
       const select = row.querySelector('.v2-quickadd-select');
       const targetInput = row.querySelector('.v2-quickadd-target');
       if(!select.value){ showToast('Choisissez une taille'); return; }
+      const sizeId = select.value;
       const val = clamp(parseInt(targetInput.value, 10) || 0, 0, 999);
       if(!Array.isArray(activeV2List().targets)) activeV2List().targets = [];
-      activeV2List().targets.push({ sizeId: select.value, categoryId, target: val });
+      let t = activeV2List().targets.find(t => t.sizeId === sizeId && t.categoryId === categoryId && !t.charId);
+      if(t) t.target = val;
+      else activeV2List().targets.push({ sizeId, categoryId, target: val });
       save(); render();
     };
   });
