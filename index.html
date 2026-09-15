@@ -434,24 +434,6 @@
   }
   .lightbox-hide-toggle input{width:15px; height:15px; accent-color:var(--sage-dark);}
 
-  /* Vinted likes: reaction picker + comment thread */
-  .vlike-description{
-    font-size:13px; color:var(--ink); white-space:pre-wrap; margin:10px 0 0; line-height:1.5;
-  }
-  .star-picker{display:flex; gap:4px; margin-top:12px;}
-  .star-btn{background:none; border:none; font-size:26px; line-height:1; color:var(--muted-2); cursor:pointer; padding:0;}
-  .star-btn.filled{color:var(--amber);}
-  .comments-thread{margin-top:12px; padding-top:12px; border-top:1px solid var(--border);}
-  .comment-row{
-    display:flex; justify-content:space-between; align-items:flex-start; gap:8px;
-    font-size:13px; margin-bottom:8px; line-height:1.4;
-  }
-  .comment-row strong{color:var(--sage-dark);}
-  .comment-text{color:var(--ink);}
-  .comment-form{display:flex; gap:8px; margin-top:4px;}
-  .comment-form input{flex:1; padding:9px 12px; border:1px solid var(--border); border-radius:999px; font-size:13px; font-family:var(--font-body);}
-  .comment-form button{flex-shrink:0;}
-
   /* Photo gallery */
   .gallery-scroll{
     display:flex; gap:12px; overflow-x:auto; padding:2px 2px 12px;
@@ -643,13 +625,9 @@
     <svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9"/></svg>
     Accueil
   </button>
-  <button class="nav-btn" data-nav="lists">
-    <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 10h8M8 14h5"/></svg>
-    Mes listes
-  </button>
   <button class="nav-btn" data-nav="listsv2">
     <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/><circle cx="17.5" cy="15.5" r="1"/></svg>
-    Listes V2
+    Mes listes
   </button>
   <button class="nav-btn" data-nav="echo">
     <svg class="icon" viewBox="0 0 24 24"><path d="M3 12h3l2-7 4 14 2-7h3"/><circle cx="19" cy="12" r="2"/></svg>
@@ -702,193 +680,7 @@ const ICONS = {
 };
 function icon(name, cls){ return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
 
-const CAT_COLORS = [
-  {key:'terracotta', main:'var(--terracotta)', dark:'var(--terracotta-dark)', tint:'var(--terracotta-tint)'},
-  {key:'sage', main:'var(--sage)', dark:'var(--sage-dark)', tint:'var(--sage-tint)'},
-  {key:'blue', main:'var(--blue)', dark:'#5A8CA3', tint:'var(--blue-tint)'},
-  {key:'pink', main:'var(--pink)', dark:'#B87878', tint:'var(--lavender-tint)'},
-  {key:'lavender', main:'var(--lavender)', dark:'#8867A0', tint:'var(--lavender-tint)'}
-];
-function catColor(key){ return CAT_COLORS.find(c=>c.key===key) || CAT_COLORS[0]; }
-
-/* ---------- Default data ---------- */
-function makeSection(label, period, list){
-  return {
-    id: newId(), label, period,
-    items: list.map(([name, target, note]) => ({ id: newId(), name, target, acquired: 0, note: note || '', link: '', purchases: [], extraPhotos: [], crossSections: [] }))
-  };
-}
-
-// Contenu de départ des listes "Puériculture", "Chambre" et "Valise de maternité",
-// utilisé à la fois pour une toute première installation et pour compléter
-// automatiquement, une seule fois, ces listes si elles étaient encore vides.
-function defaultCategorySeeds(){
-  return {
-    'Puériculture': [
-      ['Repas', '', [
-        ['Biberons 150–180 ml', 4], ['Biberons 260 ml', 4], ['Tétines', 8],
-        ['Goupillon', 1], ['Doseur / distributeur de lait', 1],
-        ['Tire-lait', 1, 'à décider'], ['Coussinets d’allaitement', 1, 'pack — si allaitement'],
-        ['Bavoirs', 10]
-      ]],
-      ['Change & soins', '', [
-        ['Matelas à langer', 1], ['Matelas à langer nomade', 1], ['Housses', 3],
-        ['Coton lavable', 15], ['Coton classique', 1, 'paquet'], ['Sérum physiologique', 1, 'boîte'],
-        ['Thermomètre bébé', 1], ['Ciseaux bébé à bouts ronds', 1], ['Brosse bébé', 1, 'facultatif'],
-        ['Gel lavant bébé', 1], ['Crème pour le change', 1, 'au besoin'], ['Compresses stériles', 1, 'boîte'],
-        ['Petite trousse / pochette de soins', 1]
-      ]],
-      ['Bain', '', [
-        ['Petite baignoire bébé', 1], ['Capes de bain', 3], ['Serviettes', 2],
-        ['Gants de toilette', 4], ['Thermomètre de bain', 1, 'facultatif']
-      ]],
-      ['Langes', '', [
-        ['Langes / mousselines', 12], ['Grandes mousselines', 3]
-      ]],
-      ['Sorties / transport', '', [
-        ['Poussette', 1], ['Nacelle / solution nouveau-né', 1, 'selon poussette'],
-        ['Coque / siège-auto naissance', 1], ['Base Isofix', 1, 'si nécessaire'],
-        ['Sac à langer', 1], ['Porte-bébé / écharpe', 1], ['Couverture légère', 1],
-        ['Chancelière / couverture chaude', 1], ['Pare-soleil voiture', 2]
-      ]],
-      ['Éveil & quotidien', '', [
-        ['Tapis d’éveil', 1], ['Transat', 1, 'facultatif'], ['Sucettes', 4, 'facultatif'],
-        ['Attaches-sucettes', 2, 'facultatif'], ['Boîte à sucettes', 1, 'facultatif'],
-        ['Doudous', 3], ['Babyphone', 1], ['Veilleuse', 1]
-      ]]
-    ],
-    'Chambre': [
-      ['Couchage principal', '', [
-        ['Lit bébé évolutif', 1], ['Matelas', 1], ['Alèses', 2], ['Draps-housses', 4],
-        ['Gigoteuses 0–6 mois', 2], ['Gigoteuses 6–12 mois', 2], ['Gigoteuse légère', 1]
-      ]],
-      ['Berceau / couffin', 'Si souhaité', [
-        ['Berceau ou couffin', 1], ['Matelas adapté', 1], ['Draps adaptés', 3], ['Alèses adaptées', 2]
-      ]],
-      ['Coin change', '', [
-        ['Table à langer', 1], ['Organisateur / panier', 1], ['Poubelle à couches', 1, 'facultatif']
-      ]],
-      ['Rangement', '', [
-        ['Commode', 1], ['Armoire', 1, 'selon espace'], ['Cintres', 15],
-        ['Organisateurs de tiroirs', 3, 'quelques-uns'], ['Panier à linge', 1]
-      ]],
-      ['Confort & déco', '', [
-        ['Thermomètre de chambre', 1], ['Rideau / store occultant', 1], ['Fauteuil', 1, 'facultatif'],
-        ['Boîte à souvenirs', 1], ['Panier à livres', 1, 'facultatif'], ['Mobile', 1, 'facultatif']
-      ]]
-    ],
-    'Valise de maternité': [
-      ['Maman — vêtements', '', [
-        ['Pyjama / tenue de nuit confortable', 2], ['Tenues confortables journée', 2], ['Gilet', 1],
-        ['Culottes confortables', 5], ['Soutiens-gorge d’allaitement', 2, 'si besoin'],
-        ['Chaussons', 1, 'paire'], ['Claquettes / tongs douche', 1, 'paire'], ['Tenue de sortie', 1]
-      ]],
-      ['Maman — toilette & confort', '', [
-        ['Trousse de toilette', 1], ['Protections postpartum', 1, 'paquet'], ['Culottes filet / postpartum', 4],
-        ['Serviette personnelle', 1], ['Papier toilette doux', 1, 'rouleau'], ['Mouchoirs', 1, 'paquet'],
-        ['Baume à lèvres', 1], ['Élastiques / pince à cheveux', 1], ['Sac pour linge sale', 1]
-      ]],
-      ['Pratique', '', [
-        ['Téléphone', 1], ['Chargeur long', 1], ['Rallonge', 1], ['Power bank', 1],
-        ['Écouteurs', 1], ['Veilleuse rechargeable', 1], ['Gourde', 1], ['Snacks', 1]
-      ]],
-      ['Administratif', '', [
-        ['Carte Vitale', 1], ['Pièce d’identité', 1], ['Mutuelle', 1],
-        ['Dossier maternité', 1], ['Documents médicaux', 1], ['Livret de famille / documents nécessaires', 1]
-      ]],
-      ['Bébé — vêtements', '', [
-        ['Bodies', 4], ['Pyjamas', 4], ['Gilet', 1], ['Chaussettes', 2, 'paires'],
-        ['Bonnet', 1], ['Tenue de sortie', 1], ['Combinaison pilote / couverture chaude', 1, 'selon météo']
-      ]],
-      ['Bébé — change & soins', '', [
-        ['Petit paquet de couches', 1, 'si non fourni'], ['Coton', 1, 'paquet'],
-        ['Sérum physiologique', 1, 'quelques dosettes'], ['Cape de bain', 1], ['Sac pour linge sale', 1]
-      ]],
-      ['Retour à la maison', '', [
-        ['Coque / siège-auto installé', 1], ['Tenue adaptée à la météo', 1],
-        ['Couverture / chancelière', 1, 'si nécessaire']
-      ]]
-    ]
-  };
-}
-
-// Complète, une seule fois, les catégories connues qui seraient encore sans
-// section (ex. après une première installation antérieure à cette liste de
-// contenu). N'écrase jamais une liste déjà personnalisée par l'utilisateur.
-function seedKnownEmptyCategories(d){
-  if(d.seededDefaults) return false;
-  const seeds = defaultCategorySeeds();
-  let changed = false;
-  d.categories.forEach(cat => {
-    const seed = seeds[cat.name];
-    if(seed && Array.isArray(cat.sections) && cat.sections.length === 0){
-      cat.sections = seed.map(([label, period, list]) => makeSection(label, period, list));
-      changed = true;
-    }
-  });
-  d.seededDefaults = true;
-  return changed;
-}
-
-// Réparation ciblée, une seule fois : remet en place la section "3 mois" des
-// vêtements bébé si elle a été supprimée par erreur, avec son contenu d'origine.
-const VETEMENTS_SECTION_ORDER = ['1 mois','3 mois','6 mois','9 mois','12 mois','18 mois','Sans taille'];
-function restoreThreeMoisSection(d){
-  if(d.threeMoisRestoredV2) return false;
-  // On identifie la catégorie par ses sections caractéristiques plutôt que par son nom,
-  // qui a pu être renommé par l'utilisateur (ex. "Vêtements bébé" au lieu du nom d'origine).
-  const cat = d.categories.find(c =>
-    Array.isArray(c.sections) &&
-    c.sections.some(s => s.label === '1 mois') &&
-    c.sections.some(s => s.label === '6 mois')
-  );
-  if(!cat) return false; // catégorie introuvable pour l'instant : on retentera au prochain sync
-  d.threeMoisRestoredV2 = true;
-  if(cat.sections.some(s => s.label === '3 mois')) return false;
-  const threeMoisData = [
-    ['Body ML léger',4],['Body MC',5],['Pyjama ML léger',3],['Pyjama MC + jambes courtes',2],
-    ['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',2],['Combinaison MC + jambes longues',2],
-    ['Combinaison éponge légère',1],['T-shirt + short',2],['Tenue estivale légère',2],['Tenue habillée été',1],
-    ['Gilet coton léger',2],['Chaussettes légères',3],['Chapeau soleil',1]
-  ];
-  const newSection = makeSection('3 mois', 'Mai / juin', threeMoisData);
-  const insertAt = cat.sections.findIndex(s => VETEMENTS_SECTION_ORDER.indexOf(s.label) > VETEMENTS_SECTION_ORDER.indexOf('3 mois'));
-  if(insertAt === -1) cat.sections.push(newSection);
-  else cat.sections.splice(insertAt, 0, newSection);
-  return true;
-}
-
-/* ---------- Mes listes V2 : tailles, catégories, marques, objectifs ---------- */
-
-// Réparation ponctuelle : initialise les catégories des listes V2 "Puériculture",
-// "Chambre" et "Valise de maternité" à partir des articles déjà saisis dans les
-// listes initiales correspondantes — un point de départ à nettoyer/organiser ensuite.
-// Ne touche jamais une liste V2 déjà personnalisée (catégories non vides).
-function v2SeedCategoriesFromV1(d){
-  if(d.v2CategoriesSeededV2) return false;
-  if(!Array.isArray(d.v2lists)) return false;
-  const seeds = defaultCategorySeeds();
-  let changed = false;
-  d.v2lists.forEach(list => {
-    const seedSections = seeds[list.name];
-    if(!seedSections) return;
-    if(!Array.isArray(list.categories)) list.categories = [];
-    if(list.categories.length > 0) return;
-    const seen = new Set();
-    seedSections.forEach(([label, period, items]) => {
-      items.forEach(([name]) => {
-        if(!seen.has(name)){
-          seen.add(name);
-          list.categories.push({ id:newId(), label:name });
-        }
-      });
-    });
-    changed = true;
-  });
-  d.v2CategoriesSeededV2 = true;
-  return changed;
-}
-
+/* ---------- Default data (Mes listes) ---------- */
 const V2_DEFAULT_SIZES = ['1 mois','3 mois','6 mois','9 mois','12 mois','18 mois','Sans taille'];
 const V2_DEFAULT_CATEGORIES = [
   'Body','T-shirt','Pull / Sweat','Gilet',
@@ -950,75 +742,10 @@ function buildDefaultV2Lists(){
 }
 
 function buildDefaultData(){
-  const seeds = defaultCategorySeeds();
-
-  const vetements = {
-    id:newId(), name:'Vêtements bébé — 1 à 18 mois', icon:'shirt', color:'terracotta',
-    sections:[
-      makeSection('1 mois','Avril / printemps',[
-        ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama léger',1],
-        ['Pantalon souple',2],['Legging léger',1],['Gilet léger',2],['Combinaison ML + jambes longues',1],
-        ['Tenue printemps',2],['Chaussettes',3],['Bonnet léger',1]
-      ]),
-      makeSection('3 mois','Mai / juin',[
-        ['Body ML léger',4],['Body MC',5],['Pyjama ML léger',3],['Pyjama MC + jambes courtes',2],
-        ['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',2],['Combinaison MC + jambes longues',2],
-        ['Combinaison éponge légère',1],['T-shirt + short',2],['Tenue estivale légère',2],['Tenue habillée été',1],
-        ['Gilet coton léger',2],['Chaussettes légères',3],['Chapeau soleil',1]
-      ]),
-      makeSection('6 mois','Août / septembre',[
-        ['Body MC',6],['Body ML léger',2],['Pyjama MC + jambes courtes',2],['Pyjama ML léger',2],
-        ['Short',3],['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',3],
-        ['Combinaison MC + jambes longues',2],['T-shirt + short',3],['Tenue estivale légère',2],['Tenue couvrante fin d’été',1],
-        ['Gilet coton léger',2],['Chaussettes légères',3],['Chapeau soleil',1]
-      ]),
-      makeSection('9 mois','Novembre / décembre',[
-        ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama chaud',1],
-        ['Pantalon',4],['Legging épais',2],['Pull chaud',2],['Sweat',1],['Gilet chaud',2],
-        ['Combinaison ML + jambes longues',1],['Combinaison chaude / molletonnée',1],['Tenue automne/hiver',3],
-        ['Manteau ou combi-pilote',1],['Bonnet chaud',1],['Chaussettes épaisses',2]
-      ]),
-      makeSection('12 mois','Février / mars',[
-        ['Body ML',6],['Body MC',2],['Pyjama ML + jambes longues',5],['Pyjama léger',2],
-        ['Pantalon',4],['Legging',2],['Pull chaud',2],['Sweat',1],['Gilet chaud',2],
-        ['Combinaison ML + jambes longues',1],['Combinaison légère de transition',1],['Tenue quotidienne',3],
-        ['Tenue habillée',1],['Manteau chaud',1],['Veste légère mi-saison',1],['Bonnet chaud',1],['Chaussettes',3]
-      ]),
-      makeSection('18 mois','Août / septembre',[
-        ['Body MC',4],['Body ML léger',2],['Pyjama léger',3],['Pyjama ML léger',1],
-        ['Short',3],['Pantalon léger',2],['Legging léger',1],['Combinaison MC + jambes courtes',3],
-        ['Combinaison MC + jambes longues',1],['T-shirt',4],['Tenue estivale',3],['Tenue habillée',1],
-        ['Gilet coton léger',1],['Veste légère',1],['Chapeau soleil',1],['Chaussettes',3]
-      ]),
-      makeSection('Sans taille','À prévoir',[
-        ['Langes / mousselines',10],['Bavoirs',8],['Capes de bain',2],['Serviettes',2],
-        ['Gigoteuses 0–6 mois',2],['Gigoteuses 6–12 mois',2],['Gigoteuse légère supplémentaire',1],
-        ['Draps-housses',3],['Alèses',2],['Couverture légère',1],['Couverture chaude',1],
-        ['Chapeau été',1],['Bonnet chaud',1],['Combi-pilote / manteau chaud',1]
-      ])
-    ]
-  };
-
-  const puericulture = {
-    id:newId(), name:'Puériculture', icon:'box', color:'sage',
-    sections: seeds['Puériculture'].map(([label, period, list]) => makeSection(label, period, list))
-  };
-  const chambre = {
-    id:newId(), name:'Chambre', icon:'bed', color:'blue',
-    sections: seeds['Chambre'].map(([label, period, list]) => makeSection(label, period, list))
-  };
-  const maternite = {
-    id:newId(), name:'Valise de maternité', icon:'suitcase', color:'lavender',
-    sections: seeds['Valise de maternité'].map(([label, period, list]) => makeSection(label, period, list))
-  };
-
   return {
     dueDate:'2027-03-25',
     pregnancyStart:'2026-06-25',
-    seededDefaults: true,
-    categories:[vetements, puericulture, chambre, maternite],
     ultrasounds: [],
-    vintedLikes: [],
     synonyms: [],
     todos: [],
     headerTagline: 'votre liste de naissance',
@@ -1048,24 +775,9 @@ function newId(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().t
 
 // `data` is the shared content, synced to Firebase for both parents.
 let data = loadLocalData();
-const bootSeeded = seedKnownEmptyCategories(data);
-const bootRestored = restoreThreeMoisSection(data);
-const bootV2Seeded = v2SeedCategoriesFromV1(data);
-if(bootSeeded || bootRestored || bootV2Seeded) save();
-function countVintedPhotos(d){
-  let n = 0;
-  (d.vintedLikes || []).forEach(v => { n += (v.photos || []).length; });
-  return n;
-}
-let lastKnownVintedPhotoCount = countVintedPhotos(data);
 // `ui` is per-device navigation state (current screen, open sections) — never synced.
 let ui = loadUi();
-let searchQuery = '';
 let searchQueryV2 = '';
-let uiIsFresh = !localStorage.getItem(UI_STORAGE_KEY);
-if(uiIsFresh && data.categories[0] && data.categories[0].sections[0]){
-  ui.collapsedSections[data.categories[0].sections[0].id] = false;
-}
 
 // Firebase Realtime Database supprime silencieusement les tableaux/objets vides
 // ([] ou {}) lors de l'enregistrement : un champ "sections: []" ou "items: []"
@@ -1074,21 +786,6 @@ if(uiIsFresh && data.categories[0] && data.categories[0].sections[0]){
 // Reconstruit un tableau dense à partir d'une valeur qui peut être un vrai
 // tableau JS, ou un objet à clés numériques (ce que Firebase renvoie quand
 // certains indices d'un tableau ont été élagués car vides).
-function allItemPhotos(it){
-  const out = [];
-  (it.purchases || []).forEach(p => (p.photos || []).forEach(src => { if(src) out.push(src); }));
-  (it.extraPhotos || []).forEach(p => { if(p) out.push(p); });
-  return out;
-}
-
-function itemPhotoLightboxItems(it, photos){
-  return photos.map(src => ({
-    src,
-    caption: it.name,
-    hideToggle: { it, src }
-  }));
-}
-
 function denseArrayFrom(raw){
   if(Array.isArray(raw)) return raw;
   if(raw && typeof raw === 'object'){
@@ -1100,48 +797,6 @@ function denseArrayFrom(raw){
     return arr;
   }
   return [];
-}
-
-function normalizeItemPurchases(it){
-  if(Array.isArray(it.purchases)){
-    it.purchases.forEach(p => {
-      p.id = p.id || newId();
-      p.qty = Math.max(1, parseInt(p.qty, 10) || 1);
-      p.price = Number(p.price) || 0;
-      p.photos = denseArrayFrom(p.photos).filter(Boolean).slice(0, 3);
-    });
-  } else {
-    // migration depuis l'ancien modèle (un prix + une photo par unité acquise)
-    const prices = denseArrayFrom(it.prices);
-    const rawUnits = denseArrayFrom(it.unitPhotos);
-    const legacyPhotos = Array.isArray(it.photos) ? it.photos : null; // très ancien modèle, une photo par unité
-    const n = Math.max(prices.length, rawUnits.length, legacyPhotos ? (it.acquired || 0) : 0);
-    const purchases = [];
-    for(let i = 0; i < n; i++){
-      const price = Number(prices[i]) || 0;
-      let photos = denseArrayFrom(rawUnits[i]).filter(Boolean);
-      if(!photos.length && legacyPhotos && legacyPhotos[i]) photos = [legacyPhotos[i]];
-      if(price > 0 || photos.length){
-        purchases.push({ id:newId(), qty:1, price, photos: photos.slice(0, 3) });
-      }
-    }
-    it.purchases = purchases;
-    delete it.prices;
-    delete it.unitPhotos;
-    if(legacyPhotos && !it.extraPhotos){
-      it.extraPhotos = legacyPhotos.slice(it.acquired || 0).filter(Boolean);
-    }
-    delete it.photo;
-    delete it.photos;
-  }
-  it.extraPhotos = denseArrayFrom(it.extraPhotos).filter(Boolean);
-  syncAcquiredFromPurchases(it);
-}
-
-function syncAcquiredFromPurchases(it){
-  if(it.purchases && it.purchases.length){
-    it.acquired = it.purchases.reduce((s, p) => s + (Number(p.qty) || 0), 0);
-  }
 }
 
 function normalizeV2List(v2){
@@ -1217,39 +872,17 @@ function activeV2List(){
 
 function normalizeData(d){
   if(!d || typeof d !== 'object') return buildDefaultData();
-  if(!Array.isArray(d.categories)) d.categories = [];
-  d.categories.forEach(cat => {
-    if(!Array.isArray(cat.sections)) cat.sections = [];
-    cat.sections.forEach(sec => {
-      if(!Array.isArray(sec.items)) sec.items = [];
-      sec.items.forEach(it => {
-        if(!Array.isArray(it.prices)){
-          const legacy = Number(it.price) || 0;
-          it.prices = legacy > 0 ? new Array(it.acquired || 0).fill(legacy) : [];
-        }
-        delete it.price;
-        normalizeItemPurchases(it);
-        it.crossSections = Array.isArray(it.crossSections) ? it.crossSections.filter(Boolean) : [];
-        it.hiddenPhotos = Array.isArray(it.hiddenPhotos) ? it.hiddenPhotos.filter(Boolean) : [];
-      });
-    });
-  });
+  delete d.categories;
+  delete d.seededDefaults;
+  delete d.threeMoisRestoredV2;
+  delete d.v2CategoriesSeededV2;
   if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
   d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
   normalizeV2(d);
   if(!Array.isArray(d.synonyms)) d.synonyms = [];
   d.synonyms.forEach(g => { g.terms = Array.isArray(g.terms) ? g.terms.filter(Boolean) : []; });
   d.synonyms = d.synonyms.filter(g => g.terms.length >= 2);
-  if(!Array.isArray(d.vintedLikes)) d.vintedLikes = [];
-  d.vintedLikes.forEach(v => {
-    if(!Array.isArray(v.photos)) v.photos = [];
-    v.photos = v.photos.filter(Boolean).map(p => (typeof p === 'string') ? p : (p && p.src) || '').filter(Boolean);
-    v.note = v.note || '';
-    v.link = v.link || '';
-    v.rating = Number(v.rating) || 0;
-    if(!Array.isArray(v.comments)) v.comments = [];
-    v.comments = v.comments.filter(Boolean).map(c => ({ id: c.id || newId(), author: c.author || '', text: c.text || '', at: c.at || 0 }));
-  });
+  delete d.vintedLikes;
   if(!Array.isArray(d.todos)) d.todos = [];
   d.todos.forEach(t => {
     t.dueDate = t.dueDate || '';
@@ -1270,7 +903,7 @@ function loadLocalData(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return buildDefaultData();
     const parsed = JSON.parse(raw);
-    if(!parsed || !Array.isArray(parsed.categories)) return buildDefaultData();
+    if(!parsed || typeof parsed !== 'object') return buildDefaultData();
     return normalizeData(parsed);
   }catch(e){
     return buildDefaultData();
@@ -1320,35 +953,6 @@ async function sha256Hex(text){
   const enc = new TextEncoder().encode(text);
   const buf = await crypto.subtle.digest('SHA-256', enc);
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-
-/* ---------- Notifications (Mes likes Vinted) ---------- */
-let swRegistration = null;
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js')
-    .then(reg => { swRegistration = reg; })
-    .catch(() => {}); // pas grave si absent : on retombe sur l'API Notification simple
-}
-
-function requestVintedNotifPermission(){
-  if(!('Notification' in window)){ showToast('Les notifications ne sont pas prises en charge par ce navigateur.'); return; }
-  if(Notification.permission === 'granted'){ showToast('Notifications déjà activées sur cet appareil'); return; }
-  if(Notification.permission === 'denied'){ showToast('Notifications bloquées — autorisez-les dans les réglages du navigateur.'); return; }
-  Notification.requestPermission().then(perm => {
-    showToast(perm === 'granted' ? 'Notifications activées sur cet appareil' : 'Notifications refusées');
-    if(ui.view === 'lists') render();
-  });
-}
-
-function notifyNewVintedLike(){
-  if(!('Notification' in window) || Notification.permission !== 'granted') return;
-  const title = 'Nidoux';
-  const options = { body: 'Nouvelle photo dans Mes likes Vinted 👀', tag: 'vinted-like' };
-  if(swRegistration && swRegistration.showNotification){
-    swRegistration.showNotification(title, options);
-  } else {
-    try{ new Notification(title, options); }catch(e){}
-  }
 }
 
 function isTypingInTextField(){
@@ -1408,15 +1012,8 @@ function handleRemoteValue(snapshot){
   const remoteStr = JSON.stringify(remote);
   if(remoteStr === lastSentJson) return; // c'est l'écho de notre propre écriture
   data = normalizeData(remote);
-  const seeded = seedKnownEmptyCategories(data);
-  const restored = restoreThreeMoisSection(data);
-  const v2Seeded = v2SeedCategoriesFromV1(data);
-  const newPhotoCount = countVintedPhotos(data);
-  if(newPhotoCount > lastKnownVintedPhotoCount) notifyNewVintedLike();
-  lastKnownVintedPhotoCount = newPhotoCount;
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
   render();
-  if(seeded || restored || v2Seeded) save();
 }
 
 function handleRemoteError(err){
@@ -1453,46 +1050,8 @@ function progressColor(pct){
   return 'var(--terracotta-dark)';
 }
 
-function sectionTotals(section){
-  let target = 0, acquired = 0;
-  section.items.forEach(it => { target += it.target; acquired += Math.min(it.acquired, it.target); });
-  const pct = target > 0 ? Math.round((acquired/target)*100) : (section.items.length ? 100 : 0);
-  return { target, acquired, pct, count: section.items.length };
-}
-function categoryTotals(cat){
-  let target = 0, acquired = 0, count = 0;
-  cat.sections.forEach(s => { s.items.forEach(it => { target += it.target; acquired += Math.min(it.acquired, it.target); count++; }); });
-  const pct = target > 0 ? Math.round((acquired/target)*100) : 0;
-  return { target, acquired, pct, count };
-}
-function globalTotals(){
-  let target = 0, acquired = 0, count = 0;
-  data.categories.forEach(cat => cat.sections.forEach(s => s.items.forEach(it => {
-    target += it.target; acquired += Math.min(it.acquired, it.target); count++;
-  })));
-  const pct = target > 0 ? Math.round((acquired/target)*100) : 0;
-  return { target, acquired, pct, count };
-}
-
 function formatPrice(n){
   return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR', maximumFractionDigits:2 }).format(n || 0);
-}
-
-function itemSpent(it){
-  return (it.purchases || []).reduce((sum, p) => sum + (Number(p.price) || 0), 0);
-}
-
-function budgetTotals(){
-  let spent = 0, projected = 0;
-  data.categories.forEach(cat => cat.sections.forEach(sec => sec.items.forEach(it => {
-    const purchases = it.purchases || [];
-    const spentForItem = purchases.reduce((s, p) => s + (Number(p.price) || 0), 0);
-    const qtyForItem = purchases.reduce((s, p) => s + (Number(p.qty) || 0), 0);
-    spent += spentForItem;
-    const avg = qtyForItem > 0 ? spentForItem / qtyForItem : 0;
-    projected += avg * it.target;
-  })));
-  return { spent, projected };
 }
 
 function daysUntil(dateStr){
@@ -1550,14 +1109,13 @@ function showToast(msg){
 function render(){
   renderHeader();
   if(ui.view === 'dashboard') renderDashboard();
-  else if(ui.view === 'lists') renderListsView();
   else if(ui.view === 'listsv2') renderListsV2();
   else if(ui.view === 'prono') renderProno();
   else if(ui.view === 'echo') renderEcho();
   else if(ui.view === 'todo') renderTodo();
-  else renderCategory();
+  else { ui.view = 'dashboard'; renderDashboard(); }
   document.querySelectorAll('.nav-btn').forEach(b=>{
-    const activeMap = { dashboard:'dashboard', lists:'lists', category:'lists', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo' };
+    const activeMap = { dashboard:'dashboard', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo' };
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
@@ -1569,33 +1127,24 @@ function renderHeader(){
   tagEl.textContent = ui.view === 'dashboard' ? (data.headerTagline || '') : '';
   if(ui.view === 'dashboard'){
     h.innerHTML = `<div class="brand"><h1>Nidoux</h1></div>`;
-  } else if(ui.view === 'lists'){
-    h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
   } else if(ui.view === 'listsv2'){
-    h.innerHTML = `<div class="brand"><h1>Mes listes V2</h1></div>`;
+    h.innerHTML = `<div class="brand"><h1>Mes listes</h1></div>`;
   } else if(ui.view === 'prono'){
     h.innerHTML = `<div class="brand"><h1>Mon petit prono</h1></div>`;
   } else if(ui.view === 'echo'){
     h.innerHTML = `<div class="brand"><h1>Échographies</h1></div>`;
   } else if(ui.view === 'todo'){
     h.innerHTML = `<div class="brand"><h1>À faire</h1></div>`;
-  } else {
-    const cat = data.categories.find(c=>c.id===ui.activeCategoryId);
-    h.innerHTML = `<div class="view-title">
-      <button class="back-btn" id="btnBack">${icon('chevronLeft')}</button>
-      <h1 style="font-size:19px;">${escapeHtml(cat ? cat.name : '')}</h1>
-    </div>`;
-    document.getElementById('btnBack').onclick = () => { ui.view = 'lists'; saveUi(); render(); };
   }
 }
 
 function renderDashboard(){
   const main = document.getElementById('mainContent');
   const days = daysUntil(data.dueDate);
-  const g = globalTotals();
+  const g = v2GlobalTotalsAcrossLists();
   const preg = pregnancyProgress();
   const milestone = currentMilestone();
-  const budget = budgetTotals();
+  const budget = budgetTotalsV2Global();
   let countdownText, countdownNum;
   if(days > 0){ countdownNum = days; countdownText = days === 1 ? 'jour avant l’arrivée' : 'jours avant l’arrivée'; }
   else if(days === 0){ countdownNum = '🎉'; countdownText = 'c’est le grand jour !'; }
@@ -1652,76 +1201,25 @@ function renderDashboard(){
 }
 
 function renderCatGrid(container){
+  const lists = data.v2lists || [];
   let html = '';
-  data.categories.forEach(cat => {
-    const t = categoryTotals(cat);
-    const c = catColor(cat.color);
-    html += `<button class="cat-card" data-open-cat="${cat.id}">
-      <div class="cat-icon" style="background:${c.main}">${icon(cat.icon, 'icon-lg')}</div>
+  lists.forEach(list => {
+    const t = v2GlobalTotalsForList(list);
+    html += `<button class="cat-card" data-goto-v2-list="${list.id}">
+      <div class="cat-icon" style="background:var(--sage-dark)">${icon('box', 'icon-lg')}</div>
       <div>
-        <div class="cat-name">${escapeHtml(cat.name)}</div>
-        <div class="cat-meta">${t.count ? t.acquired + ' / ' + t.target + ' articles' : 'Aucun article'}</div>
+        <div class="cat-name">${escapeHtml(list.name)}</div>
+        <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
       </div>
       <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
     </button>`;
   });
   html += `<button class="cat-card add-card" id="btnAddCatFromGrid">${icon('plus','icon-lg')}<span>Nouvelle liste</span></button>`;
   container.innerHTML = html;
-  container.querySelectorAll('[data-open-cat]').forEach(btn=>{
-    btn.onclick = () => { ui.view='category'; ui.activeCategoryId = btn.dataset.openCat; saveUi(); render(); };
+  container.querySelectorAll('[data-goto-v2-list]').forEach(btn => {
+    btn.onclick = () => { ui.view = 'listsv2'; ui.activeV2ListId = btn.dataset.gotoV2List; saveUi(); render(); };
   });
-  document.getElementById('btnAddCatFromGrid').onclick = openAddCategoryModal;
-}
-
-function renderListsView(){
-  const main = document.getElementById('mainContent');
-  const g = globalTotals();
-  const budget = budgetTotals();
-  main.innerHTML = `
-    <div class="search-wrap">
-      <div class="search-input-wrap">
-        ${icon('search','icon-sm')}
-        <input type="search" id="searchInput" placeholder="Rechercher un article dans toutes les listes…" value="${escapeAttr(searchQuery)}">
-        ${searchQuery ? `<button class="search-clear" id="btnClearSearch">${icon('x','icon-sm')}</button>` : ''}
-      </div>
-    </div>
-    <div id="searchResults"></div>
-    <div id="listsGridWrap">
-      <div class="progress-block" style="margin-top:2px; margin-bottom:16px;">
-        <div class="progress-head">
-          <span class="label">Achats</span>
-          <span class="pct" style="color:${progressColor(g.pct)}">${g.pct}%</span>
-        </div>
-        <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
-        ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
-      </div>
-      <div class="section-heading" style="margin-top:6px;">Toutes vos listes</div>
-      <div class="cat-grid" id="catGrid"></div>
-      <div id="vintedLikesSection" style="margin-top:24px;"></div>
-    </div>
-  `;
-  const input = document.getElementById('searchInput');
-  input.addEventListener('input', () => { searchQuery = input.value; renderSearchState(); });
-  const clearBtn = document.getElementById('btnClearSearch');
-  if(clearBtn) clearBtn.onclick = () => { searchQuery = ''; render(); };
-  renderCatGrid(document.getElementById('catGrid'));
-  renderVintedLikesSection(document.getElementById('vintedLikesSection'));
-  renderSearchState();
-}
-
-function collectAllPhotos(){
-  const out = [];
-  data.categories.forEach(cat => {
-    cat.sections.forEach(sec => {
-      sec.items.forEach(it => {
-        allItemPhotos(it).forEach(src => {
-          if((it.hiddenPhotos || []).includes(src)) return;
-          out.push({ src, itemName: it.name, catName: cat.name, secLabel: sec.label, catId: cat.id, secId: sec.id, itemId: it.id });
-        });
-      });
-    });
-  });
-  return out;
+  document.getElementById('btnAddCatFromGrid').onclick = () => { ui.view = 'listsv2'; ui.activeV2ListId = null; saveUi(); render(); };
 }
 
 function collectV2GalleryPhotos(){
@@ -1756,54 +1254,6 @@ function renderV2PhotoGalleryDash(container){
   });
 }
 
-function renderPhotoGallery(container){
-  const photos = collectAllPhotos();
-  if(photos.length === 0){
-    container.innerHTML = `
-      <div class="section-heading">Galerie photos</div>
-      <div class="empty-state" style="padding:24px 20px;">
-        ${icon('camera','icon-lg')}
-        <div>Les photos ajoutées à vos articles apparaîtront ici, pour comparer les styles en un clin d’œil.</div>
-      </div>
-    `;
-    return;
-  }
-  container.innerHTML = `
-    <div class="section-heading">Galerie photos <span style="color:var(--muted); font-weight:700; font-size:13px;">(${photos.length})</span></div>
-    <div class="gallery-scroll" id="galleryScroll">
-      ${photos.map((p, i) => `
-        <button class="gallery-item" data-gallery-index="${i}">
-          <img src="${p.src}" alt="">
-          <div class="gallery-caption">${escapeHtml(p.itemName)}</div>
-          <div class="gallery-caption gallery-caption-sub">${escapeHtml(p.secLabel)}</div>
-        </button>
-      `).join('')}
-    </div>
-  `;
-  container.querySelectorAll('[data-gallery-index]').forEach(btn => {
-    btn.onclick = () => {
-      const idx = parseInt(btn.dataset.galleryIndex, 10);
-      openLightbox(
-        photos.map(p => ({
-          src: p.src,
-          caption: `${p.itemName} · ${p.secLabel} · ${p.catName}`,
-          onGoto: () => {
-            ui.view = 'category';
-            ui.activeCategoryId = p.catId;
-            ui.collapsedSections[p.secId] = false;
-            ui.expandedItems[p.itemId] = true;
-            saveUi();
-            render();
-            const row = document.querySelector(`[data-item-row="${p.itemId}"]`);
-            if(row) row.scrollIntoView({ behavior:'smooth', block:'center' });
-          }
-        })),
-        idx
-      );
-    };
-  });
-}
-
 function normalizeSearch(s){
   return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -1818,64 +1268,6 @@ function expandSearchTerms(query){
     }
   });
   return Array.from(terms);
-}
-
-function searchItems(query){
-  const terms = expandSearchTerms(query);
-  if(!terms.length || !terms[0]) return [];
-  const results = [];
-  data.categories.forEach(cat => {
-    cat.sections.forEach(sec => {
-      sec.items.forEach(it => {
-        const nName = normalizeSearch(it.name);
-        if(terms.some(t => t && nName.includes(t))) results.push({ cat, sec, it });
-      });
-    });
-  });
-  return results;
-}
-
-function renderSearchState(){
-  const resultsEl = document.getElementById('searchResults');
-  const gridWrap = document.getElementById('listsGridWrap');
-  if(!resultsEl || !gridWrap) return;
-  const q = searchQuery.trim();
-  if(!q){ resultsEl.innerHTML = ''; gridWrap.style.display = ''; return; }
-  gridWrap.style.display = 'none';
-  const results = searchItems(q);
-  if(results.length === 0){
-    resultsEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun article ne correspond à « ${escapeHtml(q)} ».</div></div>`;
-    return;
-  }
-  resultsEl.innerHTML =
-    `<div class="section-heading" style="margin-top:6px;">${results.length} résultat${results.length>1?'s':''}</div>` +
-    results.map(({cat, sec, it}) => {
-      const status = itemStatus(it.target, it.acquired);
-      const thumb = allItemPhotos(it)[0];
-      return `<button class="search-result-row" data-goto-item data-cat-id="${cat.id}" data-sec-id="${sec.id}" data-item-id="${it.id}">
-        <span class="status-dot status-${status}"></span>
-        ${thumb ? `<img class="item-thumb" src="${thumb}" alt="">` : ''}
-        <div class="search-result-main">
-          <div class="item-name">${escapeHtml(it.name)}</div>
-          <div class="search-result-breadcrumb">${escapeHtml(cat.name)} · ${escapeHtml(sec.label)}</div>
-        </div>
-        <span class="search-result-count">${it.acquired}/${it.target}</span>
-      </button>`;
-    }).join('');
-  resultsEl.querySelectorAll('[data-goto-item]').forEach(btn => {
-    btn.onclick = () => {
-      const { catId, secId, itemId } = btn.dataset;
-      ui.view = 'category';
-      ui.activeCategoryId = catId;
-      ui.collapsedSections[secId] = false;
-      ui.expandedItems[itemId] = true;
-      searchQuery = '';
-      saveUi();
-      render();
-      const row = document.querySelector(`[data-item-row="${itemId}"]`);
-      if(row) row.scrollIntoView({ behavior:'smooth', block:'center' });
-    };
-  });
 }
 
 /* ---------- Mon petit prono ---------- */
@@ -2309,7 +1701,7 @@ function restoreFromBackup(){
   if(!backupRef){ showToast('Connexion indisponible, réessayez plus tard.'); return; }
   openConfirmModal(
     'Restaurer la dernière sauvegarde ?',
-    'Toutes les données actuelles (listes, photos, prix, échographies, prono, tâches, likes Vinted) seront remplacées par celles de la dernière sauvegarde. Cette action est irréversible.',
+    'Toutes les données actuelles (listes, photos, prix, échographies, prono, tâches) seront remplacées par celles de la dernière sauvegarde. Cette action est irréversible.',
     () => {
       backupRef.child('snapshot').once('value').then(snap => {
         const snapshot = snap.val();
@@ -2730,221 +2122,6 @@ function openEditTodoModal(t){
       t.text = text; t.dueDate = dueDate; t.assignee = assignee;
     }
     save(); closeModal(); render(); showToast(isNew ? 'Tâche ajoutée' : 'Tâche modifiée');
-  };
-}
-
-/* ---------- Mes likes Vinted ---------- */
-function getMyName(){
-  try{ return localStorage.getItem('petitNidMyName') || ''; }catch(e){ return ''; }
-}
-function setMyName(name){
-  try{ localStorage.setItem('petitNidMyName', name); }catch(e){}
-}
-
-function openNamePromptModal(onConfirm){
-  openModal(`
-    <h2>Votre prénom</h2>
-    <p style="color:var(--muted); font-size:13px;">Pour savoir qui a écrit quoi dans les commentaires.</p>
-    <div class="field"><input type="text" id="myNameInput" placeholder="Ex. Tony"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Valider</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const name = document.getElementById('myNameInput').value.trim();
-    if(!name){ showToast('Indiquez votre prénom'); return; }
-    setMyName(name);
-    closeModal();
-    onConfirm(name);
-  };
-}
-
-function addVintedComment(v, text){
-  const name = getMyName();
-  if(!name){ openNamePromptModal((chosenName) => pushVintedComment(v, chosenName, text)); return; }
-  pushVintedComment(v, name, text);
-}
-function pushVintedComment(v, author, text){
-  if(!Array.isArray(v.comments)) v.comments = [];
-  v.comments.push({ id:newId(), author, text, at: Date.now() });
-  save(); render();
-}
-function deleteVintedComment(v, commentId){
-  v.comments = (v.comments || []).filter(c => c.id !== commentId);
-  save(); render();
-}
-
-function renderVintedLikesSection(container){
-  const likes = data.vintedLikes || [];
-  const notifOn = ('Notification' in window) && Notification.permission === 'granted';
-
-  container.innerHTML = `
-    <div class="section-heading" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-      <span>Mes likes Vinted</span>
-      <div style="display:flex; gap:6px;">
-        <button class="chip-btn" id="btnNotifVinted">${icon('bell','icon-sm')} ${notifOn ? 'Notifs actives' : 'Activer les notifs'}</button>
-        <button class="chip-btn" id="btnAddVintedLike">${icon('plus','icon-sm')} Ajouter</button>
-      </div>
-    </div>
-    <div id="vlikeList"></div>
-  `;
-
-  document.getElementById('btnAddVintedLike').onclick = () => openEditVintedLikeModal(null);
-  document.getElementById('btnNotifVinted').onclick = requestVintedNotifPermission;
-
-  const listEl = document.getElementById('vlikeList');
-  if(likes.length === 0){
-    listEl.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Postez une capture ou une photo d’un article Vinted que vous aimez, pour que l’autre puisse la voir.</div></div>`;
-    return;
-  }
-  listEl.innerHTML = likes.slice().reverse().map(v => renderVintedLikeEntry(v)).join('');
-  likes.forEach(v => bindVintedLikeEntryEvents(v));
-}
-
-function renderVintedLikeEntry(v){
-  const comments = v.comments || [];
-  return `<div class="prono-row" style="margin-bottom:14px;" data-vlike-card="${v.id}">
-    <div class="prono-row-top">
-      <div>
-        <div class="prono-name">${v.note ? escapeHtml(v.note.split('\n')[0]) : 'Sans description'}</div>
-        ${v.link ? `<div class="prono-meta">${icon('link','icon-sm')} <a href="${escapeAttr(v.link)}" target="_blank" rel="noopener" style="color:var(--sage-dark);">Voir sur Vinted</a></div>` : ''}
-      </div>
-      <div style="display:flex; gap:2px;">
-        <button class="text-btn muted" data-edit-vlike="${v.id}" aria-label="Modifier">${icon('pencil','icon-sm')}</button>
-        <button class="text-btn danger" data-del-vlike="${v.id}" aria-label="Supprimer">${icon('trash','icon-sm')}</button>
-      </div>
-    </div>
-    <div class="photo-grid" style="margin-top:10px;">
-      ${(v.photos || []).map((p, i) => `
-        <div class="photo-item">
-          <img src="${p}" data-zoom-vlike-photo="${v.id}" data-index="${i}">
-          <button class="photo-del" data-del-vlike-photo="${v.id}" data-index="${i}" aria-label="Supprimer cette photo">${icon('x','icon-sm')}</button>
-        </div>
-      `).join('')}
-      <label class="photo-add-tile">
-        ${icon('camera','icon-sm')}
-        <input type="file" accept="image/*" multiple data-add-vlike-photo="${v.id}" style="display:none;">
-      </label>
-    </div>
-    ${v.note && v.note.includes('\n') ? `<p class="vlike-description">${escapeHtml(v.note)}</p>` : ''}
-    <div class="star-picker">
-      ${[1,2,3,4,5].map(n => `<button class="star-btn ${n <= v.rating ? 'filled' : ''}" data-set-rating="${v.id}" data-value="${n}" aria-label="${n} étoile(s)">★</button>`).join('')}
-    </div>
-    <div class="comments-thread">
-      ${comments.map(c => `
-        <div class="comment-row">
-          <div><strong>${escapeHtml(c.author)}</strong> <span class="comment-text">${escapeHtml(c.text)}</span></div>
-          <button class="text-btn muted" data-del-comment="${v.id}" data-comment-id="${c.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
-        </div>
-      `).join('')}
-      <form class="comment-form" data-comment-form="${v.id}">
-        <input type="text" data-comment-input="${v.id}" placeholder="Ajouter un commentaire…">
-        <button type="submit" class="chip-btn">Envoyer</button>
-      </form>
-    </div>
-  </div>`;
-}
-
-function bindVintedLikeEntryEvents(v){
-  const card = document.querySelector(`[data-vlike-card="${v.id}"]`);
-  if(!card) return;
-
-  const editBtn = card.querySelector(`[data-edit-vlike="${v.id}"]`);
-  if(editBtn) editBtn.onclick = () => openEditVintedLikeModal(v);
-
-  const delBtn = card.querySelector(`[data-del-vlike="${v.id}"]`);
-  if(delBtn) delBtn.onclick = () => openConfirmModal(
-    'Supprimer ce like ?',
-    'Cette publication, ses photos et ses commentaires seront définitivement supprimés.',
-    () => {
-      data.vintedLikes = data.vintedLikes.filter(x => x.id !== v.id);
-      save(); closeModal(); render(); showToast('Supprimé');
-    }
-  );
-
-  const photoInput = card.querySelector(`[data-add-vlike-photo="${v.id}"]`);
-  if(photoInput) photoInput.onchange = (e) => handleVintedLikePhotoUpload(e, v);
-
-  card.querySelectorAll('[data-del-vlike-photo]').forEach(btn => {
-    btn.onclick = () => {
-      const idx = parseInt(btn.dataset.index, 10);
-      v.photos.splice(idx, 1);
-      save(); render();
-    };
-  });
-
-  card.querySelectorAll('[data-zoom-vlike-photo]').forEach(imgEl => {
-    imgEl.onclick = () => openLightbox(v.photos, parseInt(imgEl.dataset.index, 10));
-  });
-
-  card.querySelectorAll('[data-set-rating]').forEach(btn => {
-    btn.onclick = () => {
-      const val = parseInt(btn.dataset.value, 10);
-      v.rating = (v.rating === val) ? 0 : val;
-      save(); render();
-    };
-  });
-
-  const form = card.querySelector(`[data-comment-form="${v.id}"]`);
-  if(form) form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = card.querySelector(`[data-comment-input="${v.id}"]`);
-    const text = input.value.trim();
-    if(!text) return;
-    input.value = '';
-    addVintedComment(v, text);
-  });
-
-  card.querySelectorAll('[data-del-comment]').forEach(btn => {
-    btn.onclick = () => deleteVintedComment(v, btn.dataset.commentId);
-  });
-}
-
-function handleVintedLikePhotoUpload(e, v){
-  const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
-  e.target.value = '';
-  if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
-  Promise.allSettled(files.map(compressImageFile)).then(results => {
-    let added = 0;
-    results.forEach(r => { if(r.status === 'fulfilled'){ v.photos.push(r.value); added++; } });
-    if(added > 0){ save(); render(); }
-    showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter ces photos.');
-  });
-}
-
-function openEditVintedLikeModal(v){
-  const isNew = !v;
-  openModal(`
-    <h2>${isNew ? 'Nouveau like Vinted' : 'Modifier'}</h2>
-    <div class="field">
-      <label class="field-label">Description (optionnel)</label>
-      <textarea id="vlNote" placeholder="Ex. Lot 5€ — body + chaussettes, pointure 1 mois">${v ? escapeHtml(v.note || '') : ''}</textarea>
-    </div>
-    <div class="field">
-      <label class="field-label">Lien Vinted (optionnel)</label>
-      <div class="link-input-wrap">
-        ${icon('link','icon-sm')}
-        <input type="url" id="vlLink" placeholder="https://www.vinted.fr/…" value="${v ? escapeAttr(v.link || '') : ''}">
-      </div>
-    </div>
-    ${isNew ? `<p style="color:var(--muted); font-size:12.5px;">Vous pourrez ajouter la ou les photos juste après.</p>` : ''}
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">${isNew ? 'Créer' : 'Enregistrer'}</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const note = document.getElementById('vlNote').value.trim();
-    const link = document.getElementById('vlLink').value.trim();
-    if(isNew){
-      data.vintedLikes.push({ id:newId(), note, link, reaction:'', comments:[], photos:[] });
-    } else {
-      v.note = note; v.link = link;
-    }
-    save(); closeModal(); render(); showToast(isNew ? 'Ajouté' : 'Modifié');
   };
 }
 
@@ -3912,10 +3089,11 @@ function openVetementModal(existingLot){
 
 function openManageV2Modal(){
   const list = activeV2List();
-  function listHtml(items, delAttr){
+  function listHtml(items, delAttr, renameAttr){
     return items.length ? items.map(i => `
-      <span class="chip-btn" style="cursor:default;">${escapeHtml(i.label)}
-        <button type="button" data-${delAttr}="${i.id}" style="border:none; background:none; cursor:pointer; margin-left:4px; padding:0; display:inline-flex;">${icon('x','icon-sm')}</button>
+      <span class="chip-btn" style="cursor:default; padding:0;">
+        <button type="button" data-${renameAttr}="${i.id}" style="border:none; background:none; cursor:pointer; font:inherit; color:inherit; padding:9px 4px 9px 14px;">${escapeHtml(i.label)}</button>
+        <button type="button" data-${delAttr}="${i.id}" style="border:none; background:none; cursor:pointer; padding:9px 14px 9px 4px; display:inline-flex;">${icon('x','icon-sm')}</button>
       </span>
     `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune pour l’instant</span>';
   }
@@ -3938,7 +3116,6 @@ function openManageV2Modal(){
           <div class="field" style="flex:1;"><label class="field-label">Nom du 2ᵉ filtre (ex. Catégorie)</label><input type="text" id="v2CategoryLabel" value="${escapeAttr(list.categoryLabel)}"></div>
         </div>
         <button type="button" class="chip-btn" id="btnSaveV2General" style="margin-bottom:10px;">Enregistrer ces noms</button>
-        <button type="button" class="chip-btn" id="btnPullV1Categories" style="margin-bottom:10px;">${icon('download','icon-sm')} Récupérer sections, catégories et objectifs depuis « Mes listes »</button>
         ${(data.v2lists || []).length > 1 ? `<button type="button" class="chip-btn danger" id="btnDeleteV2List">${icon('trash','icon-sm')} Supprimer cette liste</button>` : ''}
       </div>
     </div>
@@ -3984,46 +3161,6 @@ function openManageV2Modal(){
     list.name = name; list.sizeLabel = sizeLabel; list.categoryLabel = categoryLabel;
     save(); closeModal(); render(); showToast('Paramètres enregistrés');
   };
-  document.getElementById('btnPullV1Categories').onclick = () => {
-    const seeds = defaultCategorySeeds();
-    const norm = s => (s || '').trim().toLowerCase();
-    const key = Object.keys(seeds).find(k => norm(k) === norm(list.name));
-    if(!key){ showToast('Aucune liste « ' + list.name + ' » trouvée dans Mes listes'); return; }
-    if(!Array.isArray(list.sizes)) list.sizes = [];
-    if(!Array.isArray(list.categories)) list.categories = [];
-    if(!Array.isArray(list.targets)) list.targets = [];
-    const sizeByLabel = new Map(list.sizes.map(s => [norm(s.label), s]));
-    const catByLabel = new Map(list.categories.map(c => [norm(c.label), c]));
-    let addedSizes = 0, addedCats = 0, addedTargets = 0;
-    seeds[key].forEach(([sectionLabel, period, items]) => {
-      let sizeObj = sizeByLabel.get(norm(sectionLabel));
-      if(!sizeObj){
-        sizeObj = { id:newId(), label:sectionLabel };
-        list.sizes.push(sizeObj);
-        sizeByLabel.set(norm(sectionLabel), sizeObj);
-        addedSizes++;
-      }
-      items.forEach(([itemName, targetQty]) => {
-        let catObj = catByLabel.get(norm(itemName));
-        if(!catObj){
-          catObj = { id:newId(), label:itemName };
-          list.categories.push(catObj);
-          catByLabel.set(norm(itemName), catObj);
-          addedCats++;
-        }
-        const hasTarget = list.targets.some(t => t.sizeId === sizeObj.id && t.categoryId === catObj.id && !t.charId);
-        if(!hasTarget){
-          list.targets.push({ sizeId:sizeObj.id, categoryId:catObj.id, target: Math.max(1, parseInt(targetQty, 10) || 1) });
-          addedTargets++;
-        }
-      });
-    });
-    if(addedSizes || addedCats || addedTargets){
-      save();
-      showToast(`${addedSizes} section(s), ${addedCats} catégorie(s), ${addedTargets} objectif(s) ajoutés`);
-      closeModal(); openManageV2Modal();
-    } else showToast('Rien de nouveau à récupérer');
-  };
   const deleteListBtn = document.getElementById('btnDeleteV2List');
   if(deleteListBtn) deleteListBtn.onclick = () => openConfirmModal(
     'Supprimer cette liste ?',
@@ -4056,13 +3193,25 @@ function openManageV2Modal(){
   }
 
   function rebind(){
-    document.getElementById('v2SizesList').innerHTML = listHtml(activeV2List().sizes, 'del-v2-size');
-    document.getElementById('v2CategoriesList').innerHTML = listHtml(activeV2List().categories, 'del-v2-cat');
-    document.getElementById('v2BrandsList').innerHTML = listHtml(activeV2List().brands, 'del-v2-brand');
+    document.getElementById('v2SizesList').innerHTML = listHtml(activeV2List().sizes, 'del-v2-size', 'rename-v2-size');
+    document.getElementById('v2CategoriesList').innerHTML = listHtml(activeV2List().categories, 'del-v2-cat', 'rename-v2-cat');
+    document.getElementById('v2BrandsList').innerHTML = listHtml(activeV2List().brands, 'del-v2-brand', 'rename-v2-brand');
     document.getElementById('v2CharsList').innerHTML = charsListHtml();
     document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => { activeV2List().sizes = activeV2List().sizes.filter(s => s.id !== b.dataset.delV2Size); save(); rebind(); });
     document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => { activeV2List().categories = activeV2List().categories.filter(c => c.id !== b.dataset.delV2Cat); save(); rebind(); });
     document.querySelectorAll('[data-del-v2-brand]').forEach(b => b.onclick = () => { activeV2List().brands = activeV2List().brands.filter(x => x.id !== b.dataset.delV2Brand); save(); rebind(); });
+    document.querySelectorAll('[data-rename-v2-size]').forEach(b => b.onclick = () => {
+      const item = activeV2List().sizes.find(s => s.id === b.dataset.renameV2Size);
+      openRenamePrompt(list.sizeLabel, item.label, (val) => { item.label = val; save(); closeModal(); openManageV2Modal(); });
+    });
+    document.querySelectorAll('[data-rename-v2-cat]').forEach(b => b.onclick = () => {
+      const item = activeV2List().categories.find(c => c.id === b.dataset.renameV2Cat);
+      openRenamePrompt(list.categoryLabel, item.label, (val) => { item.label = val; save(); closeModal(); openManageV2Modal(); });
+    });
+    document.querySelectorAll('[data-rename-v2-brand]').forEach(b => b.onclick = () => {
+      const item = activeV2List().brands.find(x => x.id === b.dataset.renameV2Brand);
+      openRenamePrompt('Marque', item.label, (val) => { item.label = val; save(); closeModal(); openManageV2Modal(); });
+    });
     document.querySelectorAll('[data-edit-char]').forEach(b => b.onclick = () => {
       const ch = activeV2List().characteristics.find(c => c.id === b.dataset.editChar);
       openEditCharacteristicModal(ch);
@@ -4097,8 +3246,9 @@ function openEditCharacteristicModal(existingChar){
 
   function valuesHtml(){
     return values.length ? values.map((v, i) => `
-      <span class="chip-btn" style="cursor:default;">${escapeHtml(v.label)}
-        <button type="button" data-del-value="${i}" style="border:none; background:none; cursor:pointer; margin-left:4px; padding:0; display:inline-flex;">${icon('x','icon-sm')}</button>
+      <span class="chip-btn" style="cursor:default; padding:0;">
+        <button type="button" data-rename-value="${i}" style="border:none; background:none; cursor:pointer; font:inherit; color:inherit; padding:6px 4px 6px 12px;">${escapeHtml(v.label)}</button>
+        <button type="button" data-del-value="${i}" style="border:none; background:none; cursor:pointer; padding:6px 10px 6px 4px; display:inline-flex;">${icon('x','icon-sm')}</button>
       </span>
     `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune valeur</span>';
   }
@@ -4108,500 +3258,92 @@ function openEditCharacteristicModal(existingChar){
     `).join('');
   }
 
-  openModal(`
-    <h2>${isNew ? 'Nouvelle caractéristique' : 'Modifier la caractéristique'}</h2>
-    <div class="field">
-      <label class="field-label">Nom</label>
-      <input type="text" id="charLabel" placeholder="ex. Manche" value="${escapeAttr(label)}">
-    </div>
-    <div class="field">
-      <label class="field-label">Valeurs possibles</label>
-      <div id="charValuesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${valuesHtml()}</div>
-      <div style="display:flex; gap:8px;">
-        <input type="text" id="newCharValue" placeholder="ex. Manches longues" style="flex:1;">
-        <button type="button" class="chip-btn" id="btnAddCharValue">Ajouter</button>
+  function draw(){
+    openModal(`
+      <h2>${isNew ? 'Nouvelle caractéristique' : 'Modifier la caractéristique'}</h2>
+      <div class="field">
+        <label class="field-label">Nom</label>
+        <input type="text" id="charLabel" placeholder="ex. Manche" value="${escapeAttr(label)}">
       </div>
-    </div>
-    <div class="field">
-      <label class="field-label">Catégories concernées</label>
-      <div class="crosslist-checks" id="charCatsList">${catChecksHtml()}</div>
-    </div>
-    <div class="modal-actions">
-      ${!isNew ? `<button type="button" class="btn btn-danger" id="btnDeleteChar">${icon('trash','icon-sm')} Supprimer</button>` : `<button class="btn btn-secondary" id="mCancel">Annuler</button>`}
-      <button class="btn btn-primary" id="mSave">Enregistrer</button>
-    </div>
-  `);
+      <div class="field">
+        <label class="field-label">Valeurs possibles</label>
+        <div id="charValuesList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">${valuesHtml()}</div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="newCharValue" placeholder="ex. Manches longues" style="flex:1;">
+          <button type="button" class="chip-btn" id="btnAddCharValue">Ajouter</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Catégories concernées</label>
+        <div class="crosslist-checks" id="charCatsList">${catChecksHtml()}</div>
+      </div>
+      <div class="modal-actions">
+        ${!isNew ? `<button type="button" class="btn btn-danger" id="btnDeleteChar">${icon('trash','icon-sm')} Supprimer</button>` : `<button class="btn btn-secondary" id="mCancel">Annuler</button>`}
+        <button class="btn btn-primary" id="mSave">Enregistrer</button>
+      </div>
+    `);
 
-  function refreshValues(){ document.getElementById('charValuesList').innerHTML = valuesHtml(); bindValueDeletes(); }
-  function bindValueDeletes(){
-    document.querySelectorAll('[data-del-value]').forEach(btn => {
-      btn.onclick = () => { values.splice(parseInt(btn.dataset.delValue, 10), 1); refreshValues(); };
-    });
-  }
-  bindValueDeletes();
+    function refreshValues(){ document.getElementById('charValuesList').innerHTML = valuesHtml(); bindValueButtons(); }
+    function bindValueButtons(){
+      document.querySelectorAll('[data-del-value]').forEach(btn => {
+        btn.onclick = () => { values.splice(parseInt(btn.dataset.delValue, 10), 1); refreshValues(); };
+      });
+      document.querySelectorAll('[data-rename-value]').forEach(btn => {
+        btn.onclick = () => {
+          label = document.getElementById('charLabel').value; // conserve la saisie en cours
+          const idx = parseInt(btn.dataset.renameValue, 10);
+          openRenamePrompt('Valeur', values[idx].label, (val) => { values[idx].label = val; draw(); });
+        };
+      });
+    }
+    bindValueButtons();
 
-  document.getElementById('btnAddCharValue').onclick = () => {
-    const input = document.getElementById('newCharValue');
-    const l = input.value.trim();
-    if(!l){ showToast('Indiquez une valeur'); return; }
-    values.push({ id:newId(), label:l });
-    input.value = '';
-    refreshValues();
-  };
-  document.querySelectorAll('[data-char-cat]').forEach(cb => {
-    cb.onchange = () => {
-      const id = cb.dataset.charCat;
-      if(cb.checked){ if(!categoryIds.includes(id)) categoryIds.push(id); }
-      else { categoryIds = categoryIds.filter(x => x !== id); }
+    document.getElementById('btnAddCharValue').onclick = () => {
+      const input = document.getElementById('newCharValue');
+      const l = input.value.trim();
+      if(!l){ showToast('Indiquez une valeur'); return; }
+      values.push({ id:newId(), label:l });
+      input.value = '';
+      refreshValues();
     };
-  });
-  const cancelBtn = document.getElementById('mCancel');
-  if(cancelBtn) cancelBtn.onclick = closeModal;
-  const deleteBtn = document.getElementById('btnDeleteChar');
-  if(deleteBtn) deleteBtn.onclick = () => openConfirmModal(
-    'Supprimer cette caractéristique ?',
-    'Elle sera retirée, ainsi que les valeurs déjà choisies sur vos articles pour celle-ci.',
-    () => {
-      activeV2List().characteristics = activeV2List().characteristics.filter(c => c.id !== existingChar.id);
-      save(); closeModal(); openManageV2Modal();
-    }
-  );
-  document.getElementById('mSave').onclick = () => {
-    const lbl = document.getElementById('charLabel').value.trim();
-    if(!lbl){ showToast('Indiquez un nom'); return; }
-    if(!values.length){ showToast('Ajoutez au moins une valeur'); return; }
-    if(isNew){
-      if(!Array.isArray(activeV2List().characteristics)) activeV2List().characteristics = [];
-      activeV2List().characteristics.push({ id:newId(), label:lbl, values, categoryIds });
-    } else {
-      existingChar.label = lbl;
-      existingChar.values = values;
-      existingChar.categoryIds = categoryIds;
-    }
-    save(); closeModal(); openManageV2Modal(); showToast(isNew ? 'Caractéristique ajoutée' : 'Caractéristique modifiée');
-  };
-}
-
-function renderCategory(){
-  const main = document.getElementById('mainContent');
-  const cat = data.categories.find(c=>c.id===ui.activeCategoryId);
-  if(!cat){ ui.view='lists'; saveUi(); renderListsView(); return; }
-  const t = categoryTotals(cat);
-
-  let html = `
-    <div class="progress-block" style="margin-bottom:4px;">
-      <div class="progress-head">
-        <span class="label">${t.count ? t.acquired + ' / ' + t.target + ' articles réunis' : 'Liste vide pour le moment'}</span>
-        <span class="pct" style="color:${progressColor(t.pct)}">${t.pct}%</span>
-      </div>
-      <div class="track"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
-    </div>
-    <div class="cat-actions-row">
-      <button class="chip-btn" id="btnRenameCat">${icon('pencil','icon-sm')} Renommer</button>
-      <button class="chip-btn danger" id="btnDeleteCat">${icon('trash','icon-sm')} Supprimer la liste</button>
-    </div>
-  `;
-
-  if(cat.sections.length === 0){
-    html += `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Cette liste n’a pas encore de section.<br>Ajoutez-en une pour commencer à suivre vos articles.</div></div>`;
-  } else {
-    html += `<div id="sectionsWrap">`;
-    cat.sections.forEach(sec => { html += renderSectionHtml(cat, sec); });
-    html += `</div>`;
-  }
-  html += `<button class="add-row-btn" id="btnAddSection">${icon('plus','icon-sm')} Ajouter une section</button>`;
-
-  main.innerHTML = html;
-
-  document.getElementById('btnRenameCat').onclick = () => openRenameCategoryModal(cat);
-  document.getElementById('btnDeleteCat').onclick = () => openConfirmModal(
-    'Supprimer cette liste ?',
-    `« ${cat.name} » et tous ses articles seront définitivement supprimés.`,
-    () => {
-      data.categories = data.categories.filter(c=>c.id!==cat.id);
-      ui.view = 'lists'; saveUi(); save(); closeModal(); render(); showToast('Liste supprimée');
-    }
-  );
-  document.getElementById('btnAddSection').onclick = () => openAddSectionModal(cat);
-
-  cat.sections.forEach(sec => bindSectionEvents(cat, sec));
-}
-
-function isSecCollapsed(sec){
-  return ui.collapsedSections[sec.id] !== false;
-}
-
-function collectCrossListedItems(cat, sec){
-  const out = [];
-  cat.sections.forEach(otherSec => {
-    if(otherSec.id === sec.id) return;
-    otherSec.items.forEach(it => {
-      if((it.crossSections || []).includes(sec.id)) out.push({ homeSec: otherSec, it });
+    document.querySelectorAll('[data-char-cat]').forEach(cb => {
+      cb.onchange = () => {
+        const id = cb.dataset.charCat;
+        if(cb.checked){ if(!categoryIds.includes(id)) categoryIds.push(id); }
+        else { categoryIds = categoryIds.filter(x => x !== id); }
+      };
     });
-  });
-  return out;
-}
-
-function renderCrossListedRow(homeSec, it){
-  const status = itemStatus(it.target, it.acquired);
-  const key = homeSec.id + '::' + it.id;
-  return `<div class="item-row crosslist-row" data-cross-row="${key}">
-    <span class="status-dot status-${status}"></span>
-    <div class="item-main" data-cross-goto="${key}" data-cross-home="${homeSec.id}" data-cross-item="${it.id}">
-      <div class="item-name-row"><span class="item-name">${escapeHtml(it.name)}</span></div>
-      <div class="item-sub"><span>${it.acquired} / ${it.target}</span><span class="link-dot"></span><span class="crosslist-tag">${icon('link','icon-sm')} depuis « ${escapeHtml(homeSec.label)} »</span></div>
-    </div>
-    <div class="stepper">
-      <button data-cross-dec="${key}" data-cross-item="${it.id}" ${it.acquired<=0?'disabled':''}>${icon('minus','icon-sm')}</button>
-      <span class="count">${it.acquired}</span>
-      <button data-cross-inc="${key}" data-cross-item="${it.id}">${icon('plus','icon-sm')}</button>
-    </div>
-  </div>`;
-}
-
-function bindCrossListedEvents(cat, sec){
-  const crossListed = collectCrossListedItems(cat, sec);
-  crossListed.forEach(({ homeSec, it }) => {
-    const key = homeSec.id + '::' + it.id;
-    const row = document.querySelector(`[data-cross-row="${CSS.escape(key)}"]`);
-    if(!row) return;
-    const inc = row.querySelector(`[data-cross-inc="${CSS.escape(key)}"]`);
-    const dec = row.querySelector(`[data-cross-dec="${CSS.escape(key)}"]`);
-    if(inc) inc.onclick = () => { it.acquired++; syncAcquiredFromPurchases(it); save(); render(); };
-    if(dec) dec.onclick = () => { it.acquired = clamp(it.acquired - 1, 0, 9999); syncAcquiredFromPurchases(it); save(); render(); };
-    const mainEl = row.querySelector(`[data-cross-goto="${CSS.escape(key)}"]`);
-    if(mainEl) mainEl.onclick = () => {
-      ui.collapsedSections[homeSec.id] = false;
-      ui.expandedItems[it.id] = true;
-      saveUi();
-      render();
-      const target = document.querySelector(`[data-item-row="${it.id}"]`);
-      if(target) target.scrollIntoView({ behavior:'smooth', block:'center' });
+    const cancelBtn = document.getElementById('mCancel');
+    if(cancelBtn) cancelBtn.onclick = closeModal;
+    const deleteBtn = document.getElementById('btnDeleteChar');
+    if(deleteBtn) deleteBtn.onclick = () => openConfirmModal(
+      'Supprimer cette caractéristique ?',
+      'Elle sera retirée, ainsi que les valeurs déjà choisies sur vos articles pour celle-ci.',
+      () => {
+        activeV2List().characteristics = activeV2List().characteristics.filter(c => c.id !== existingChar.id);
+        save(); closeModal(); openManageV2Modal();
+      }
+    );
+    document.getElementById('mSave').onclick = () => {
+      const lbl = document.getElementById('charLabel').value.trim();
+      if(!lbl){ showToast('Indiquez un nom'); return; }
+      if(!values.length){ showToast('Ajoutez au moins une valeur'); return; }
+      if(isNew){
+        if(!Array.isArray(activeV2List().characteristics)) activeV2List().characteristics = [];
+        activeV2List().characteristics.push({ id:newId(), label:lbl, values, categoryIds });
+      } else {
+        existingChar.label = lbl;
+        existingChar.values = values;
+        existingChar.categoryIds = categoryIds;
+      }
+      save(); closeModal(); openManageV2Modal(); showToast(isNew ? 'Caractéristique ajoutée' : 'Caractéristique modifiée');
     };
-  });
-}
-
-function renderSectionHtml(cat, sec){
-  const t = sectionTotals(sec);
-  const collapsed = isSecCollapsed(sec);
-  const crossListed = collectCrossListedItems(cat, sec);
-  return `
-    <div class="section-card" data-sec-card="${sec.id}">
-      <div class="section-head ${collapsed ? '' : 'open'}" data-sec-toggle="${sec.id}">
-        <div class="section-info">
-          <div class="section-title-row">
-            <span class="section-title">${escapeHtml(sec.label)}</span>
-            ${sec.period ? `<span class="section-period">${escapeHtml(sec.period)}</span>` : ''}
-          </div>
-          <div class="section-progress">
-            <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
-          </div>
-        </div>
-        <span class="section-count">${t.acquired}/${t.target}</span>
-        <span class="chev">${icon('chevronDown','icon-sm')}</span>
-      </div>
-      <div class="section-body ${collapsed ? '' : 'open'}" data-sec-body="${sec.id}">
-        ${sec.items.map(it => renderItemHtml(cat, sec, it)).join('')}
-        <button class="add-row-btn" data-add-item="${sec.id}">${icon('plus','icon-sm')} Ajouter un article</button>
-        ${crossListed.length ? `
-          <div class="field-label" style="margin:14px 0 6px;">Également utile ici</div>
-          ${crossListed.map(({homeSec, it}) => renderCrossListedRow(homeSec, it)).join('')}
-        ` : ''}
-        <div class="expand-actions" style="margin-top:10px;">
-          <button class="text-btn muted" data-rename-sec="${sec.id}">${icon('pencil','icon-sm')} Renommer la section</button>
-          <button class="text-btn danger" data-del-sec="${sec.id}">${icon('trash','icon-sm')} Supprimer</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderItemHtml(cat, sec, it){
-  const status = itemStatus(it.target, it.acquired);
-  const done = status === 'atteint' || status === 'surplus';
-  const expanded = !!ui.expandedItems[it.id];
-  const thumbPhotos = allItemPhotos(it);
-  let html = `<div class="item-row ${done ? 'done' : ''}" data-item-row="${it.id}">
-    <span class="status-dot status-${status}"></span>
-    ${thumbPhotos.length ? `<button class="item-thumb-wrap" data-item-thumb="${it.id}" aria-label="Voir les photos"><img class="item-thumb" src="${thumbPhotos[0]}" alt="">${thumbPhotos.length > 1 ? `<span class="item-thumb-count">${thumbPhotos.length}</span>` : ''}</button>` : ''}
-    <div class="item-main" data-item-toggle="${it.id}">
-      <div class="item-name-row">
-        <span class="item-name">${escapeHtml(it.name)}</span>
-        ${status === 'surplus' ? '<span class="badge-bonus">Bonus</span>' : ''}
-      </div>
-      <div class="item-sub">
-        <span>${it.acquired} / ${it.target}</span>
-        ${itemSpent(it) > 0 ? `<span class="link-dot"></span><span>${formatPrice(itemSpent(it))}</span>` : ''}
-        ${it.link ? '<span class="link-dot"></span>' + icon('link','icon-sm') : ''}
-        ${it.note ? '<span class="link-dot"></span><span>note</span>' : ''}
-      </div>
-    </div>
-    <div class="stepper">
-      <button data-dec="${it.id}" ${(it.acquired<=0 || it.purchases.length)?'disabled':''}>${icon('minus','icon-sm')}</button>
-      <span class="count">${it.acquired}</span>
-      <button data-inc="${it.id}" ${it.purchases.length?'disabled':''}>${icon('plus','icon-sm')}</button>
-    </div>
-  </div>`;
-
-  if(expanded){
-    html += `<div class="item-expand" data-item-expand="${it.id}">
-      <div class="field">
-        <label class="field-label">Nom de l’article</label>
-        <input type="text" data-field="name" data-item="${it.id}" value="${escapeAttr(it.name)}">
-      </div>
-      <div style="display:flex; gap:10px;">
-        <div class="field" style="flex:1;">
-          <label class="field-label">Qté cible</label>
-          <input type="number" min="0" data-field="target" data-item="${it.id}" value="${it.target}">
-        </div>
-        <div class="field" style="flex:1;">
-          <label class="field-label">Qté acquise${it.purchases.length ? ' (= somme des lots)' : ''}</label>
-          <input type="number" min="0" data-field="acquired" data-item="${it.id}" value="${it.acquired}" ${it.purchases.length ? 'readonly style="background:#F2EDE0; color:var(--muted);"' : ''}>
-        </div>
-      </div>
-      <div class="field">
-        <label class="field-label">Achats${it.purchases.length ? ' (' + it.purchases.length + ')' : ''}</label>
-        ${it.purchases.length ? `
-          <div class="unit-list">
-            <div class="unit-row unit-header-row">
-              <div class="unit-photos"></div>
-              <div class="unit-controls">
-                <span class="unit-col-label">Qté</span>
-                <span class="unit-col-label">Prix</span>
-                <span class="unit-del-spacer"></span>
-              </div>
-            </div>
-            ${it.purchases.map((p) => `
-              <div class="unit-row">
-                <div class="unit-photos">
-                  ${(p.photos || []).slice(0, 3).map((src, pi) => `
-                    <div class="unit-photo-thumb">
-                      <img src="${src}" data-zoom-purchase-photo="${it.id}" data-purchase="${p.id}" data-index="${pi}">
-                      <button class="photo-del photo-del-sm" data-del-purchase-photo="${it.id}" data-purchase="${p.id}" data-index="${pi}" aria-label="Supprimer la photo">${icon('x','icon-sm')}</button>
-                    </div>
-                  `).join('')}
-                  ${(p.photos || []).length < 3 ? `
-                    <label class="unit-photo-add-sm">
-                      ${icon('camera','icon-sm')}
-                      <input type="file" accept="image/*" multiple data-add-purchase-photo="${it.id}" data-purchase="${p.id}" style="display:none;">
-                    </label>
-                  ` : ''}
-                </div>
-                <div class="unit-controls">
-                  <input type="number" class="unit-qty-input" min="1" data-purchase-qty="${p.id}" data-item="${it.id}" value="${p.qty}">
-                  <input type="number" class="unit-price-input" min="0" step="0.01" data-purchase-price="${p.id}" data-item="${it.id}" value="${p.price || ''}" placeholder="€">
-                  <button class="text-btn danger unit-del-btn" data-del-purchase="${it.id}" data-purchase="${p.id}" aria-label="Supprimer ce lot">${icon('x','icon-sm')}</button>
-                </div>
-              </div>
-            `).join('')}
-            ${itemSpent(it) > 0 ? `<div class="price-list-total">Total : <strong>${formatPrice(itemSpent(it))}</strong></div>` : ''}
-          </div>
-        ` : ''}
-        <button type="button" class="add-row-btn" data-add-purchase="${it.id}" style="margin-top:${it.purchases.length ? '10px' : '0'};">${icon('plus','icon-sm')} Ajouter un lot (photo + quantité + prix)</button>
-        ${it.extraPhotos.length ? `<div class="field-label" style="margin:12px 0 6px;">Autres photos</div>` : ''}
-        <div class="photo-grid" style="margin-top:${it.extraPhotos.length ? '0' : '10px'};">
-          ${it.extraPhotos.map((p, idx) => p ? `
-            <div class="photo-item">
-              <img src="${p}" data-zoom-extra-photo="${it.id}" data-index="${idx}">
-              <button class="photo-del" data-del-extra-photo="${it.id}" data-index="${idx}" aria-label="Supprimer cette photo">${icon('x','icon-sm')}</button>
-            </div>
-          ` : '').join('')}
-          <label class="photo-add-tile">
-            ${icon('camera','icon-sm')}
-            <input type="file" accept="image/*" multiple data-photo="${it.id}" style="display:none;">
-          </label>
-        </div>
-      </div>
-      <div class="field">
-        <label class="field-label">Lien / référence d’achat</label>
-        <div class="link-input-wrap">
-          ${icon('link','icon-sm')}
-          <input type="url" placeholder="https://…" data-field="link" data-item="${it.id}" value="${escapeAttr(it.link)}">
-          ${it.link ? `<a class="link-open" href="${escapeAttr(it.link)}" target="_blank" rel="noopener">Ouvrir</a>` : ''}
-        </div>
-      </div>
-      <div class="field">
-        <label class="field-label">Note</label>
-        <textarea data-field="note" data-item="${it.id}" placeholder="Taille, couleur, magasin…">${escapeHtml(it.note)}</textarea>
-      </div>
-      ${cat.sections.length > 1 ? `
-        <div class="field">
-          <label class="field-label">Afficher aussi dans</label>
-          <div class="crosslist-checks">
-            ${cat.sections.filter(s => s.id !== sec.id).map(s => `
-              <label class="crosslist-check">
-                <input type="checkbox" data-cross-toggle="${it.id}" data-cross-target="${s.id}" ${(it.crossSections||[]).includes(s.id) ? 'checked' : ''}>
-                ${escapeHtml(s.label)}
-              </label>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
-      <div class="expand-actions">
-        <button class="text-btn danger" data-del-item="${it.id}">${icon('trash','icon-sm')} Supprimer l’article</button>
-        <button class="text-btn muted" data-close-item="${it.id}">Fermer</button>
-      </div>
-    </div>`;
   }
-  return html;
+  draw();
 }
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
-
-/* ---------- Event binding ---------- */
-function bindSectionEvents(cat, sec){
-  const toggle = document.querySelector(`[data-sec-toggle="${sec.id}"]`);
-  if(toggle) toggle.onclick = () => { ui.collapsedSections[sec.id] = !isSecCollapsed(sec); saveUi(); render(); };
-
-  const addItemBtn = document.querySelector(`[data-add-item="${sec.id}"]`);
-  if(addItemBtn) addItemBtn.onclick = () => openAddItemModal(cat, sec);
-
-  const renameBtn = document.querySelector(`[data-rename-sec="${sec.id}"]`);
-  if(renameBtn) renameBtn.onclick = (e) => { e.stopPropagation(); openRenameSectionModal(sec); };
-
-  const delBtn = document.querySelector(`[data-del-sec="${sec.id}"]`);
-  if(delBtn) delBtn.onclick = (e) => {
-    e.stopPropagation();
-    openConfirmModal('Supprimer cette section ?', `« ${sec.label} » et ses articles seront supprimés.`, () => {
-      cat.sections = cat.sections.filter(s=>s.id!==sec.id);
-      save(); closeModal(); render(); showToast('Section supprimée');
-    });
-  };
-
-  sec.items.forEach(it => bindItemEvents(cat, sec, it));
-  bindCrossListedEvents(cat, sec);
-}
-
-function bindItemEvents(cat, sec, it){
-  const row = document.querySelector(`[data-item-row="${it.id}"]`);
-  if(!row) return;
-
-  const mainEl = row.querySelector(`[data-item-toggle="${it.id}"]`);
-  if(mainEl) mainEl.onclick = () => { ui.expandedItems[it.id] = !ui.expandedItems[it.id]; render(); };
-
-  const thumbBtn = row.querySelector(`[data-item-thumb="${it.id}"]`);
-  if(thumbBtn) thumbBtn.onclick = (e) => {
-    e.stopPropagation();
-    openLightbox(itemPhotoLightboxItems(it, allItemPhotos(it)), 0);
-  };
-
-  const inc = row.querySelector(`[data-inc="${it.id}"]`);
-  if(inc) inc.onclick = () => { it.acquired++; save(); render(); };
-  const dec = row.querySelector(`[data-dec="${it.id}"]`);
-  if(dec) dec.onclick = () => { it.acquired = clamp(it.acquired-1, 0, 9999); save(); render(); };
-
-  const expand = document.querySelector(`[data-item-expand="${it.id}"]`);
-  if(!expand) return;
-
-  expand.querySelectorAll('[data-field]').forEach(input => {
-    const field = input.dataset.field;
-    const evt = (input.tagName === 'TEXTAREA' || input.type === 'text' || input.type === 'url') ? 'input' : 'change';
-    input.addEventListener(evt, () => {
-      if(field === 'target' || field === 'acquired'){
-        it[field] = clamp(parseInt(input.value || '0', 10), 0, 9999);
-      } else {
-        it[field] = input.value;
-      }
-      save();
-      if(field !== 'note' && field !== 'link' && field !== 'name') render();
-    });
-    input.addEventListener('blur', () => render());
-  });
-
-  expand.querySelectorAll('[data-purchase-qty]').forEach(input => {
-    input.addEventListener('change', () => {
-      const p = (it.purchases || []).find(x => x.id === input.dataset.purchaseQty);
-      if(!p) return;
-      p.qty = Math.max(1, parseInt(input.value, 10) || 1);
-      syncAcquiredFromPurchases(it);
-      save(); render();
-    });
-  });
-
-  expand.querySelectorAll('[data-purchase-price]').forEach(input => {
-    input.addEventListener('change', () => {
-      const p = (it.purchases || []).find(x => x.id === input.dataset.purchasePrice);
-      if(!p) return;
-      p.price = Math.max(0, parseFloat(input.value) || 0);
-      save(); render();
-    });
-  });
-
-  const addPurchaseBtn = expand.querySelector(`[data-add-purchase="${it.id}"]`);
-  if(addPurchaseBtn) addPurchaseBtn.onclick = () => {
-    if(!Array.isArray(it.purchases)) it.purchases = [];
-    it.purchases.push({ id:newId(), qty:1, price:0, photos:[] });
-    syncAcquiredFromPurchases(it);
-    save(); render();
-  };
-
-  expand.querySelectorAll('[data-del-purchase]').forEach(btn => {
-    btn.onclick = () => {
-      it.purchases = (it.purchases || []).filter(p => p.id !== btn.dataset.purchase);
-      syncAcquiredFromPurchases(it);
-      save(); render();
-    };
-  });
-
-  const photoInput = expand.querySelector(`[data-photo="${it.id}"]`);
-  if(photoInput) photoInput.onchange = (e) => handlePhotoUpload(e, it);
-
-  expand.querySelectorAll('[data-add-purchase-photo]').forEach(input => {
-    input.onchange = (e) => handleAddPurchasePhotos(e, it, input.dataset.purchase);
-  });
-
-  expand.querySelectorAll('[data-del-purchase-photo]').forEach(btn => {
-    btn.onclick = () => {
-      const p = (it.purchases || []).find(x => x.id === btn.dataset.purchase);
-      const idx = parseInt(btn.dataset.index, 10);
-      if(p && Array.isArray(p.photos)) p.photos.splice(idx, 1);
-      save(); render();
-    };
-  });
-
-  expand.querySelectorAll('[data-zoom-purchase-photo]').forEach(imgEl => {
-    imgEl.onclick = () => {
-      const p = (it.purchases || []).find(x => x.id === imgEl.dataset.purchase);
-      const idx = parseInt(imgEl.dataset.index, 10);
-      openLightbox(itemPhotoLightboxItems(it, (p && p.photos) || []), idx);
-    };
-  });
-
-  expand.querySelectorAll('[data-del-extra-photo]').forEach(btn => {
-    btn.onclick = () => {
-      const idx = parseInt(btn.dataset.index, 10);
-      it.extraPhotos.splice(idx, 1);
-      save(); render();
-    };
-  });
-
-  expand.querySelectorAll('[data-zoom-extra-photo]').forEach(imgEl => {
-    imgEl.onclick = () => openLightbox(itemPhotoLightboxItems(it, it.extraPhotos), parseInt(imgEl.dataset.index, 10));
-  });
-
-  expand.querySelectorAll('[data-cross-toggle]').forEach(checkbox => {
-    checkbox.onchange = () => {
-      const targetSecId = checkbox.dataset.crossTarget;
-      if(!Array.isArray(it.crossSections)) it.crossSections = [];
-      if(checkbox.checked){
-        if(!it.crossSections.includes(targetSecId)) it.crossSections.push(targetSecId);
-      } else {
-        it.crossSections = it.crossSections.filter(id => id !== targetSecId);
-      }
-      save(); render();
-    };
-  });
-
-  const delItem = expand.querySelector(`[data-del-item="${it.id}"]`);
-  if(delItem) delItem.onclick = () => openConfirmModal('Supprimer cet article ?', `« ${it.name} » sera retiré de la liste.`, () => {
-    sec.items = sec.items.filter(x=>x.id!==it.id);
-    save(); closeModal(); render(); showToast('Article supprimé');
-  });
-
-  const closeItem = expand.querySelector(`[data-close-item="${it.id}"]`);
-  if(closeItem) closeItem.onclick = () => { ui.expandedItems[it.id] = false; render(); };
-}
 
 function compressImageFile(file){
   return new Promise((resolve, reject) => {
@@ -4625,41 +3367,6 @@ function compressImageFile(file){
   });
 }
 
-function handleAddPurchasePhotos(e, it, purchaseId){
-  const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
-  e.target.value = '';
-  if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
-  const p = (it.purchases || []).find(x => x.id === purchaseId);
-  if(!p) return;
-  if(!Array.isArray(p.photos)) p.photos = [];
-  const room = Math.max(0, 3 - p.photos.length);
-  if(room <= 0){ showToast('Maximum 3 photos par lot.'); return; }
-  const toProcess = files.slice(0, room);
-  Promise.allSettled(toProcess.map(compressImageFile)).then(results => {
-    let added = 0;
-    results.forEach(r => { if(r.status === 'fulfilled'){ p.photos.push(r.value); added++; } });
-    if(added > 0){ save(); render(); }
-    if(added > 0 && files.length > toProcess.length) showToast(added + ' photo(s) ajoutée(s) — maximum 3 par lot.');
-    else if(added > 0) showToast(added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée');
-    else showToast('Impossible de traiter ces photos.');
-  });
-}
-
-function handlePhotoUpload(e, it){
-  const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
-  e.target.value = ''; // permet de reselectionner les memes fichiers plus tard
-  if(!files.length){ showToast('Aucune image valide sélectionnée.'); return; }
-  Promise.allSettled(files.map(compressImageFile)).then(results => {
-    let added = 0;
-    if(!Array.isArray(it.extraPhotos)) it.extraPhotos = [];
-    results.forEach(r => { if(r.status === 'fulfilled'){ it.extraPhotos.push(r.value); added++; } });
-    if(added > 0){ save(); render(); }
-    if(added === files.length) showToast(added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée');
-    else if(added > 0) showToast(added + ' photo(s) ajoutée(s), certaines ont échoué');
-    else showToast('Impossible de traiter ces photos.');
-  });
-}
-
 /* ---------- Modals ---------- */
 function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
 
@@ -4680,12 +3387,6 @@ function openLightbox(photos, startIndex){
         <div class="lightbox-footer">
           ${cur.caption ? `<div class="lightbox-caption">${escapeHtml(cur.caption)}</div>` : ''}
           ${items.length > 1 ? `<div class="lightbox-count">${idx + 1} / ${items.length}</div>` : ''}
-          ${cur.hideToggle ? `
-            <label class="lightbox-hide-toggle">
-              <input type="checkbox" id="lbHideToggle" ${(cur.hideToggle.it.hiddenPhotos || []).includes(cur.hideToggle.src) ? 'checked' : ''}>
-              Masquer sur la galerie photo
-            </label>
-          ` : ''}
           ${cur.onGoto ? `<button class="btn btn-primary" id="lbGoto">${escapeHtml(cur.gotoLabel || 'Voir l’article')}</button>` : ''}
         </div>
       </div>
@@ -4781,16 +3482,6 @@ function openLightbox(photos, startIndex){
     }, { passive:true });
 
     if(cur.onGoto) document.getElementById('lbGoto').onclick = () => { close(); cur.onGoto(); };
-    if(cur.hideToggle){
-      const cb = document.getElementById('lbHideToggle');
-      if(cb) cb.onchange = () => {
-        const { it, src } = cur.hideToggle;
-        if(!Array.isArray(it.hiddenPhotos)) it.hiddenPhotos = [];
-        if(cb.checked){ if(!it.hiddenPhotos.includes(src)) it.hiddenPhotos.push(src); }
-        else { it.hiddenPhotos = it.hiddenPhotos.filter(s => s !== src); }
-        save();
-      };
-    }
   }
   draw();
 }
@@ -4798,6 +3489,26 @@ function openLightbox(photos, startIndex){
 function openModal(innerHtml){
   document.getElementById('modalRoot').innerHTML = `<div class="overlay" id="overlayEl"><div class="modal">${innerHtml}</div></div>`;
   document.getElementById('overlayEl').addEventListener('mousedown', (e) => { if(e.target.id === 'overlayEl') closeModal(); });
+}
+
+function openRenamePrompt(fieldLabel, currentValue, onSave){
+  openModal(`
+    <h2>Renommer</h2>
+    <div class="field">
+      <label class="field-label">${escapeHtml(fieldLabel)}</label>
+      <input type="text" id="renameInput" value="${escapeAttr(currentValue)}">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const val = document.getElementById('renameInput').value.trim();
+    if(!val){ showToast('Le nom ne peut pas être vide'); return; }
+    onSave(val);
+  };
 }
 
 function openConfirmModal(title, msg, onConfirm, confirmLabel, confirmIconName){
@@ -4831,128 +3542,6 @@ function openSizeModal(){
     data.sizeFruit = document.getElementById('szFruit').value.trim();
     data.sizeAnimal = document.getElementById('szAnimal').value.trim();
     save(); closeModal(); render();
-  };
-}
-
-function openAddCategoryModal(){
-  let chosen = CAT_COLORS[0].key;
-  openModal(`
-    <h2>Nouvelle liste</h2>
-    <div class="field">
-      <label class="field-label">Nom</label>
-      <input type="text" id="catName" placeholder="Ex. Puériculture">
-    </div>
-    <div class="field">
-      <label class="field-label">Couleur</label>
-      <div class="color-pick" id="colorPick"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Créer</button>
-    </div>
-  `);
-  const pick = document.getElementById('colorPick');
-  pick.innerHTML = CAT_COLORS.map(c => `<div class="swatch ${c.key===chosen?'selected':''}" data-color="${c.key}" style="background:${c.main}"></div>`).join('');
-  pick.querySelectorAll('.swatch').forEach(sw => sw.onclick = () => {
-    chosen = sw.dataset.color;
-    pick.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));
-    sw.classList.add('selected');
-  });
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const name = document.getElementById('catName').value.trim();
-    if(!name){ showToast('Donnez un nom à la liste'); return; }
-    data.categories.push({ id:newId(), name, icon:'box', color:chosen, sections:[] });
-    save(); closeModal(); render(); showToast('Liste créée');
-  };
-}
-
-function openRenameCategoryModal(cat){
-  openModal(`
-    <h2>Renommer la liste</h2>
-    <div class="field"><input type="text" id="catName" value="${escapeAttr(cat.name)}"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Enregistrer</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const v = document.getElementById('catName').value.trim();
-    if(v) cat.name = v;
-    save(); closeModal(); render();
-  };
-}
-
-function openAddSectionModal(cat){
-  openModal(`
-    <h2>Nouvelle section</h2>
-    <div class="field">
-      <label class="field-label">Titre</label>
-      <input type="text" id="secLabel" placeholder="Ex. 2 ans">
-    </div>
-    <div class="field">
-      <label class="field-label">Période (optionnel)</label>
-      <input type="text" id="secPeriod" placeholder="Ex. Été">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Ajouter</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const label = document.getElementById('secLabel').value.trim();
-    if(!label){ showToast('Donnez un titre à la section'); return; }
-    const period = document.getElementById('secPeriod').value.trim();
-    const sec = { id:newId(), label, period, items:[] };
-    cat.sections.push(sec);
-    ui.collapsedSections[sec.id] = false; saveUi();
-    save(); closeModal(); render(); showToast('Section ajoutée');
-  };
-}
-
-function openRenameSectionModal(sec){
-  openModal(`
-    <h2>Modifier la section</h2>
-    <div class="field"><label class="field-label">Titre</label><input type="text" id="secLabel" value="${escapeAttr(sec.label)}"></div>
-    <div class="field"><label class="field-label">Période</label><input type="text" id="secPeriod" value="${escapeAttr(sec.period||'')}"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Enregistrer</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const l = document.getElementById('secLabel').value.trim();
-    if(l) sec.label = l;
-    sec.period = document.getElementById('secPeriod').value.trim();
-    save(); closeModal(); render();
-  };
-}
-
-function openAddItemModal(cat, sec){
-  openModal(`
-    <h2>Nouvel article</h2>
-    <div class="field"><label class="field-label">Nom</label><input type="text" id="itName" placeholder="Ex. Body ML"></div>
-    <div style="display:flex; gap:10px;">
-      <div class="field" style="flex:1;"><label class="field-label">Qté cible</label><input type="number" id="itTarget" min="0" value="1"></div>
-      <div class="field" style="flex:1;"><label class="field-label">Déjà acquis</label><input type="number" id="itAcquired" min="0" value="0"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Ajouter</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    const name = document.getElementById('itName').value.trim();
-    if(!name){ showToast('Donnez un nom à l’article'); return; }
-    const target = clamp(parseInt(document.getElementById('itTarget').value||'0',10), 0, 9999);
-    const acquired = clamp(parseInt(document.getElementById('itAcquired').value||'0',10), 0, 9999);
-    sec.items.push({ id:newId(), name, target, acquired, note:'', link:'', purchases:[], extraPhotos:[], crossSections:[] });
-    ui.collapsedSections[sec.id] = false; saveUi();
-    save(); closeModal(); render(); showToast('Article ajouté');
   };
 }
 
