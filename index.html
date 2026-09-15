@@ -297,6 +297,10 @@
     display:inline-block; font-size:10.5px; font-weight:800; color:var(--sage-dark);
     background:var(--sage-tint); padding:2px 8px; border-radius:999px;
   }
+  .v2-tag-size{color:var(--muted); background:#F4EEE1;}
+  .gallery-tags{
+    display:flex; flex-wrap:wrap; gap:4px; justify-content:center; margin-top:6px; max-width:132px;
+  }
   .v2-char-target-list{display:flex; flex-direction:column; gap:8px;}
   .v2-char-target-row{display:flex; align-items:center; gap:8px;}
   .v2-char-target-label{flex:1; font-size:13.5px; color:var(--ink); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -384,11 +388,12 @@
   @keyframes spin{ to{ transform:rotate(360deg); } }
   .item-thumb-wrap{position:relative; flex-shrink:0; border:none; background:none; padding:0; cursor:pointer;}
   .v2-row-char-summary{
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
-    background:var(--sage-dark); color:#fff; border-radius:var(--r-sm); flex-shrink:0;
-    padding:5px 10px; font-size:11px; font-weight:800; text-align:center; line-height:1.4;
+    display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:3px; flex-shrink:0;
   }
-  .v2-row-char-summary span{white-space:nowrap;}
+  .v2-row-char-pill{
+    color:#fff; border-radius:999px; white-space:nowrap;
+    padding:3px 9px; font-size:11px; font-weight:800; text-align:center; line-height:1.3;
+  }
   .v2-row-thumbs{display:flex; gap:4px; flex-shrink:0; margin-left:8px;}
   .v2-row-thumb{
     width:30px; height:30px; border-radius:7px; border:1px solid var(--border); padding:0;
@@ -1231,10 +1236,20 @@ function renderCatGrid(container){
 function collectV2GalleryPhotos(){
   const out = [];
   (data.v2lists || []).forEach(list => {
-    (list.lots || []).forEach(lot => (lot.photos || []).forEach(src => {
-      if((lot.hiddenPhotos || []).includes(src)) return;
-      out.push({ src, lot });
-    }));
+    (list.lots || []).forEach(lot => {
+      const categoryLabels = [...new Set((lot.entries || []).map(e => {
+        const c = (list.categories || []).find(x => x.id === e.categoryId);
+        return c ? c.label : null;
+      }).filter(Boolean))];
+      const sizeLabels = [...new Set((lot.entries || []).flatMap(e => (e.sizeIds || [])).map(id => {
+        const s = (list.sizes || []).find(x => x.id === id);
+        return s ? s.label : null;
+      }).filter(Boolean))];
+      (lot.photos || []).forEach(src => {
+        if((lot.hiddenPhotos || []).includes(src)) return;
+        out.push({ src, lot, categoryLabels, sizeLabels });
+      });
+    });
   });
   return out;
 }
@@ -1243,11 +1258,15 @@ function renderV2PhotoGalleryDash(container){
   const photos = collectV2GalleryPhotos();
   if(photos.length === 0){ container.innerHTML = ''; return; }
   container.innerHTML = `
-    <div class="section-heading">Galerie photos V2 <span style="color:var(--muted); font-weight:700; font-size:13px;">(${photos.length})</span></div>
+    <div class="section-heading">Galerie photos <span style="color:var(--muted); font-weight:700; font-size:13px;">(${photos.length})</span></div>
     <div class="gallery-scroll" id="v2GalleryDashScroll">
       ${photos.map((p, i) => `
         <button class="gallery-item" data-v2-dash-gallery-index="${i}">
           <img src="${p.src}" alt="" style="width:132px; height:132px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
+          ${(p.categoryLabels.length || p.sizeLabels.length) ? `<div class="gallery-tags">
+            ${p.categoryLabels.map(l => `<span class="v2-tag">${escapeHtml(l)}</span>`).join('')}
+            ${p.sizeLabels.map(l => `<span class="v2-tag v2-tag-size">${escapeHtml(l)}</span>`).join('')}
+          </div>` : ''}
         </button>
       `).join('')}
     </div>
@@ -2653,11 +2672,23 @@ function renderV2RowThumbs(key, photoRefs){
   </div>`;
 }
 
+function v2CharPillColor(status){
+  switch(status){
+    case 'atteint': return 'var(--sage-dark)';
+    case 'encours': return 'var(--amber)';
+    case 'surplus': return 'var(--lavender)';
+    default: return 'var(--terracotta-dark)';
+  }
+}
+
 function renderV2RowCharSummary(rows){
-  const withTarget = rows.filter(r => r.target > 0);
+  const withTarget = rows.filter(r => r.charId && r.target > 0);
   if(!withTarget.length) return '';
   return `<div class="v2-row-char-summary">
-    ${withTarget.map(r => `<span>${escapeHtml(r.label)} ${r.acquired}/${r.target}</span>`).join('')}
+    ${withTarget.map(r => {
+      const color = v2CharPillColor(itemStatus(r.target, r.acquired));
+      return `<span class="v2-row-char-pill" style="background:${color}">${escapeHtml(r.label)} ${r.acquired}/${r.target}</span>`;
+    }).join('')}
   </div>`;
 }
 
