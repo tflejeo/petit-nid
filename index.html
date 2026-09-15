@@ -166,6 +166,7 @@
   .unit-list{display:flex; flex-direction:column; gap:12px;}
   .unit-row{display:flex; align-items:center; gap:6px; flex-wrap:nowrap; padding-bottom:7px; margin-bottom:7px; border-bottom:1px solid #F2ECDE;}
   .unit-row:last-child{border-bottom:none; padding-bottom:0; margin-bottom:0;}
+  .unit-row-clickable{cursor:pointer;}
   .unit-header-row{padding-bottom:4px; border-bottom:none;}
   .unit-col-label{font-size:10.5px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px;}
   .unit-col-label:first-child{width:38px; text-align:center;}
@@ -743,14 +744,14 @@ function buildDefaultV2(){
   });
   const brands = ['Petit Bateau','Vertbaudet','Jacadi'].map(label => ({ id:newId(), label }));
   return {
-    id:newId(), name:'Vêtements bébé', sizeLabel:'Taille', categoryLabel:'Catégorie',
+    id:newId(), name:'Vêtements bébé', sizeLabel:'Taille', categoryLabel:'Catégorie', mode:'lots',
     sizes, categories, brands, targets, lots: [], characteristics: [], groupBy: 'size', photoSort: 'date'
   };
 }
 
 function buildEmptyV2List(name){
   return {
-    id:newId(), name, sizeLabel:'Filtre A', categoryLabel:'Catégorie',
+    id:newId(), name, sizeLabel:'Catégorie', categoryLabel:'Article', mode:'catalog',
     sizes:[], categories:[], brands:[], targets:[], lots:[], characteristics:[], groupBy:'size', photoSort:'date'
   };
 }
@@ -827,6 +828,17 @@ function normalizeV2List(v2){
   v2.name = v2.name || 'Liste';
   v2.sizeLabel = v2.sizeLabel || 'Taille';
   v2.categoryLabel = v2.categoryLabel || 'Catégorie';
+  // Migration : les listes créées avant l'introduction du mode "catalogue" n'ont pas
+  // de champ mode. On déduit : la liste "Vêtements bébé" reste en mode "lots" (photo
+  // d'abord, plusieurs tailles par article), toutes les autres basculent en "catalog"
+  // (navigation catégorie -> article, achat unitaire avec photo/quantité/prix).
+  if(v2.mode !== 'lots' && v2.mode !== 'catalog'){
+    v2.mode = (v2.name === 'Vêtements bébé') ? 'lots' : 'catalog';
+  }
+  if(v2.mode === 'catalog'){
+    if(v2.sizeLabel === 'Filtre A') v2.sizeLabel = 'Catégorie';
+    if(v2.categoryLabel === 'Catégorie') v2.categoryLabel = 'Article';
+  }
   v2.sizes = denseArrayFrom(v2.sizes).filter(Boolean);
   v2.categories = denseArrayFrom(v2.categories).filter(Boolean);
   v2.brands = denseArrayFrom(v2.brands).filter(Boolean);
@@ -899,6 +911,9 @@ function activeV2List(){
   if(!Array.isArray(data.v2lists) || !data.v2lists.length) return null;
   if(!ui.activeV2ListId) return null;
   return data.v2lists.find(l => l.id === ui.activeV2ListId) || null;
+}
+function v2IsCatalog(list){
+  return !!(list && list.mode === 'catalog');
 }
 
 function normalizeData(d){
@@ -2516,8 +2531,9 @@ function renderListsV2(){
   const list = activeV2List();
   if(!list){ renderV2ListPicker(); return; }
   const main = document.getElementById('mainContent');
-  const photoRefs = collectV2LotPhotoRefs();
-  const groupBy = list.groupBy || 'size';
+  const catalogMode = v2IsCatalog(list);
+  const photoRefs = catalogMode ? [] : collectV2LotPhotoRefs();
+  const groupBy = catalogMode ? 'size' : (list.groupBy || 'size');
   const g = v2GlobalTotals();
   const budget = budgetTotalsV2();
   main.innerHTML = `
@@ -2525,7 +2541,7 @@ function renderListsV2(){
       <h2 style="font-family:var(--font-display); font-weight:600; font-size:19px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(list.name)}</h2>
       <button class="text-btn muted" id="btnChangeV2List" style="flex-shrink:0;">${icon('chevronLeft','icon-sm')} Changer de liste</button>
     </div>
-    <button class="btn btn-primary" id="btnAddVetement" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter un article</button>
+    ${catalogMode ? '' : `<button class="btn btn-primary" id="btnAddVetement" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter un article</button>`}
     <div class="search-wrap">
       <div class="search-input-wrap">
         ${icon('search','icon-sm')}
@@ -2546,7 +2562,7 @@ function renderListsV2(){
       <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
         <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Paramétrage</button>
       </div>
-      ${photoRefs.length ? `
+      ${(!catalogMode && photoRefs.length) ? `
         <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <span>Vos photos</span>
           <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${list.photoSort === 'size' ? 'Par ' + list.sizeLabel.toLowerCase() : 'Plus récentes'}</button>
@@ -2560,9 +2576,11 @@ function renderListsV2(){
           `).join('')}
         </div>
       ` : ''}
+      ${catalogMode ? '' : `
       <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
         <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? list.categoryLabel : list.sizeLabel}</button>
       </div>
+      `}
       <div id="v2GroupList">
         ${groupBy === 'category'
           ? (list.categories || []).map(cat => renderV2CategoryCard(cat)).join('')
@@ -2742,6 +2760,9 @@ function renderV2PairRow(sizeId, categoryId, label){
   </div>`;
   if(expanded){
     html += `<div class="item-expand">`;
+    if(v2IsCatalog(activeV2List())){
+      html += `<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>`;
+    }
     if(mainChar){
       html += `<div class="field">
         <label class="field-label">Objectifs par ${escapeHtml(mainChar.label)}</label>
@@ -2987,6 +3008,39 @@ function bindListsV2Events(photoRefs){
       save(); closeModal(); render(); showToast('Article supprimé');
     });
   });
+
+  if(v2IsCatalog(activeV2List())){
+    document.querySelectorAll('[data-v2-catalog-add]').forEach(btn => {
+      btn.onclick = () => {
+        const [sizeId, categoryId] = btn.dataset.v2CatalogAdd.split('::');
+        openCatalogEntryModal(sizeId, categoryId, null);
+      };
+    });
+    document.querySelectorAll('[data-v2-entry-row]').forEach(row => {
+      row.classList.add('unit-row-clickable');
+      row.addEventListener('click', (e) => {
+        if(e.target.closest('[data-v2-del-entry]') || e.target.closest('[data-v2-zoom-lot]')) return;
+        const entryId = row.dataset.v2EntryRow;
+        const lot = (activeV2List().lots || []).find(l => (l.entries || []).some(en => en.id === entryId));
+        if(!lot) return;
+        const entry = lot.entries.find(en => en.id === entryId);
+        openCatalogEntryModal((entry.sizeIds || [])[0], entry.categoryId, { lot, entry });
+      });
+    });
+    document.querySelectorAll('[data-v2-zoom-lot]').forEach(imgEl => {
+      imgEl.onclick = () => {
+        const lot = (activeV2List().lots || []).find(l => l.id === imgEl.dataset.v2ZoomLot);
+        if(lot && lot.photos && lot.photos.length){
+          const entry = (lot.entries || [])[0];
+          openLightbox(lot.photos.map(src => ({
+            src,
+            gotoLabel: 'Modifier',
+            onGoto: () => entry ? openCatalogEntryModal((entry.sizeIds || [])[0], entry.categoryId, { lot, entry }) : null
+          })), 0);
+        }
+      };
+    });
+  }
 }
 
 function openVetementModal(existingLot){
@@ -3196,6 +3250,137 @@ function openVetementModal(existingLot){
       existingLot.entries = entries;
     }
     save(); closeModal(); render(); showToast(isNew ? 'Vêtement ajouté' : 'Lot mis à jour');
+  };
+}
+
+function openCatalogEntryModal(sizeId, categoryId, existing){
+  const isNew = !existing;
+  const catLabel = v2CategoryLabel(categoryId);
+  const sectionLabel = v2SizeLabel(sizeId);
+  let photos = isNew ? [] : (existing.lot.photos || []).map(src => ({ src }));
+  let charValues = isNew ? {} : Object.assign({}, existing.entry.charValues);
+  const chars = v2CharacteristicsForCategory(categoryId);
+
+  function charPickersHtml(){
+    if(!chars.length) return '';
+    return chars.map(ch => `
+      <div class="field">
+        <label class="field-label">${escapeHtml(ch.label)}</label>
+        <div class="v2-size-chips">
+          ${ch.values.map(v => `<button type="button" class="chip-toggle ${(charValues||{})[ch.id]===v.id ? 'selected' : ''}" data-catalog-char="${ch.id}" data-value-id="${v.id}">${escapeHtml(v.label)}</button>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  let uploading = false;
+  function photosHtml(){
+    return `
+      <div class="v2-photo-list">
+        ${photos.map((p, i) => `
+          <div class="v2-photo-row">
+            <img src="${p.src}" class="v2-photo-thumb-lg" data-catalog-modal-zoom="${i}">
+            <div class="v2-photo-controls">
+              <button type="button" class="text-btn danger" data-del-catalog-photo="${i}">${icon('trash','icon-sm')} Retirer cette photo</button>
+            </div>
+          </div>
+        `).join('')}
+        <label class="photo-add-tile ${uploading ? 'uploading' : ''}" style="align-self:flex-start;">
+          ${uploading ? '<span class="photo-add-spinner"></span>' : icon('camera','icon-sm')}
+          <input type="file" accept="image/*" multiple id="catalogPhotoInput" style="display:none;" ${uploading ? 'disabled' : ''}>
+        </label>
+      </div>
+    `;
+  }
+
+  openModal(`
+    <h2>${isNew ? 'Ajouter un achat' : 'Modifier cet achat'}</h2>
+    <p style="color:var(--muted); font-size:13px; margin:-6px 0 4px;">${escapeHtml(sectionLabel)} · ${escapeHtml(catLabel)}</p>
+    <div class="field">
+      <label class="field-label">Photo(s)</label>
+      <div id="catalogPhotos">${photosHtml()}</div>
+    </div>
+    <div id="catalogChars">${charPickersHtml()}</div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;">
+        <label class="field-label">Quantité</label>
+        <input type="number" min="1" id="catalogQty" value="${isNew ? 1 : existing.entry.qty}">
+      </div>
+      <div class="field" style="flex:1;">
+        <label class="field-label">Prix (€)</label>
+        <input type="number" min="0" step="0.01" id="catalogPrice" placeholder="0,00" value="${isNew ? '' : (existing.lot.price || '')}">
+      </div>
+    </div>
+    <div class="modal-actions">
+      ${!isNew ? `<button type="button" class="btn btn-danger" id="btnDeleteCatalogEntry">${icon('trash','icon-sm')} Supprimer</button>` : `<button class="btn btn-secondary" id="mCancel">Annuler</button>`}
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+
+  function bindPhotoEvents(){
+    const container = document.getElementById('catalogPhotos');
+    container.innerHTML = photosHtml();
+    const input = document.getElementById('catalogPhotoInput');
+    if(input) input.onchange = (e) => {
+      const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
+      e.target.value = '';
+      if(!files.length) return;
+      uploading = true;
+      bindPhotoEvents();
+      Promise.allSettled(files.map(compressImageFile)).then(results => {
+        let added = 0;
+        results.forEach(r => { if(r.status === 'fulfilled'){ photos.push({ src:r.value }); added++; } });
+        uploading = false;
+        bindPhotoEvents();
+        showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter cette photo.');
+      });
+    };
+    container.querySelectorAll('[data-del-catalog-photo]').forEach(btn => {
+      btn.onclick = () => { photos.splice(parseInt(btn.dataset.delCatalogPhoto, 10), 1); bindPhotoEvents(); };
+    });
+    container.querySelectorAll('[data-catalog-modal-zoom]').forEach(imgEl => {
+      imgEl.onclick = () => openLightbox(photos.map(p => ({ src:p.src })), parseInt(imgEl.dataset.catalogModalZoom, 10));
+    });
+  }
+  bindPhotoEvents();
+
+  function bindCharEvents(){
+    document.querySelectorAll('[data-catalog-char]').forEach(btn => {
+      btn.onclick = () => {
+        charValues[btn.dataset.catalogChar] = (charValues[btn.dataset.catalogChar] === btn.dataset.valueId) ? undefined : btn.dataset.valueId;
+        const container = document.getElementById('catalogChars');
+        if(container){ container.innerHTML = charPickersHtml(); bindCharEvents(); }
+      };
+    });
+  }
+  bindCharEvents();
+
+  const cancelBtn = document.getElementById('mCancel');
+  if(cancelBtn) cancelBtn.onclick = closeModal;
+
+  const deleteBtn = document.getElementById('btnDeleteCatalogEntry');
+  if(deleteBtn) deleteBtn.onclick = () => openConfirmModal('Supprimer cet achat ?', 'La photo et les informations associées seront définitivement supprimées.', () => {
+    activeV2List().lots = (activeV2List().lots || []).filter(l => l.id !== existing.lot.id);
+    save(); closeModal(); render(); showToast('Achat supprimé');
+  });
+
+  document.getElementById('mSave').onclick = () => {
+    const qtyVal = Math.max(1, parseInt(document.getElementById('catalogQty').value, 10) || 1);
+    const priceVal = Math.max(0, parseFloat(document.getElementById('catalogPrice').value) || 0);
+    const photoSrcs = photos.map(p => p.src);
+    if(isNew){
+      if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
+      activeV2List().lots.push({
+        id:newId(), photos:photoSrcs, hiddenPhotos:[], price:priceVal,
+        entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:'', qty:qtyVal, charValues: Object.assign({}, charValues) }]
+      });
+    } else {
+      existing.lot.photos = photoSrcs;
+      existing.lot.price = priceVal;
+      existing.entry.qty = qtyVal;
+      existing.entry.charValues = Object.assign({}, charValues);
+    }
+    save(); closeModal(); render(); showToast(isNew ? 'Achat ajouté' : 'Achat mis à jour');
   };
 }
 
