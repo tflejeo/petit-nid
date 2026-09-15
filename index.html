@@ -383,6 +383,12 @@
   }
   @keyframes spin{ to{ transform:rotate(360deg); } }
   .item-thumb-wrap{position:relative; flex-shrink:0; border:none; background:none; padding:0; cursor:pointer;}
+  .v2-row-char-summary{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+    background:var(--sage-dark); color:#fff; border-radius:var(--r-sm); flex-shrink:0;
+    padding:5px 10px; font-size:11px; font-weight:800; text-align:center; line-height:1.4;
+  }
+  .v2-row-char-summary span{white-space:nowrap;}
   .v2-row-thumbs{display:flex; gap:4px; flex-shrink:0; margin-left:8px;}
   .v2-row-thumb{
     width:30px; height:30px; border-radius:7px; border:1px solid var(--border); padding:0;
@@ -2161,6 +2167,21 @@ function v2EntriesFor(sizeId, categoryId){
   }));
   return out;
 }
+function v2CharTargetRows(sizeId, categoryId, mainChar, entries){
+  const indiffTarget = v2TargetEntriesFor(sizeId, categoryId).find(t => !t.charId);
+  const indiffAcquired = entries.reduce((s, { entry }) => s + ((entry.charValues && entry.charValues[mainChar.id]) ? 0 : (Number(entry.qty) || 0)), 0);
+  const rows = [{ charId: null, valueId: null, label: 'Indifférent', acquired: indiffAcquired, target: indiffTarget ? (Number(indiffTarget.target) || 0) : 0 }];
+  mainChar.values.forEach(v => {
+    rows.push({
+      charId: mainChar.id,
+      valueId: v.id,
+      label: v.label,
+      acquired: v2AcquiredForValue(sizeId, categoryId, mainChar.id, v.id),
+      target: Number(v2TargetForValue(sizeId, categoryId, mainChar.id, v.id)) || 0
+    });
+  });
+  return rows;
+}
 function v2CategoriesForSize(sizeId){
   return (activeV2List().categories || []).filter(c => v2TargetFor(sizeId, c.id) > 0 || v2EntriesFor(sizeId, c.id).length > 0);
 }
@@ -2632,6 +2653,14 @@ function renderV2RowThumbs(key, photoRefs){
   </div>`;
 }
 
+function renderV2RowCharSummary(rows){
+  const withTarget = rows.filter(r => r.target > 0);
+  if(!withTarget.length) return '';
+  return `<div class="v2-row-char-summary">
+    ${withTarget.map(r => `<span>${escapeHtml(r.label)} ${r.acquired}/${r.target}</span>`).join('')}
+  </div>`;
+}
+
 function renderV2PairRow(sizeId, categoryId, label){
   const acquired = v2AcquiredFor(sizeId, categoryId);
   const target = v2TargetFor(sizeId, categoryId);
@@ -2641,12 +2670,14 @@ function renderV2PairRow(sizeId, categoryId, label){
   const entries = v2EntriesFor(sizeId, categoryId);
   const photoRefs = v2PhotoRefsForPair(sizeId, categoryId);
   const mainChar = v2CharacteristicsForCategory(categoryId)[0] || null;
+  const charRows = mainChar ? v2CharTargetRows(sizeId, categoryId, mainChar, entries) : [];
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
       <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span></div>
       <div class="item-sub"><span>${acquired} / ${target}</span></div>
     </div>
+    ${charRows.length ? renderV2RowCharSummary(charRows) : ''}
     ${photoRefs.length ? renderV2RowThumbs(key, photoRefs) : ''}
   </div>`;
   if(expanded){
@@ -2655,22 +2686,14 @@ function renderV2PairRow(sizeId, categoryId, label){
       html += `<div class="field">
         <label class="field-label">Objectifs par ${escapeHtml(mainChar.label)}</label>
         <div class="v2-char-target-list">
-          ${(() => {
-            const indiffTarget = v2TargetEntriesFor(sizeId, categoryId).find(t => !t.charId);
-            const indiffAcquired = entries.reduce((s, { entry }) => s + ((entry.charValues && entry.charValues[mainChar.id]) ? 0 : (Number(entry.qty) || 0)), 0);
+          ${charRows.map(r => {
+            const inputAttrs = r.charId
+              ? `data-v2-char-target="${key}" data-char-id="${r.charId}" data-value-id="${r.valueId}"`
+              : `data-v2-target="${key}"`;
             return `<div class="v2-char-target-row">
-              <span class="v2-char-target-label">Indifférent</span>
-              <span class="v2-char-target-count">${indiffAcquired} /</span>
-              <input type="number" min="0" class="v2-char-target-input" data-v2-target="${key}" value="${indiffTarget ? indiffTarget.target : 0}">
-            </div>`;
-          })()}
-          ${mainChar.values.map(v => {
-            const vTarget = v2TargetForValue(sizeId, categoryId, mainChar.id, v.id);
-            const vAcquired = v2AcquiredForValue(sizeId, categoryId, mainChar.id, v.id);
-            return `<div class="v2-char-target-row">
-              <span class="v2-char-target-label">${escapeHtml(v.label)}</span>
-              <span class="v2-char-target-count">${vAcquired} /</span>
-              <input type="number" min="0" class="v2-char-target-input" data-v2-char-target="${key}" data-char-id="${mainChar.id}" data-value-id="${v.id}" value="${vTarget}">
+              <span class="v2-char-target-label">${escapeHtml(r.label)}</span>
+              <span class="v2-char-target-count">${r.acquired} /</span>
+              <input type="number" min="0" class="v2-char-target-input" ${inputAttrs} value="${r.target}">
             </div>`;
           }).join('')}
         </div>
