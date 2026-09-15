@@ -1,7 +1,7 @@
-// Service worker minimal pour Nidoux — permet d'afficher des notifications
-// système fiables (notamment sur Chrome Android) quand un article ou une
-// photo est ajouté(e) à une liste depuis un autre appareil.
-// Ne fait aucune mise en cache, aucun mode hors-ligne : juste les notifications.
+// Service worker minimal pour Nidoux — actuellement inutilisé (les
+// notifications d'ajout d'article/photo sont gérées en local, via un badge
+// dans l'app, sans notification système). Conservé pour un usage futur.
+// Ne fait aucune mise en cache, aucun mode hors-ligne.
 
 self.addEventListener('install', () => {
   self.skipWaiting();

@@ -140,7 +140,13 @@
     border-radius:999px;
   }
   .icon-btn-ghost:active{background:rgba(58,53,41,0.06);}
-  .icon-btn-ghost.active{color:var(--sage-dark);}
+  #notifyBtn{position:relative;}
+  .notif-badge{
+    position:absolute; top:2px; right:2px; min-width:15px; height:15px; padding:0 3px;
+    border-radius:999px; background:var(--terracotta-dark); color:#fff;
+    font-size:9.5px; font-weight:800; display:flex; align-items:center; justify-content:center;
+    line-height:1; pointer-events:none;
+  }
 
   .progress-block{margin-top:16px;}
   .size-row{
@@ -636,7 +642,7 @@
     <div id="headerContent" class="header-title-block"></div>
     <div id="headerTagline" class="header-tagline"></div>
     <div class="header-actions">
-      <button class="icon-btn-ghost" id="notifyBtn" aria-label="Activer les notifications">
+      <button class="icon-btn-ghost" id="notifyBtn" aria-label="Notifications">
         <svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M9.5 20a2.5 2.5 0 005 0"/></svg>
       </button>
       <button class="icon-btn-ghost" id="settingsBtn" aria-label="Paramètres">
@@ -983,17 +989,16 @@ function loadUi(){
       activeCategoryId: (parsed && parsed.activeCategoryId) || null,
       activeV2ListId: (parsed && parsed.activeV2ListId) || null,
       collapsedSections: (parsed && parsed.collapsedSections) || {},
-      notifyEnabled: !!(parsed && parsed.notifyEnabled),
       expandedItems: {}
     };
   }catch(e){
-    return { view:'dashboard', activeCategoryId:null, activeV2ListId:null, collapsedSections:{}, notifyEnabled:false, expandedItems:{} };
+    return { view:'dashboard', activeCategoryId:null, activeV2ListId:null, collapsedSections:{}, expandedItems:{} };
   }
 }
 function saveUi(){
   try{
     localStorage.setItem(UI_STORAGE_KEY, JSON.stringify({
-      view: ui.view, activeCategoryId: ui.activeCategoryId, activeV2ListId: ui.activeV2ListId, collapsedSections: ui.collapsedSections, notifyEnabled: ui.notifyEnabled
+      view: ui.view, activeCategoryId: ui.activeCategoryId, activeV2ListId: ui.activeV2ListId, collapsedSections: ui.collapsedSections
     }));
   }catch(e){}
 }
@@ -1066,6 +1071,16 @@ function handlePronosValue(snapshot){
   if(ui.view === 'prono' && isAdminUnlocked) render();
 }
 
+const NOTIF_STORAGE_KEY = 'petitNidNotifs_v1';
+function loadNotifications(){
+  try{ const arr = JSON.parse(localStorage.getItem(NOTIF_STORAGE_KEY)); return Array.isArray(arr) ? arr : []; }
+  catch(e){ return []; }
+}
+function saveNotifications(){
+  try{ localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(notifications.slice(0, 50))); }catch(e){}
+}
+let notifications = loadNotifications();
+
 function v2CollectLotsById(v2lists){
   const map = new Map();
   (v2lists || []).forEach(list => (list.lots || []).forEach(lot => { if(lot && lot.id) map.set(lot.id, lot); }));
@@ -1075,30 +1090,44 @@ function v2CategoryLabelInList(list, categoryId){
   const c = (list.categories || []).find(x => x.id === categoryId);
   return c ? c.label : '';
 }
-function showAppNotification(title, options){
-  if(!ui.notifyEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options)).catch(() => {
-      try{ new Notification(title, options); }catch(e){}
-    });
-  } else {
-    try{ new Notification(title, options); }catch(e){}
+function updateNotifyBadge(){
+  const btn = document.getElementById('notifyBtn');
+  if(!btn) return;
+  const count = notifications.filter(n => !n.read).length;
+  let badge = btn.querySelector('.notif-badge');
+  if(count > 0){
+    if(!badge){ badge = document.createElement('span'); badge.className = 'notif-badge'; btn.appendChild(badge); }
+    badge.textContent = count > 9 ? '9+' : String(count);
+  } else if(badge){
+    badge.remove();
   }
 }
+function recordV2Activity(list, lot, type){
+  const entry = (lot.entries || [])[0];
+  const sizeId = entry ? (entry.sizeIds || [])[0] : null;
+  const categoryId = entry ? entry.categoryId : null;
+  const catLabel = categoryId ? v2CategoryLabelInList(list, categoryId) : '';
+  notifications.unshift({
+    id: newId(),
+    title: type === 'photo' ? 'Nouvelle photo ajoutée' : 'Nouvel article ajouté',
+    body: [list.name, catLabel].filter(Boolean).join(' · '),
+    at: Date.now(), read: false,
+    listId: list.id, sizeId, categoryId
+  });
+  if(notifications.length > 50) notifications.length = 50;
+  saveNotifications();
+  updateNotifyBadge();
+}
 function notifyNewV2Activity(oldData, newData){
-  if(!ui.notifyEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const oldLots = v2CollectLotsById(oldData && oldData.v2lists);
   (newData.v2lists || []).forEach(list => {
     (list.lots || []).forEach(lot => {
       if(!lot || !lot.id) return;
       const oldLot = oldLots.get(lot.id);
-      const entry = (lot.entries || [])[0];
-      const catLabel = entry ? v2CategoryLabelInList(list, entry.categoryId) : '';
-      const body = [list.name, catLabel].filter(Boolean).join(' · ');
       if(!oldLot){
-        showAppNotification('Nouvel article ajouté', { body, tag:'nidoux-lot-' + lot.id });
+        recordV2Activity(list, lot, 'article');
       } else if((lot.photos || []).length > (oldLot.photos || []).length){
-        showAppNotification('Nouvelle photo ajoutée', { body, tag:'nidoux-lot-' + lot.id + '-photo-' + (lot.photos||[]).length });
+        recordV2Activity(list, lot, 'photo');
       }
     });
   });
@@ -3995,42 +4024,59 @@ document.getElementById('settingsBtn').onclick = () => {
   else openAdminAccessModal(() => openSettingsPanel());
 };
 
-function updateNotifyBtn(){
-  const btn = document.getElementById('notifyBtn');
-  if(!btn) return;
-  const supported = typeof Notification !== 'undefined';
-  const active = supported && ui.notifyEnabled && Notification.permission === 'granted';
-  btn.classList.toggle('active', active);
-  btn.setAttribute('aria-label', active ? 'Notifications activées' : 'Activer les notifications');
+function formatNotifTime(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
 }
 
-document.getElementById('notifyBtn').onclick = () => {
-  if(typeof Notification === 'undefined'){ showToast('Notifications non supportées par ce navigateur.'); return; }
-  if(ui.notifyEnabled && Notification.permission === 'granted'){
-    ui.notifyEnabled = false; saveUi(); updateNotifyBtn(); showToast('Notifications désactivées');
-    return;
-  }
-  if(Notification.permission === 'denied'){
-    showToast('Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.');
-    return;
-  }
-  if(Notification.permission === 'granted'){
-    ui.notifyEnabled = true; saveUi(); updateNotifyBtn(); showToast('Notifications activées');
-    return;
-  }
-  Notification.requestPermission().then(perm => {
-    if(perm === 'granted'){ ui.notifyEnabled = true; saveUi(); showToast('Notifications activées'); }
-    else { showToast('Permission refusée'); }
-    updateNotifyBtn();
+function openNotifPanel(){
+  const shown = notifications.slice(0, 30);
+  openModal(`
+    <h2>Notifications</h2>
+    ${shown.length ? `
+      <div style="display:flex; flex-direction:column; gap:6px; max-height:60vh; overflow-y:auto;">
+        ${shown.map(n => `
+          <button type="button" class="v2-line-card" data-notif-goto="${n.id}" style="text-align:left; padding:10px 12px; cursor:pointer; ${n.read ? '' : 'background:var(--sage-tint);'}">
+            <div style="font-weight:800; font-size:13.5px; color:var(--ink);">${escapeHtml(n.title)}</div>
+            ${n.body ? `<div style="font-size:12.5px; color:var(--muted); margin-top:2px;">${escapeHtml(n.body)}</div>` : ''}
+            <div style="font-size:11px; color:var(--muted-2); margin-top:3px;">${formatNotifTime(n.at)}</div>
+          </button>
+        `).join('')}
+      </div>
+    ` : `<p style="color:var(--muted); font-size:13px;">Aucune notification pour l’instant.</p>`}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Fermer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.querySelectorAll('[data-notif-goto]').forEach(btn => {
+    btn.onclick = () => {
+      const n = notifications.find(x => x.id === btn.dataset.notifGoto);
+      closeModal();
+      if(n && n.listId && n.sizeId && n.categoryId){
+        const list = (data.v2lists || []).find(l => l.id === n.listId);
+        if(list){
+          ui.activeV2ListId = n.listId;
+          ui.view = 'listsv2';
+          const groupBy = list.groupBy || 'size';
+          if(groupBy === 'category') ui.collapsedSections['v2c-' + n.categoryId] = false;
+          else ui.collapsedSections['v2-' + n.sizeId] = false;
+          ui.expandedItems['v2-' + n.sizeId + '::' + n.categoryId] = true;
+          saveUi();
+          render();
+        }
+      }
+    };
   });
-};
-
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  notifications.forEach(n => { n.read = true; });
+  saveNotifications();
+  updateNotifyBadge();
 }
+
+document.getElementById('notifyBtn').onclick = openNotifPanel;
 
 updateConnectionBadge('offline');
-updateNotifyBtn();
+updateNotifyBadge();
 render();
 initFirebase();
 })();
