@@ -1,6 +1,6 @@
 // Service worker minimal pour Nidoux — permet d'afficher des notifications
-// système fiables (notamment sur Chrome Android) quand l'app détecte un
-// nouveau like Vinted pendant qu'un onglet du site est ouvert.
+// système fiables (notamment sur Chrome Android) quand un article ou une
+// photo est ajouté(e) à une liste depuis un autre appareil.
 // Ne fait aucune mise en cache, aucun mode hors-ligne : juste les notifications.
 
 self.addEventListener('install', () => {

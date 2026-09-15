@@ -140,6 +140,7 @@
     border-radius:999px;
   }
   .icon-btn-ghost:active{background:rgba(58,53,41,0.06);}
+  .icon-btn-ghost.active{color:var(--sage-dark);}
 
   .progress-block{margin-top:16px;}
   .size-row{
@@ -635,6 +636,9 @@
     <div id="headerContent" class="header-title-block"></div>
     <div id="headerTagline" class="header-tagline"></div>
     <div class="header-actions">
+      <button class="icon-btn-ghost" id="notifyBtn" aria-label="Activer les notifications">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M9.5 20a2.5 2.5 0 005 0"/></svg>
+      </button>
       <button class="icon-btn-ghost" id="settingsBtn" aria-label="Paramètres">
         <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.2a1.7 1.7 0 00-1.6 1z"/></svg>
       </button>
@@ -752,7 +756,7 @@ function buildDefaultV2(){
 
 function buildEmptyV2List(name){
   return {
-    id:newId(), name, sizeLabel:'Catégorie', categoryLabel:'Article', mode:'catalog', icon:'box',
+    id:newId(), name, sizeLabel:'Catégorie', categoryLabel:'Article', mode:'catalog', icon:'box', color:'var(--sage-dark)',
     sizes:[], categories:[], brands:[], targets:[], lots:[], characteristics:[], groupBy:'size', photoSort:'date'
   };
 }
@@ -846,6 +850,13 @@ function normalizeV2List(v2){
     else if(v2.name === 'Valise de maternité') v2.icon = 'suitcase';
     else if(v2.name === 'Puériculture') v2.icon = 'bottle';
     else v2.icon = 'box';
+  }
+  if(!v2.color){
+    if(v2.name === 'Vêtements bébé') v2.color = 'var(--sage-dark)';
+    else if(v2.name === 'Puériculture') v2.color = 'var(--terracotta-dark)';
+    else if(v2.name === 'Chambre') v2.color = 'var(--lavender)';
+    else if(v2.name === 'Valise de maternité') v2.color = 'var(--amber)';
+    else v2.color = 'var(--sage-dark)';
   }
   v2.sizes = denseArrayFrom(v2.sizes).filter(Boolean);
   v2.categories = denseArrayFrom(v2.categories).filter(Boolean);
@@ -972,16 +983,17 @@ function loadUi(){
       activeCategoryId: (parsed && parsed.activeCategoryId) || null,
       activeV2ListId: (parsed && parsed.activeV2ListId) || null,
       collapsedSections: (parsed && parsed.collapsedSections) || {},
+      notifyEnabled: !!(parsed && parsed.notifyEnabled),
       expandedItems: {}
     };
   }catch(e){
-    return { view:'dashboard', activeCategoryId:null, activeV2ListId:null, collapsedSections:{}, expandedItems:{} };
+    return { view:'dashboard', activeCategoryId:null, activeV2ListId:null, collapsedSections:{}, notifyEnabled:false, expandedItems:{} };
   }
 }
 function saveUi(){
   try{
     localStorage.setItem(UI_STORAGE_KEY, JSON.stringify({
-      view: ui.view, activeCategoryId: ui.activeCategoryId, activeV2ListId: ui.activeV2ListId, collapsedSections: ui.collapsedSections
+      view: ui.view, activeCategoryId: ui.activeCategoryId, activeV2ListId: ui.activeV2ListId, collapsedSections: ui.collapsedSections, notifyEnabled: ui.notifyEnabled
     }));
   }catch(e){}
 }
@@ -1054,6 +1066,44 @@ function handlePronosValue(snapshot){
   if(ui.view === 'prono' && isAdminUnlocked) render();
 }
 
+function v2CollectLotsById(v2lists){
+  const map = new Map();
+  (v2lists || []).forEach(list => (list.lots || []).forEach(lot => { if(lot && lot.id) map.set(lot.id, lot); }));
+  return map;
+}
+function v2CategoryLabelInList(list, categoryId){
+  const c = (list.categories || []).find(x => x.id === categoryId);
+  return c ? c.label : '';
+}
+function showAppNotification(title, options){
+  if(!ui.notifyEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, options)).catch(() => {
+      try{ new Notification(title, options); }catch(e){}
+    });
+  } else {
+    try{ new Notification(title, options); }catch(e){}
+  }
+}
+function notifyNewV2Activity(oldData, newData){
+  if(!ui.notifyEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const oldLots = v2CollectLotsById(oldData && oldData.v2lists);
+  (newData.v2lists || []).forEach(list => {
+    (list.lots || []).forEach(lot => {
+      if(!lot || !lot.id) return;
+      const oldLot = oldLots.get(lot.id);
+      const entry = (lot.entries || [])[0];
+      const catLabel = entry ? v2CategoryLabelInList(list, entry.categoryId) : '';
+      const body = [list.name, catLabel].filter(Boolean).join(' · ');
+      if(!oldLot){
+        showAppNotification('Nouvel article ajouté', { body, tag:'nidoux-lot-' + lot.id });
+      } else if((lot.photos || []).length > (oldLot.photos || []).length){
+        showAppNotification('Nouvelle photo ajoutée', { body, tag:'nidoux-lot-' + lot.id + '-photo-' + (lot.photos||[]).length });
+      }
+    });
+  });
+}
+
 function handleRemoteValue(snapshot){
   const remote = snapshot.val();
   if(isTypingInTextField()) return; // ne pas couper la saisie en cours d'un champ
@@ -1062,11 +1112,14 @@ function handleRemoteValue(snapshot){
     bootstrapped = true;
     return;
   }
+  const wasBootstrapped = bootstrapped;
   bootstrapped = true;
   const remoteStr = JSON.stringify(remote);
   if(remoteStr === lastSentJson) return; // c'est l'écho de notre propre écriture
+  const previousData = data;
   data = normalizeData(remote);
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
+  if(wasBootstrapped) notifyNewV2Activity(previousData, data);
   render();
 }
 
@@ -1260,7 +1313,7 @@ function renderCatGrid(container){
   lists.forEach(list => {
     const t = v2GlobalTotalsForList(list);
     html += `<button class="cat-card" data-goto-v2-list="${list.id}">
-      <div class="cat-icon" style="background:var(--sage-dark)">${icon(list.icon || 'box', 'icon-lg')}</div>
+      <div class="cat-icon" style="background:${list.color || 'var(--sage-dark)'}">${icon(list.icon || 'box', 'icon-lg')}</div>
       <div>
         <div class="cat-name">${escapeHtml(list.name)}</div>
         <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
@@ -2443,7 +2496,7 @@ function renderV2ListPicker(){
         ${lists.map(l => {
           const t = v2GlobalTotalsForList(l);
           return `<button class="cat-card" data-v2-select-list="${l.id}">
-            <div class="cat-icon" style="background:var(--sage-dark);">${icon(l.icon || 'box','icon-lg')}</div>
+            <div class="cat-icon" style="background:${l.color || 'var(--sage-dark)'};">${icon(l.icon || 'box','icon-lg')}</div>
             <div>
               <div class="cat-name">${escapeHtml(l.name)}</div>
               <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
@@ -2556,8 +2609,8 @@ function renderListsV2(){
   const budget = budgetTotalsV2();
   main.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
-      <h2 style="font-family:var(--font-display); font-weight:600; font-size:19px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(list.name)}</h2>
-      <button class="text-btn muted" id="btnChangeV2List" style="flex-shrink:0;">${icon('chevronLeft','icon-sm')} Changer de liste</button>
+      <h2 style="font-family:var(--font-display); font-weight:600; font-size:19px; margin:0; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(list.name)}</h2>
+      <button class="text-btn muted" id="btnChangeV2List" style="flex-shrink:0; white-space:nowrap;">${icon('chevronLeft','icon-sm')} Changer de liste</button>
     </div>
     ${catalogMode ? '' : `<button class="btn btn-primary" id="btnAddVetement" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter un article</button>`}
     <div class="search-wrap">
@@ -2594,11 +2647,7 @@ function renderListsV2(){
           `).join('')}
         </div>
       ` : ''}
-      ${catalogMode ? `
-      <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-        <button class="chip-btn" id="btnCatalogAddSize">${icon('plus','icon-sm')} Nouvelle ${list.sizeLabel.toLowerCase()}</button>
-      </div>
-      ` : `
+      ${catalogMode ? '' : `
       <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
         <button class="chip-btn" id="btnToggleV2Group">${icon('sort','icon-sm')} Trier par : ${groupBy === 'category' ? list.categoryLabel : list.sizeLabel}</button>
       </div>
@@ -2608,6 +2657,11 @@ function renderListsV2(){
           ? (list.categories || []).map(cat => renderV2CategoryCard(cat)).join('')
           : (list.sizes || []).map(size => renderV2SizeCard(size)).join('')}
       </div>
+      ${catalogMode ? `
+      <div style="display:flex; justify-content:center; margin-top:14px;">
+        <button class="chip-btn" id="btnCatalogAddSize">${icon('plus','icon-sm')} Nouvelle ${list.sizeLabel.toLowerCase()}</button>
+      </div>
+      ` : ''}
     </div>
   `;
   document.getElementById('btnChangeV2List').onclick = () => { ui.activeV2ListId = null; saveUi(); render(); };
@@ -3941,7 +3995,42 @@ document.getElementById('settingsBtn').onclick = () => {
   else openAdminAccessModal(() => openSettingsPanel());
 };
 
+function updateNotifyBtn(){
+  const btn = document.getElementById('notifyBtn');
+  if(!btn) return;
+  const supported = typeof Notification !== 'undefined';
+  const active = supported && ui.notifyEnabled && Notification.permission === 'granted';
+  btn.classList.toggle('active', active);
+  btn.setAttribute('aria-label', active ? 'Notifications activées' : 'Activer les notifications');
+}
+
+document.getElementById('notifyBtn').onclick = () => {
+  if(typeof Notification === 'undefined'){ showToast('Notifications non supportées par ce navigateur.'); return; }
+  if(ui.notifyEnabled && Notification.permission === 'granted'){
+    ui.notifyEnabled = false; saveUi(); updateNotifyBtn(); showToast('Notifications désactivées');
+    return;
+  }
+  if(Notification.permission === 'denied'){
+    showToast('Notifications bloquées : autorisez-les dans les réglages du navigateur pour ce site.');
+    return;
+  }
+  if(Notification.permission === 'granted'){
+    ui.notifyEnabled = true; saveUi(); updateNotifyBtn(); showToast('Notifications activées');
+    return;
+  }
+  Notification.requestPermission().then(perm => {
+    if(perm === 'granted'){ ui.notifyEnabled = true; saveUi(); showToast('Notifications activées'); }
+    else { showToast('Permission refusée'); }
+    updateNotifyBtn();
+  });
+};
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
 updateConnectionBadge('offline');
+updateNotifyBtn();
 render();
 initFirebase();
 })();
