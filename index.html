@@ -486,7 +486,7 @@
   }
   .gallery-caption-sub{font-weight:600; color:var(--muted); font-size:11px; margin-top:1px;}
   .expand-actions{display:flex; justify-content:space-between; align-items:center; margin-top:2px;}
-  .text-btn{background:none; border:none; font-weight:800; font-size:13px; cursor:pointer; padding:6px 4px;}
+  .text-btn{background:none; border:none; font-weight:800; font-size:13px; cursor:pointer; padding:6px 4px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;}
   .text-btn.danger{color:var(--terracotta-dark);}
   .text-btn.muted{color:var(--muted);}
 
@@ -2867,6 +2867,8 @@ function renderV2PairRow(sizeId, categoryId, label){
   const photoRefs = v2PhotoRefsForPair(sizeId, categoryId);
   const mainChar = v2CharacteristicsForCategory(categoryId)[0] || null;
   const charRows = mainChar ? v2CharTargetRows(sizeId, categoryId, mainChar, entries) : [];
+  const list = activeV2List();
+  const catalogMode = v2IsCatalog(list);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
@@ -2878,8 +2880,13 @@ function renderV2PairRow(sizeId, categoryId, label){
   </div>`;
   if(expanded){
     html += `<div class="item-expand">`;
-    if(v2IsCatalog(activeV2List())){
-      html += `<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>`;
+    if(catalogMode){
+      const catObj = (list.categories || []).find(c => c.id === categoryId);
+      html += `<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>
+      <div class="field">
+        <label class="field-label">Commentaire</label>
+        <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel…" style="min-height:40px;">${escapeHtml((catObj && catObj.comment) || '')}</textarea>
+      </div>`;
     }
     if(mainChar){
       const indiffRow = charRows.find(r => !r.charId);
@@ -2949,7 +2956,6 @@ function renderV2EntryRow(lot, entry, excludeCharId){
     ${tags.length ? `<div class="v2-entry-tags-inline">${tags.map(t => `<span class="v2-tag">${escapeHtml(t.label)}</span>`).join('')}</div>` : ''}
     <div style="flex:1; font-size:12.5px; color:var(--ink); min-width:0;">
       <div>${brand ? escapeHtml(brand) + ' · ' : ''}Qté ${entry.qty}</div>
-      ${entry.comment ? `<div style="color:var(--muted); font-style:italic; font-size:11.5px; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(entry.comment)}</div>` : ''}
     </div>
     <button class="text-btn danger" data-v2-del-entry="${entry.id}" data-v2-lot="${lot.id}" aria-label="Supprimer">${icon('x','icon-sm')}</button>
   </div>`;
@@ -3052,6 +3058,14 @@ function bindListsV2Events(photoRefs){
       ui.collapsedSections[key] = !isV2CharGroupCollapsed(key);
       saveUi(); render();
     };
+  });
+
+  document.querySelectorAll('[data-v2-cat-comment]').forEach(el => {
+    el.addEventListener('change', () => {
+      const categoryId = el.dataset.v2CatComment;
+      const cat = (activeV2List().categories || []).find(c => c.id === categoryId);
+      if(cat){ cat.comment = el.value.trim(); save(); }
+    });
   });
 
   document.querySelectorAll('[data-v2-target]').forEach(input => {
@@ -3460,10 +3474,6 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
         <input type="number" min="0" step="0.01" id="catalogPrice" placeholder="0,00" value="${isNew ? '' : (existing.lot.price || '')}">
       </div>
     </div>
-    <div class="field">
-      <label class="field-label">Commentaire</label>
-      <textarea id="catalogComment" placeholder="Optionnel…" style="min-height:44px;">${isNew ? '' : escapeHtml(existing.entry.comment || '')}</textarea>
-    </div>
     <div class="modal-actions">
       ${!isNew ? `<button type="button" class="btn btn-danger" id="btnDeleteCatalogEntry">${icon('trash','icon-sm')} Supprimer</button>` : `<button class="btn btn-secondary" id="mCancel">Annuler</button>`}
       <button class="btn btn-primary" id="mSave">Enregistrer</button>
@@ -3520,19 +3530,17 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   document.getElementById('mSave').onclick = () => {
     const qtyVal = Math.max(1, parseInt(document.getElementById('catalogQty').value, 10) || 1);
     const priceVal = Math.max(0, parseFloat(document.getElementById('catalogPrice').value) || 0);
-    const commentVal = document.getElementById('catalogComment').value.trim();
     const photoSrcs = photos.map(p => p.src);
     if(isNew){
       if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
       activeV2List().lots.push({
         id:newId(), photos:photoSrcs, hiddenPhotos:[], price:priceVal,
-        entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:'', qty:qtyVal, comment:commentVal, charValues: Object.assign({}, charValues) }]
+        entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:'', qty:qtyVal, charValues: Object.assign({}, charValues) }]
       });
     } else {
       existing.lot.photos = photoSrcs;
       existing.lot.price = priceVal;
       existing.entry.qty = qtyVal;
-      existing.entry.comment = commentVal;
       existing.entry.charValues = Object.assign({}, charValues);
     }
     save(); closeModal(); render(); showToast(isNew ? 'Achat ajouté' : 'Achat mis à jour');
