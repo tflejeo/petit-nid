@@ -1337,7 +1337,7 @@ function renderDashboard(){
 }
 
 function renderCatGrid(container){
-  const lists = data.v2lists || [];
+  const lists = v2SortListsByName(data.v2lists || []);
   let html = '';
   lists.forEach(list => {
     const t = v2GlobalTotalsForList(list);
@@ -2342,7 +2342,10 @@ function v2CharTargetRows(sizeId, categoryId, mainChar, entries){
   return rows;
 }
 function v2SortByLabel(arr){
-  return (arr || []).slice().sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+  return (arr || []).slice().sort((a, b) => a.label.localeCompare(b.label, 'fr', { numeric: true, sensitivity: 'base' }));
+}
+function v2SortListsByName(arr){
+  return (arr || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true, sensitivity: 'base' }));
 }
 function v2CategoriesForSize(sizeId){
   return (activeV2List().categories || []).filter(c => v2TargetFor(sizeId, c.id) > 0 || v2EntriesFor(sizeId, c.id).length > 0);
@@ -2509,7 +2512,7 @@ function collectV2LotPhotoRefs(){
 
 function renderV2ListPicker(){
   const main = document.getElementById('mainContent');
-  const lists = data.v2lists || [];
+  const lists = v2SortListsByName(data.v2lists || []);
   const g = v2GlobalTotalsAcrossLists();
   const budget = budgetTotalsV2Global();
   main.innerHTML = `
