@@ -2341,6 +2341,9 @@ function v2CharTargetRows(sizeId, categoryId, mainChar, entries){
   });
   return rows;
 }
+function v2SortByLabel(arr){
+  return (arr || []).slice().sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+}
 function v2CategoriesForSize(sizeId){
   return (activeV2List().categories || []).filter(c => v2TargetFor(sizeId, c.id) > 0 || v2EntriesFor(sizeId, c.id).length > 0);
 }
@@ -2349,7 +2352,7 @@ function v2SizesForCategory(categoryId){
 }
 function v2CategoriesNotInSize(sizeId){
   const shown = new Set(v2CategoriesForSize(sizeId).map(c => c.id));
-  return (activeV2List().categories || []).filter(c => !shown.has(c.id));
+  return v2SortByLabel((activeV2List().categories || []).filter(c => !shown.has(c.id)));
 }
 function v2SizesNotInCategory(categoryId){
   const shown = new Set(v2SizesForCategory(categoryId).map(s => s.id));
@@ -3216,10 +3219,10 @@ function openVetementModal(existingLot){
 
   function catOptions(selected){
     return `<option value="" ${selected ? '' : 'selected'}>Choisir : ${escapeHtml(list.categoryLabel)}…</option>` +
-      (activeV2List().categories || []).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
+      v2SortByLabel(activeV2List().categories).map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${escapeHtml(c.label)}</option>`).join('');
   }
   function brandOptions(selected){
-    return `<option value="">Marque —</option>` + (activeV2List().brands || []).map(b => `<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHtml(b.label)}</option>`).join('');
+    return `<option value="">Marque —</option>` + v2SortByLabel(activeV2List().brands).map(b => `<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHtml(b.label)}</option>`).join('');
   }
   function sizeChips(line){
     return (activeV2List().sizes || []).map(s => `<button type="button" class="chip-toggle ${line.sizeIds.includes(s.id) ? 'selected' : ''}" data-line-size="${line.id}" data-size-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
@@ -3659,8 +3662,8 @@ function openManageV2Modal(){
 
   function rebind(){
     document.getElementById('v2SizesList').innerHTML = listHtml(activeV2List().sizes, 'del-v2-size', 'rename-v2-size');
-    document.getElementById('v2CategoriesList').innerHTML = listHtml(activeV2List().categories, 'del-v2-cat', 'rename-v2-cat');
-    document.getElementById('v2BrandsList').innerHTML = listHtml(activeV2List().brands, 'del-v2-brand', 'rename-v2-brand');
+    document.getElementById('v2CategoriesList').innerHTML = listHtml(v2SortByLabel(activeV2List().categories), 'del-v2-cat', 'rename-v2-cat');
+    document.getElementById('v2BrandsList').innerHTML = listHtml(v2SortByLabel(activeV2List().brands), 'del-v2-brand', 'rename-v2-brand');
     document.getElementById('v2CharsList').innerHTML = charsListHtml();
     document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => { activeV2List().sizes = activeV2List().sizes.filter(s => s.id !== b.dataset.delV2Size); save(); rebind(); });
     document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => { activeV2List().categories = activeV2List().categories.filter(c => c.id !== b.dataset.delV2Cat); save(); rebind(); });
@@ -3718,7 +3721,7 @@ function openEditCharacteristicModal(existingChar){
     `).join('') : '<span style="font-size:12.5px; color:var(--muted);">Aucune valeur</span>';
   }
   function catChecksHtml(){
-    return (activeV2List().categories || []).map(c => `
+    return v2SortByLabel(activeV2List().categories).map(c => `
       <label class="crosslist-check"><input type="checkbox" data-char-cat="${c.id}" ${categoryIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.label)}</label>
     `).join('');
   }
