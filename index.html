@@ -1260,7 +1260,7 @@ function render(){
 function renderHeader(){
   const h = document.getElementById('headerContent');
   const tagEl = document.getElementById('headerTagline');
-  tagEl.textContent = ui.view === 'dashboard' ? (data.headerTagline || '') : '';
+  tagEl.textContent = data.headerTagline || '';
   if(ui.view === 'dashboard'){
     h.innerHTML = `<div class="brand"><h1>Nidoux</h1></div>`;
   } else if(ui.view === 'listsv2'){
@@ -1893,7 +1893,7 @@ function openSettingsPanel(){
       </div>
     </div>
     <div class="field">
-      <label class="field-label">Texte sous "Nidoux" (emojis autorisés)</label>
+      <label class="field-label">Texte sous le titre (emojis autorisés, affiché sur tous les onglets)</label>
       <input type="text" id="sTagline" value="${escapeAttr(data.headerTagline || '')}" placeholder="Ex. 🍼 votre liste de naissance">
     </div>
     <div class="field">
@@ -2644,9 +2644,9 @@ function renderListsV2(){
   const photoRefs = catalogMode ? [] : collectV2LotPhotoRefs();
   const groupBy = catalogMode ? 'size' : (list.groupBy || 'size');
   main.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
-      <h2 style="font-family:var(--font-display); font-weight:600; font-size:19px; margin:0; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(list.name)}</h2>
-      <button class="text-btn muted" id="btnChangeV2List" style="flex-shrink:0; white-space:nowrap;">${icon('chevronLeft','icon-sm')} Changer de liste</button>
+    <div style="display:flex; flex-wrap:nowrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
+      <h2 style="font-family:var(--font-display); font-weight:600; font-size:18px; margin:0; flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(list.name)}</h2>
+      <button class="text-btn muted" id="btnChangeV2List" style="flex:0 0 auto; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; font-size:12.5px;">${icon('chevronLeft','icon-sm')} Changer de liste</button>
     </div>
     ${catalogMode ? '' : `<button class="btn btn-primary" id="btnAddVetement" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter un article</button>`}
     <div class="search-wrap">
