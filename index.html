@@ -213,9 +213,21 @@
   .cat-card{
     background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);
     padding:14px; box-shadow:var(--shadow); cursor:pointer; text-align:left;
-    display:flex; flex-direction:column; gap:10px;
+    display:flex; flex-direction:column; gap:10px; position:relative;
   }
   .cat-card:active{transform:scale(0.98);}
+  .cat-card-gear{
+    position:absolute; top:6px; right:6px; width:26px; height:26px; z-index:2;
+    display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--muted-2); cursor:pointer; padding:0;
+  }
+  .cat-card-gear:active{color:var(--muted);}
+  .v2-list-type-option{
+    display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:var(--r-md);
+    border:1.5px solid var(--border); cursor:pointer;
+  }
+  .v2-list-type-option.selected{border-color:var(--sage-dark); background:var(--sage-tint);}
+  .v2-list-type-option input{margin-top:3px; accent-color:var(--sage-dark); width:17px; height:17px; flex-shrink:0;}
   .cat-icon{
     width:38px; height:38px; border-radius:12px;
     display:flex; align-items:center; justify-content:center;
@@ -327,6 +339,11 @@
   }
   .v2-group-label{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .v2-group-target{display:flex; align-items:center; gap:6px; flex-shrink:0; cursor:default; text-transform:none;}
+  .v2-checklist-check{
+    display:flex; align-items:center; gap:8px; cursor:pointer; margin:8px 0 12px;
+    font-size:13.5px; font-weight:700; color:var(--ink);
+  }
+  .v2-checklist-check input{width:19px; height:19px; accent-color:var(--sage-dark); flex-shrink:0;}
   .v2-group-acquired{font-size:13px; color:var(--muted); font-weight:700;}
   .v2-group-heading-toggle .chev{color:var(--muted); flex-shrink:0; width:14px; height:14px; transition:transform 0.2s ease;}
   .v2-group-heading-toggle.open .chev{transform:rotate(180deg);}
@@ -843,7 +860,7 @@ function normalizeV2List(v2){
   // de champ mode. On déduit : la liste "Vêtements bébé" reste en mode "lots" (photo
   // d'abord, plusieurs tailles par article), toutes les autres basculent en "catalog"
   // (navigation catégorie -> article, achat unitaire avec photo/quantité/prix).
-  if(v2.mode !== 'lots' && v2.mode !== 'catalog'){
+  if(v2.mode !== 'lots' && v2.mode !== 'catalog' && v2.mode !== 'checklist'){
     v2.mode = (v2.name === 'Vêtements bébé') ? 'lots' : 'catalog';
   }
   if(v2.mode === 'catalog'){
@@ -937,8 +954,61 @@ function activeV2List(){
   if(!ui.activeV2ListId) return null;
   return data.v2lists.find(l => l.id === ui.activeV2ListId) || null;
 }
+const V2_LIST_TYPES = [
+  { value:'catalog', title:'Classique', desc:'Navigation catégorie → article, achats avec photo et prix (ex. Puériculture, Chambre).' },
+  { value:'lots', title:'Vêtements', desc:'Ajout par photo, plusieurs tailles par article (ex. Vêtements bébé).' },
+  { value:'checklist', title:'Liste à cocher', desc:'Un objectif et une case à cocher par article, sans photo ni prix (ex. Valise de maternité).' }
+];
+function renderV2ListTypeOptions(currentMode){
+  const mode = currentMode || 'catalog';
+  return V2_LIST_TYPES.map(o => `
+    <label class="v2-list-type-option ${mode === o.value ? 'selected' : ''}">
+      <input type="radio" name="v2ListTypeChoice" value="${o.value}" ${mode === o.value ? 'checked' : ''}>
+      <div>
+        <div style="font-weight:800; font-size:13.5px;">${escapeHtml(o.title)}</div>
+        <div style="font-size:12px; color:var(--muted);">${escapeHtml(o.desc)}</div>
+      </div>
+    </label>
+  `).join('');
+}
+function bindV2ListTypeOptions(container){
+  container.querySelectorAll('input[name="v2ListTypeChoice"]').forEach(radio => {
+    radio.onchange = () => {
+      container.querySelectorAll('.v2-list-type-option').forEach(el => el.classList.remove('selected'));
+      radio.closest('.v2-list-type-option').classList.add('selected');
+    };
+  });
+}
+function openV2ListTypeModal(listId){
+  const list = (data.v2lists || []).find(l => l.id === listId);
+  if(!list) return;
+  openModal(`
+    <h2>Type de liste</h2>
+    <p style="color:var(--muted); font-size:13px; margin:-6px 0 12px;">${escapeHtml(list.name)}</p>
+    <div style="display:flex; flex-direction:column; gap:8px;" id="v2ListTypeOptions">
+      ${renderV2ListTypeOptions(list.mode)}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  bindV2ListTypeOptions(document.getElementById('v2ListTypeOptions'));
+  document.getElementById('mSave').onclick = () => {
+    const chosen = document.querySelector('input[name="v2ListTypeChoice"]:checked').value;
+    list.mode = chosen;
+    save(); closeModal(); render(); showToast('Type de liste mis à jour');
+  };
+}
 function v2IsCatalog(list){
   return !!(list && list.mode === 'catalog');
+}
+function v2IsChecklist(list){
+  return !!(list && list.mode === 'checklist');
+}
+function v2UsesSimpleFlow(list){
+  return v2IsCatalog(list) || v2IsChecklist(list);
 }
 
 function normalizeData(d){
@@ -2296,8 +2366,13 @@ function renderV2GalleryTags(tags, maxWidth){
 }
 
 function v2AcquiredFor(sizeId, categoryId){
+  const list = activeV2List();
+  if(v2IsChecklist(list)){
+    const t = (list.targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId && !t.charId);
+    return (t && t.checked) ? (Number(t.target) || 0) : 0;
+  }
   let n = 0;
-  (activeV2List().lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+  (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
     if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId) n += Number(e.qty) || 0;
   }));
   return n;
@@ -2389,14 +2464,21 @@ function isV2CategoryCollapsed(categoryId){ return ui.collapsedSections['v2c-' +
 
 function v2GlobalTotalsForList(list){
   let acquired = 0, target = 0;
-  (list.targets || []).forEach(t => {
-    let a = 0;
-    (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
-      if((e.sizeIds || []).includes(t.sizeId) && e.categoryId === t.categoryId) a += Number(e.qty) || 0;
-    }));
-    target += t.target;
-    acquired += Math.min(a, t.target);
-  });
+  if(v2IsChecklist(list)){
+    (list.targets || []).forEach(t => {
+      target += t.target || 0;
+      acquired += t.checked ? (Number(t.target) || 0) : 0;
+    });
+  } else {
+    (list.targets || []).forEach(t => {
+      let a = 0;
+      (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+        if((e.sizeIds || []).includes(t.sizeId) && e.categoryId === t.categoryId) a += Number(e.qty) || 0;
+      }));
+      target += t.target;
+      acquired += Math.min(a, t.target);
+    });
+  }
   const pct = target > 0 ? Math.round((acquired / target) * 100) : 0;
   return { acquired, target, pct };
 }
@@ -2538,15 +2620,18 @@ function renderV2ListPicker(){
         ${lists.map(l => {
           const t = v2GlobalTotalsForList(l);
           const b = budgetTotalsForV2List(l);
-          return `<button class="cat-card" data-v2-select-list="${l.id}">
-            <div class="cat-icon" style="background:${l.color || 'var(--sage-dark)'};">${icon(l.icon || 'box','icon-lg')}</div>
+          return `<div class="cat-card" data-v2-select-list="${l.id}">
+            <button type="button" class="cat-card-gear" data-v2-list-type="${l.id}" onclick="event.stopPropagation()" aria-label="Type de liste">${icon('gear','icon-sm')}</button>
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:6px;">
+              <div class="cat-icon" style="background:${l.color || 'var(--sage-dark)'};">${icon(l.icon || 'box','icon-lg')}</div>
+              ${b.spent > 0 ? `<div style="display:flex; align-items:center; gap:4px; color:var(--sage-dark); font-weight:800; font-size:12px; margin-top:5px;">${icon('wallet','icon-sm')} ${formatPrice(b.spent)}</div>` : ''}
+            </div>
             <div>
               <div class="cat-name">${escapeHtml(l.name)}</div>
               <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
-              ${b.spent > 0 ? `<div class="cat-meta" style="display:flex; align-items:center; gap:4px; color:var(--sage-dark); font-weight:800; margin-top:1px;">${icon('wallet','icon-sm')} ${formatPrice(b.spent)}</div>` : ''}
             </div>
             <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
-          </button>`;
+          </div>`;
         }).join('')}
         <button class="cat-card add-card" id="btnAddV2List">${icon('plus','icon-lg')}<span>Nouvelle liste</span></button>
       </div>
@@ -2557,29 +2642,34 @@ function renderV2ListPicker(){
   const clearBtn = document.getElementById('btnClearSearchV2');
   if(clearBtn) clearBtn.onclick = () => { searchQueryV2 = ''; render(); };
   renderSearchStateV2Global();
-  document.querySelectorAll('[data-v2-select-list]').forEach(btn => {
-    btn.onclick = () => { ui.activeV2ListId = btn.dataset.v2SelectList; saveUi(); render(); };
+  document.querySelectorAll('[data-v2-select-list]').forEach(card => {
+    card.addEventListener('click', () => { ui.activeV2ListId = card.dataset.v2SelectList; saveUi(); render(); });
+  });
+  document.querySelectorAll('[data-v2-list-type]').forEach(btn => {
+    btn.onclick = () => openV2ListTypeModal(btn.dataset.v2ListType);
   });
   document.getElementById('btnAddV2List').onclick = () => {
     openModal(`
       <h2>Nouvelle liste</h2>
       <div class="field"><label class="field-label">Nom</label><input type="text" id="newV2ListName" placeholder="ex. Jouets"></div>
-      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:4px 0 6px;">
-        <input type="checkbox" id="newV2ListVetements" style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
-        <span style="font-size:13px; color:var(--ink);">Liste de vêtements (ajout par photo, plusieurs tailles par article)</span>
-      </label>
+      <label class="field-label" style="display:block; margin-bottom:6px;">Type de liste</label>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;" id="newV2ListTypeOptions">
+        ${renderV2ListTypeOptions('catalog')}
+      </div>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="mCancel">Annuler</button>
         <button class="btn btn-primary" id="mSave">Créer</button>
       </div>
     `);
     document.getElementById('mCancel').onclick = closeModal;
+    bindV2ListTypeOptions(document.getElementById('newV2ListTypeOptions'));
     document.getElementById('mSave').onclick = () => {
       const name = document.getElementById('newV2ListName').value.trim();
       if(!name){ showToast('Donnez un nom à la liste'); return; }
+      const chosen = document.querySelector('input[name="v2ListTypeChoice"]:checked').value;
       const list = buildEmptyV2List(name);
-      if(document.getElementById('newV2ListVetements').checked){
-        list.mode = 'lots';
+      list.mode = chosen;
+      if(chosen === 'lots'){
         list.sizeLabel = 'Taille';
         list.categoryLabel = 'Catégorie';
         list.icon = 'shirt';
@@ -2646,7 +2736,7 @@ function renderListsV2(){
   const list = activeV2List();
   if(!list){ renderV2ListPicker(); return; }
   const main = document.getElementById('mainContent');
-  const catalogMode = v2IsCatalog(list);
+  const catalogMode = v2UsesSimpleFlow(list);
   const photoRefs = catalogMode ? [] : collectV2LotPhotoRefs();
   const groupBy = catalogMode ? 'size' : (list.groupBy || 'size');
   main.innerHTML = `
@@ -2753,7 +2843,7 @@ function renderV2SizeCard(size){
   const collapsed = isV2SizeCollapsed(size.id);
   const cats = v2CategoriesForSize(size.id);
   const remaining = v2CategoriesNotInSize(size.id);
-  const showQuickAdd = v2IsCatalog(activeV2List()) || remaining.length;
+  const showQuickAdd = v2UsesSimpleFlow(activeV2List()) || remaining.length;
   return `
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-size-toggle="${size.id}">
@@ -2797,7 +2887,7 @@ function renderV2CategoryCard(cat){
 
 function renderV2QuickAdd(mode, fixedId, options){
   const list = activeV2List();
-  if(mode === 'size' && v2IsCatalog(list)){
+  if(mode === 'size' && v2UsesSimpleFlow(list)){
     return `
       <div class="v2-quickadd" data-v2-catalog-newcat="${fixedId}">
         <input type="text" class="v2-quickadd-newcat-input" placeholder="Nouvel ${list.categoryLabel.toLowerCase()}…" style="flex:1; min-width:0;">
@@ -2871,9 +2961,10 @@ function renderV2PairRow(sizeId, categoryId, label){
   const expanded = !!ui.expandedItems['v2-' + key];
   const entries = v2EntriesFor(sizeId, categoryId);
   const photoRefs = v2PhotoRefsForPair(sizeId, categoryId);
-  const mainChar = v2CharacteristicsForCategory(categoryId)[0] || null;
-  const charRows = mainChar ? v2CharTargetRows(sizeId, categoryId, mainChar, entries) : [];
   const list = activeV2List();
+  const checklistMode = v2IsChecklist(list);
+  const mainChar = checklistMode ? null : (v2CharacteristicsForCategory(categoryId)[0] || null);
+  const charRows = mainChar ? v2CharTargetRows(sizeId, categoryId, mainChar, entries) : [];
   const catalogMode = v2IsCatalog(list);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
@@ -2886,6 +2977,27 @@ function renderV2PairRow(sizeId, categoryId, label){
   </div>`;
   if(expanded){
     html += `<div class="item-expand">`;
+    if(checklistMode){
+      const t = (list.targets || []).find(t => t.sizeId === sizeId && t.categoryId === categoryId && !t.charId);
+      const checked = !!(t && t.checked);
+      const catObj = (list.categories || []).find(c => c.id === categoryId);
+      html += `
+        <div class="field">
+          <label class="field-label">Objectif</label>
+          <input type="number" min="0" data-v2-target="${key}" value="${target}">
+        </div>
+        <label class="v2-checklist-check">
+          <input type="checkbox" data-v2-checklist-toggle="${key}" ${checked ? 'checked' : ''}>
+          <span>Déjà dans la valise</span>
+        </label>
+        <div class="field">
+          <label class="field-label">Commentaire</label>
+          <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel…" style="min-height:40px;">${escapeHtml((catObj && catObj.comment) || '')}</textarea>
+        </div>
+      `;
+      html += `</div>`;
+      return html;
+    }
     if(catalogMode){
       const catObj = (list.categories || []).find(c => c.id === categoryId);
       html += `<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>
@@ -3066,6 +3178,18 @@ function bindListsV2Events(photoRefs){
     };
   });
 
+  document.querySelectorAll('[data-v2-checklist-toggle]').forEach(el => {
+    el.onchange = () => {
+      const [sizeId, categoryId] = el.dataset.v2ChecklistToggle.split('::');
+      const list = activeV2List();
+      if(!Array.isArray(list.targets)) list.targets = [];
+      let t = list.targets.find(t => t.sizeId === sizeId && t.categoryId === categoryId && !t.charId);
+      if(!t){ t = { sizeId, categoryId, target: 0 }; list.targets.push(t); }
+      t.checked = el.checked;
+      save(); render();
+    };
+  });
+
   document.querySelectorAll('[data-v2-cat-comment]').forEach(el => {
     el.addEventListener('change', () => {
       const categoryId = el.dataset.v2CatComment;
@@ -3137,7 +3261,7 @@ function bindListsV2Events(photoRefs){
     });
   });
 
-  if(v2IsCatalog(activeV2List())){
+  if(v2UsesSimpleFlow(activeV2List())){
     const addSizeBtn = document.getElementById('btnCatalogAddSize');
     if(addSizeBtn) addSizeBtn.onclick = () => {
       const list = activeV2List();
@@ -3581,10 +3705,10 @@ function openManageV2Modal(){
           <div class="field" style="flex:1;"><label class="field-label">Nom du 1er filtre (ex. Taille)</label><input type="text" id="v2SizeLabel" value="${escapeAttr(list.sizeLabel)}"></div>
           <div class="field" style="flex:1;"><label class="field-label">Nom du 2ᵉ filtre (ex. Catégorie)</label><input type="text" id="v2CategoryLabel" value="${escapeAttr(list.categoryLabel)}"></div>
         </div>
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:2px 0 10px;">
-          <input type="checkbox" id="v2ListVetements" ${list.mode === 'lots' ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
-          <span style="font-size:13px; color:var(--ink);">Liste de vêtements (ajout par photo, plusieurs tailles par article)</span>
-        </label>
+        <label class="field-label" style="display:block; margin:4px 0 6px;">Type de liste</label>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;" id="v2ListTypeOptionsManage">
+          ${renderV2ListTypeOptions(list.mode)}
+        </div>
         <button type="button" class="chip-btn" id="btnSaveV2General" style="margin-bottom:10px;">Enregistrer ces noms</button>
         ${(data.v2lists || []).length > 1 ? `<button type="button" class="chip-btn danger" id="btnDeleteV2List">${icon('trash','icon-sm')} Supprimer cette liste</button>` : ''}
       </div>
@@ -3623,13 +3747,14 @@ function openManageV2Modal(){
     </div>
   `);
   document.getElementById('mCancel').onclick = closeModal;
+  bindV2ListTypeOptions(document.getElementById('v2ListTypeOptionsManage'));
   document.getElementById('btnSaveV2General').onclick = () => {
     const name = document.getElementById('v2ListName').value.trim();
     const sizeLabel = document.getElementById('v2SizeLabel').value.trim();
     const categoryLabel = document.getElementById('v2CategoryLabel').value.trim();
     if(!name || !sizeLabel || !categoryLabel){ showToast('Tous les champs sont requis'); return; }
     list.name = name; list.sizeLabel = sizeLabel; list.categoryLabel = categoryLabel;
-    list.mode = document.getElementById('v2ListVetements').checked ? 'lots' : 'catalog';
+    list.mode = document.querySelector('input[name="v2ListTypeChoice"]:checked').value;
     save(); closeModal(); render(); showToast('Paramètres enregistrés');
   };
   const deleteListBtn = document.getElementById('btnDeleteV2List');
