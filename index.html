@@ -213,15 +213,9 @@
   .cat-card{
     background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);
     padding:14px; box-shadow:var(--shadow); cursor:pointer; text-align:left;
-    display:flex; flex-direction:column; gap:10px; position:relative;
+    display:flex; flex-direction:column; gap:10px;
   }
   .cat-card:active{transform:scale(0.98);}
-  .cat-card-gear{
-    position:absolute; top:6px; right:6px; width:26px; height:26px; z-index:2;
-    display:flex; align-items:center; justify-content:center;
-    background:none; border:none; color:var(--muted-2); cursor:pointer; padding:0;
-  }
-  .cat-card-gear:active{color:var(--muted);}
   .v2-list-type-option{
     display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:var(--r-md);
     border:1.5px solid var(--border); cursor:pointer;
@@ -978,28 +972,6 @@ function bindV2ListTypeOptions(container){
       radio.closest('.v2-list-type-option').classList.add('selected');
     };
   });
-}
-function openV2ListTypeModal(listId){
-  const list = (data.v2lists || []).find(l => l.id === listId);
-  if(!list) return;
-  openModal(`
-    <h2>Type de liste</h2>
-    <p style="color:var(--muted); font-size:13px; margin:-6px 0 12px;">${escapeHtml(list.name)}</p>
-    <div style="display:flex; flex-direction:column; gap:8px;" id="v2ListTypeOptions">
-      ${renderV2ListTypeOptions(list.mode)}
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Enregistrer</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  bindV2ListTypeOptions(document.getElementById('v2ListTypeOptions'));
-  document.getElementById('mSave').onclick = () => {
-    const chosen = document.querySelector('input[name="v2ListTypeChoice"]:checked').value;
-    list.mode = chosen;
-    save(); closeModal(); render(); showToast('Type de liste mis à jour');
-  };
 }
 function v2IsCatalog(list){
   return !!(list && list.mode === 'catalog');
@@ -2620,8 +2592,7 @@ function renderV2ListPicker(){
         ${lists.map(l => {
           const t = v2GlobalTotalsForList(l);
           const b = budgetTotalsForV2List(l);
-          return `<div class="cat-card" data-v2-select-list="${l.id}">
-            <button type="button" class="cat-card-gear" data-v2-list-type="${l.id}" onclick="event.stopPropagation()" aria-label="Type de liste">${icon('gear','icon-sm')}</button>
+          return `<button type="button" class="cat-card" data-v2-select-list="${l.id}">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:6px;">
               <div class="cat-icon" style="background:${l.color || 'var(--sage-dark)'};">${icon(l.icon || 'box','icon-lg')}</div>
               ${b.spent > 0 ? `<div style="display:flex; align-items:center; gap:4px; color:var(--sage-dark); font-weight:800; font-size:12px; margin-top:5px;">${icon('wallet','icon-sm')} ${formatPrice(b.spent)}</div>` : ''}
@@ -2631,7 +2602,7 @@ function renderV2ListPicker(){
               <div class="cat-meta">${t.target ? t.acquired + ' / ' + t.target + ' articles' : 'Pas encore d’objectif'}</div>
             </div>
             <div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div>
-          </div>`;
+          </button>`;
         }).join('')}
         <button class="cat-card add-card" id="btnAddV2List">${icon('plus','icon-lg')}<span>Nouvelle liste</span></button>
       </div>
@@ -2643,10 +2614,7 @@ function renderV2ListPicker(){
   if(clearBtn) clearBtn.onclick = () => { searchQueryV2 = ''; render(); };
   renderSearchStateV2Global();
   document.querySelectorAll('[data-v2-select-list]').forEach(card => {
-    card.addEventListener('click', () => { ui.activeV2ListId = card.dataset.v2SelectList; saveUi(); render(); });
-  });
-  document.querySelectorAll('[data-v2-list-type]').forEach(btn => {
-    btn.onclick = () => openV2ListTypeModal(btn.dataset.v2ListType);
+    card.onclick = () => { ui.activeV2ListId = card.dataset.v2SelectList; saveUi(); render(); };
   });
   document.getElementById('btnAddV2List').onclick = () => {
     openModal(`
