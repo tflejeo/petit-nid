@@ -2977,7 +2977,11 @@ function renderV2PairRow(sizeId, categoryId, label){
     if(mainChar){
       const indiffRow = charRows.find(r => !r.charId);
       const indiffEntries = entries.filter(({ entry }) => !(entry.charValues && entry.charValues[mainChar.id]));
-      html += renderV2CharGroup(key, 'v2g-' + key + '::' + mainChar.id + '::indiff', indiffRow, indiffEntries, mainChar.id);
+      const anyValueHasTarget = mainChar.values.some(v => (Number(v2TargetForValue(sizeId, categoryId, mainChar.id, v.id)) || 0) > 0);
+      const hideIndiff = anyValueHasTarget && (indiffRow.target || 0) === 0 && indiffEntries.length === 0;
+      if(!hideIndiff){
+        html += renderV2CharGroup(key, 'v2g-' + key + '::' + mainChar.id + '::indiff', indiffRow, indiffEntries, mainChar.id);
+      }
       mainChar.values.forEach(v => {
         const row = charRows.find(r => r.charId === mainChar.id && r.valueId === v.id);
         const groupEntries = entries.filter(({ entry }) => entry.charValues && entry.charValues[mainChar.id] === v.id);
