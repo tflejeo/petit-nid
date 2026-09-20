@@ -151,9 +151,15 @@
   .guest-need-comment{font-size:12.5px; color:var(--muted); font-style:italic;}
   .guest-need-photos{display:flex; gap:5px; flex-wrap:wrap;}
   .guest-need-photo{width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid var(--border); background:#EFE8D8;}
-  .guest-claim-btn{width:100%; justify-content:center;}
-  .guest-claimed-badge{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--sage-tint); color:var(--sage-dark); font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:var(--r-sm);}
-  .guest-claimed-badge button{background:none; border:none; color:var(--terracotta-dark); font-weight:800; font-size:12px; cursor:pointer; padding:2px 4px;}
+  .guest-claim-chip{font-size:12px; padding:6px 10px; margin-top:2px;}
+  .guest-claimed-pill{display:inline-flex; align-items:center; gap:4px; background:var(--sage-tint); color:var(--sage-dark); font-weight:800; font-size:11.5px; padding:5px 10px; border-radius:999px; margin-top:2px;}
+  .guest-claimed-pill button{background:none; border:none; color:var(--terracotta-dark); font-weight:800; font-size:11.5px; cursor:pointer; padding:0;}
+  .guest-cat-group{margin-bottom:8px; border:1px solid var(--border); border-radius:var(--r-sm); padding:2px 10px;}
+  .guest-cat-group .v2-group-heading-toggle{text-transform:none; font-size:13.5px; color:var(--ink);}
+  .guest-value-row{padding:8px 0; border-top:1px solid var(--border);}
+  .guest-value-row:first-child{border-top:none;}
+  .guest-value-top{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;}
+  .guest-value-label{font-weight:700; font-size:13px; color:var(--sage-dark);}
   .reserved-badge{display:inline-flex; align-items:center; gap:4px; background:var(--lavender); color:#fff; font-size:11px; font-weight:800; padding:4px 9px; border-radius:999px; flex-shrink:0;}
   #notifyBtn{position:relative;}
   .notif-badge{
@@ -1361,6 +1367,55 @@ const PREGNANCY_MILESTONES = [
   { week: 40, text: 'Vous êtes arrivés au terme prévu !' },
   { week: 41, text: 'Le terme est dépassé — le grand jour ne devrait plus tarder.' }
 ];
+const DAILY_QUOTES = [
+  "Un enfant, c'est un peu de nous qui continue après nous.",
+  "Les bras d'une mère sont faits de tendresse, l'enfant y dort profondément.",
+  "Éduquer un enfant, ce n'est pas remplir un vase, c'est allumer un feu.",
+  "Chaque enfant a besoin d'une personne convaincue qu'il en vaut la peine.",
+  "La patience est la plus belle preuve d'amour envers un enfant.",
+  "On n'élève pas un enfant pour soi, mais pour le monde qu'il habitera.",
+  "Le plus beau cadeau à faire à un enfant, c'est du temps.",
+  "Devenir parent, c'est accepter que son cœur batte désormais hors de soi.",
+  "Un foyer heureux se construit avec beaucoup de petits riens.",
+  "Les enfants ont plus besoin de modèles que de critiques.",
+  "Grandir, c'est apprendre petit à petit à voler de ses propres ailes.",
+  "L'amour d'un parent ne se mesure pas, il se donne sans compter.",
+  "Chaque grossesse écrit une histoire qui n'appartient qu'à elle.",
+  "Un enfant qui se sent aimé apprend plus vite à aimer les autres.",
+  "Être parent, c'est apprendre chaque jour un métier qu'on n'a jamais appris.",
+  "La première leçon d'un enfant, c'est de voir comment on s'aime autour de lui.",
+  "Il n'existe pas de parent parfait, seulement des parents qui essaient.",
+  "Un sourire de bébé efface d'un coup toutes les nuits sans sommeil.",
+  "Éduquer, c'est donner des racines et des ailes.",
+  "On ne devient pas parent en un jour, on le devient chaque jour un peu plus.",
+  "La confiance que l'on donne à un enfant, il la porte toute sa vie.",
+  "Les tout-petits nous apprennent à voir le monde s'émerveiller à nouveau.",
+  "Rien ne prépare vraiment à la joie que donne un enfant.",
+  "Un parent attentif vaut mille conseils.",
+  "L'enfance est un pays que l'on ne quitte jamais tout à fait.",
+  "Ce que l'on sème dans l'enfance, on le récolte toute une vie.",
+  "Aimer un enfant, c'est lui apprendre à se passer un jour de nous.",
+  "Chaque étape de la grossesse rapproche un peu plus d'une rencontre unique.",
+  "Un enfant ne se souvient pas de ce qu'on lui a dit, mais de ce qu'il a ressenti.",
+  "Le calme d'un parent devient souvent la sécurité d'un enfant.",
+  "Neuf mois pour attendre, une vie entière pour aimer.",
+  "Les plus grandes leçons de vie s'apprennent souvent à hauteur d'enfant.",
+  "Materner, c'est aussi apprendre à se faire confiance.",
+  "Chaque enfant grandit à son rythme — le nôtre est d'apprendre à l'accepter.",
+  "L'amour inconditionnel se construit dès les premiers regards échangés.",
+  "Un bébé qui arrive change tout, sauf l'essentiel : l'envie de bien faire.",
+  "Petit à petit, un foyer s'agrandit de tendresse autant que de monde.",
+  "La meilleure préparation à la parentalité reste la bienveillance envers soi-même.",
+  "Un enfant heureux commence par des parents qui s'autorisent à souffler.",
+  "Ce qui compte n'est pas d'être un parent parfait, mais un parent présent."
+];
+function todaysQuote(){
+  const start = new Date(2026, 0, 1);
+  const today = new Date();
+  const dayIndex = Math.floor((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - start) / 86400000);
+  const idx = ((dayIndex % DAILY_QUOTES.length) + DAILY_QUOTES.length) % DAILY_QUOTES.length;
+  return DAILY_QUOTES[idx];
+}
 function currentMilestone(){
   const { weeks } = pregnancyProgress();
   let current = PREGNANCY_MILESTONES[0];
@@ -1420,7 +1475,6 @@ function renderDashboard(){
   const days = daysUntil(data.dueDate);
   const g = v2GlobalTotalsAcrossLists();
   const preg = pregnancyProgress();
-  const milestone = currentMilestone();
   const budget = budgetTotalsV2Global();
   let countdownText, countdownNum;
   if(days > 0){ countdownNum = days; countdownText = days === 1 ? 'jour avant l’arrivée' : 'jours avant l’arrivée'; }
@@ -1449,7 +1503,7 @@ function renderDashboard(){
           <span class="pct" style="color:var(--terracotta-dark)">${preg.pct}% · sem. ${preg.weeks}/${preg.totalWeeks}</span>
         </div>
         <div class="track"><div class="fill" style="width:${preg.pct}%; background:var(--terracotta)"></div></div>
-        <div class="milestone-note">${icon('sparkle','icon-sm')} ${escapeHtml(milestone.text)}</div>
+        <div class="milestone-note">${icon('sparkle','icon-sm')} ${escapeHtml(todaysQuote())}</div>
       </div>
     </div>
 
@@ -4525,6 +4579,26 @@ function renderGuestListPicker(){
   });
 }
 
+let guestCollapsed = {};
+
+function guestNeedStatusHtml(n){
+  return n.remaining <= 0 ? '✓ complet' : 'encore ' + n.remaining;
+}
+function guestNeedExtrasHtml(n){
+  const resKey = guestReservationKey(guestActiveListId, n.sizeId, n.categoryId, n.charId, n.valueId);
+  const res = guestReservations[resKey];
+  const myName = (localStorage.getItem('nidouxGuestName') || '').toLowerCase();
+  const isMine = res && (res.name || '').toLowerCase() === myName;
+  const complete = n.remaining <= 0;
+  return `
+    ${n.photoIds.length ? `<div class="guest-need-photos">${n.photoIds.map(id => `<img data-photo-src="${id}" alt="" class="guest-need-photo">`).join('')}</div>` : ''}
+    ${n.comment ? `<div class="guest-need-comment">${escapeHtml(n.comment)}</div>` : ''}
+    ${complete ? '' : (res ? `
+      <span class="guest-claimed-pill">${isMine ? 'Réservé par vous' : 'Réservé'}${isMine ? ` <button type="button" data-guest-unclaim="${resKey}">Annuler</button>` : ''}</span>
+    ` : `<button type="button" class="chip-btn guest-claim-chip" data-guest-claim="${resKey}">🎁 Je m'en occupe</button>`)}
+  `;
+}
+
 function renderGuestListDetail(){
   const main = document.getElementById('mainContent');
   const list = (guestData.v2lists || []).find(l => l.id === guestActiveListId);
@@ -4534,27 +4608,41 @@ function renderGuestListDetail(){
   needs.forEach(n => { (bySize[n.sizeId] = bySize[n.sizeId] || []).push(n); });
   const sizeOrder = (list.sizes || []).map(s => s.id).filter(id => bySize[id]);
 
-  function needRowHtml(n){
-    const resKey = guestReservationKey(list.id, n.sizeId, n.categoryId, n.charId, n.valueId);
-    const res = guestReservations[resKey];
-    const myName = (localStorage.getItem('nidouxGuestName') || '').toLowerCase();
-    const isMine = res && (res.name || '').toLowerCase() === myName;
-    const label = n.valueLabel ? `${n.categoryLabel} · ${n.valueLabel}` : n.categoryLabel;
-    const complete = n.remaining <= 0;
-    return `
-      <div class="v2-line-card guest-need-row">
+  function categoryGroupHtml(sizeId, categoryId, groupNeeds){
+    const catLabel = groupNeeds[0].categoryLabel;
+    if(groupNeeds.length === 1 && !groupNeeds[0].charId){
+      const n = groupNeeds[0];
+      return `<div class="v2-line-card guest-need-row">
         <div class="guest-need-top">
-          <span class="guest-need-name">${escapeHtml(label)}</span>
-          <span class="guest-need-qty">${complete ? '✓ complet' : 'encore ' + n.remaining}</span>
+          <span class="guest-need-name">${escapeHtml(catLabel)}</span>
+          <span class="guest-need-qty">${guestNeedStatusHtml(n)}</span>
         </div>
-        ${n.photoIds.length ? `<div class="guest-need-photos">${n.photoIds.map(id => `<img data-photo-src="${id}" alt="" class="guest-need-photo">`).join('')}</div>` : ''}
-        ${n.comment ? `<div class="guest-need-comment">${escapeHtml(n.comment)}</div>` : ''}
-        ${complete ? '' : (res ? `
-          <div class="guest-claimed-badge">
-            <span>${isMine ? 'Réservé par vous' : 'Réservé par ' + escapeHtml(res.name)}</span>
-            ${isMine ? `<button type="button" data-guest-unclaim="${resKey}">Annuler</button>` : ''}
-          </div>
-        ` : `<button type="button" class="btn btn-primary guest-claim-btn" data-guest-claim="${resKey}">${icon('check','icon-sm')} Je m'en occupe</button>`)}
+        ${guestNeedExtrasHtml(n)}
+      </div>`;
+    }
+    const groupKey = 'g-' + sizeId + '::' + categoryId;
+    const explicit = guestCollapsed[groupKey];
+    const anyRemaining = groupNeeds.some(n => n.remaining > 0);
+    const collapsed = (explicit === true || explicit === false) ? explicit : !anyRemaining;
+    const totalRemaining = groupNeeds.reduce((s, n) => s + n.remaining, 0);
+    return `
+      <div class="v2-char-group guest-cat-group">
+        <div class="v2-group-heading-toggle ${collapsed ? '' : 'open'}" data-guest-group-toggle="${groupKey}">
+          <span class="v2-group-label">${escapeHtml(catLabel)}</span>
+          <span class="guest-need-qty">${totalRemaining > 0 ? 'encore ' + totalRemaining : '✓ complet'}</span>
+          <span class="chev">${icon('chevronDown','icon-sm')}</span>
+        </div>
+        <div class="v2-char-group-body ${collapsed ? '' : 'open'}">
+          ${groupNeeds.map(n => `
+            <div class="guest-value-row">
+              <div class="guest-value-top">
+                <span class="guest-value-label">${escapeHtml(n.valueLabel || 'Indifférent')}</span>
+                <span class="guest-need-qty">${guestNeedStatusHtml(n)}</span>
+              </div>
+              ${guestNeedExtrasHtml(n)}
+            </div>
+          `).join('')}
+        </div>
       </div>
     `;
   }
@@ -4565,13 +4653,25 @@ function renderGuestListDetail(){
       <h1 style="text-align:left; font-size:19px;">${escapeHtml(list.name)}</h1>
     </div>
     <div style="padding:6px 16px 24px;">
-      ${needs.length ? sizeOrder.map(sizeId => `
-        <div class="section-heading">${escapeHtml(guestLabel(list.sizes, sizeId))}</div>
-        ${bySize[sizeId].map(needRowHtml).join('')}
-      `).join('') : `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun objectif renseigné pour cette liste pour l’instant.</div></div>`}
+      ${needs.length ? sizeOrder.map(sizeId => {
+        const byCategory = {};
+        bySize[sizeId].forEach(n => { (byCategory[n.categoryId] = byCategory[n.categoryId] || []).push(n); });
+        const catIds = Object.keys(byCategory).sort((a, b) => byCategory[a][0].categoryLabel.localeCompare(byCategory[b][0].categoryLabel, 'fr'));
+        return `
+          <div class="section-heading">${escapeHtml(guestLabel(list.sizes, sizeId))}</div>
+          ${catIds.map(catId => categoryGroupHtml(sizeId, catId, byCategory[catId])).join('')}
+        `;
+      }).join('') : `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun objectif renseigné pour cette liste pour l’instant.</div></div>`}
     </div>
   `;
   document.getElementById('guestBack').onclick = () => { guestActiveListId = null; renderGuestView(); };
+  document.querySelectorAll('[data-guest-group-toggle]').forEach(el => {
+    el.onclick = () => {
+      const key = el.dataset.guestGroupToggle;
+      guestCollapsed[key] = el.classList.contains('open');
+      renderGuestView();
+    };
+  });
   document.querySelectorAll('[data-guest-claim]').forEach(btn => {
     btn.onclick = () => {
       const resKey = btn.dataset.guestClaim;
