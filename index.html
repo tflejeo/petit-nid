@@ -170,13 +170,15 @@
   }
 
   .progress-block{margin-top:16px;}
-  .size-row{
-    display:flex; justify-content:space-between; align-items:center;
-    margin-top:12px; padding-top:12px; border-top:1px solid var(--border);
-    color:var(--ink); cursor:pointer;
+  .theme-color-grid{display:flex; flex-wrap:wrap; gap:14px;}
+  .theme-color-item{display:flex; flex-direction:column; align-items:center; gap:5px; font-size:11.5px; color:var(--muted); font-weight:700;}
+  .theme-color-item input[type=color]{
+    width:44px; height:44px; border:2px solid var(--border); border-radius:999px; padding:0;
+    cursor:pointer; background:none; -webkit-appearance:none; appearance:none;
   }
-  .size-row .icon{color:var(--muted-2); flex-shrink:0;}
-  .size-value{font-weight:700; font-size:14px; margin-top:2px;}
+  .theme-color-item input[type=color]::-webkit-color-swatch-wrapper{padding:0; border-radius:999px;}
+  .theme-color-item input[type=color]::-webkit-color-swatch{border:none; border-radius:999px;}
+  .theme-color-item input[type=color]::-moz-color-swatch{border:none; border-radius:999px;}
   .milestone-note{
     display:flex; align-items:flex-start; gap:6px; margin-top:10px;
     font-size:12.5px; color:var(--sage-dark); font-weight:700; line-height:1.4;
@@ -817,8 +819,6 @@ function buildDefaultData(){
     todos: [],
     headerTagline: 'votre liste de naissance',
     homeTodoCount: 3,
-    sizeFruit: '',
-    sizeAnimal: '',
     v2lists: buildDefaultV2Lists()
   };
 }
@@ -841,7 +841,43 @@ const UI_STORAGE_KEY = 'petitNidUi_v1';
 function newId(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
 
 // `data` is the shared content, synced to Firebase for both parents.
+const THEME_DEFAULTS = {
+  primary: '#5D7A54',
+  secondary: '#C06E48',
+  accent1: '#E3A44F',
+  accent2: '#B79BCB',
+  bg: '#FAF6EC'
+};
+function lightenHex(hex, amount){
+  hex = String(hex || '').replace('#', '');
+  if(hex.length !== 6) return hex ? '#' + hex : '#FFFFFF';
+  const r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
+  const mix = (c) => Math.max(0, Math.min(255, Math.round(c + (255 - c) * amount)));
+  return '#' + [mix(r), mix(g), mix(b)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+function applyTheme(themeObj){
+  const t = themeObj || {};
+  const primary = t.primary || THEME_DEFAULTS.primary;
+  const secondary = t.secondary || THEME_DEFAULTS.secondary;
+  const accent1 = t.accent1 || THEME_DEFAULTS.accent1;
+  const accent2 = t.accent2 || THEME_DEFAULTS.accent2;
+  const bg = t.bg || THEME_DEFAULTS.bg;
+  const root = document.documentElement.style;
+  root.setProperty('--sage-dark', primary);
+  root.setProperty('--sage', lightenHex(primary, 0.25));
+  root.setProperty('--sage-tint', lightenHex(primary, 0.88));
+  root.setProperty('--terracotta-dark', secondary);
+  root.setProperty('--terracotta', lightenHex(secondary, 0.25));
+  root.setProperty('--terracotta-tint', lightenHex(secondary, 0.9));
+  root.setProperty('--amber', accent1);
+  root.setProperty('--amber-tint', lightenHex(accent1, 0.88));
+  root.setProperty('--lavender', accent2);
+  root.setProperty('--lavender-tint', lightenHex(accent2, 0.9));
+  root.setProperty('--bg', bg);
+}
+
 let data = loadLocalData();
+applyTheme(data.theme);
 // `ui` is per-device navigation state (current screen, open sections) — never synced.
 let ui = loadUi();
 let searchQueryV2 = '';
@@ -1012,6 +1048,7 @@ function normalizeData(d){
   delete d.v2CategoriesSeededV2;
   if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
   d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
+  if(!d.theme || typeof d.theme !== 'object') d.theme = {};
   normalizeV2(d);
   if(!Array.isArray(d.synonyms)) d.synonyms = [];
   d.synonyms.forEach(g => { g.terms = Array.isArray(g.terms) ? g.terms.filter(Boolean) : []; });
@@ -1027,8 +1064,6 @@ function normalizeData(d){
   if(!d.pregnancyStart) d.pregnancyStart = '2026-06-25';
   if(typeof d.headerTagline !== 'string') d.headerTagline = 'votre liste de naissance';
   if(typeof d.homeTodoCount !== 'number') d.homeTodoCount = 3;
-  if(typeof d.sizeFruit !== 'string') d.sizeFruit = '';
-  if(typeof d.sizeAnimal !== 'string') d.sizeAnimal = '';
   return d;
 }
 
@@ -1291,6 +1326,7 @@ function handleRemoteValue(snapshot){
   if(remoteStr === lastSentJson) return; // c'est l'écho de notre propre écriture
   const previousData = data;
   data = normalizeData(remote);
+  applyTheme(data.theme);
   const migrated = migrateLegacyV2Photos();
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
   if(wasBootstrapped) notifyNewV2Activity(previousData, data);
@@ -1490,13 +1526,6 @@ function renderDashboard(){
           <div class="hero-date">Terme prévu le ${formatDate(data.dueDate)}</div>
         </div>
       </div>
-      <div class="size-row" id="btnEditSize">
-        <div>
-          <div class="hero-label">Taille du bébé cette semaine</div>
-          <div class="size-value">${(data.sizeFruit || data.sizeAnimal) ? [data.sizeFruit, data.sizeAnimal].filter(Boolean).map(escapeHtml).join(' · ') : 'Pas encore renseignée'}</div>
-        </div>
-        ${icon('pencil','icon-sm')}
-      </div>
       <div class="progress-block">
         <div class="progress-head">
           <span class="label">Grossesse</span>
@@ -1528,7 +1557,6 @@ function renderDashboard(){
   renderV2PhotoGalleryDash(document.getElementById('v2GalleryDash'));
   renderEchoDashboardGallery(document.getElementById('echoGalleryDash'));
   renderHomeTodos(document.getElementById('homeTodos'));
-  document.getElementById('btnEditSize').onclick = openSizeModal;
 }
 
 function renderCatGrid(container){
@@ -2107,6 +2135,33 @@ function openSettingsPanel(){
       </div>
     </div>
     <div class="field">
+      <label class="field-label">Palette de couleurs de l'app</label>
+      <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">S'applique pour tout le monde, sur tous les appareils.</p>
+      <div class="theme-color-grid">
+        <label class="theme-color-item">
+          <input type="color" id="thPrimary" value="${(data.theme && data.theme.primary) || THEME_DEFAULTS.primary}">
+          <span>Principale</span>
+        </label>
+        <label class="theme-color-item">
+          <input type="color" id="thSecondary" value="${(data.theme && data.theme.secondary) || THEME_DEFAULTS.secondary}">
+          <span>Secondaire</span>
+        </label>
+        <label class="theme-color-item">
+          <input type="color" id="thAccent1" value="${(data.theme && data.theme.accent1) || THEME_DEFAULTS.accent1}">
+          <span>Accent 1</span>
+        </label>
+        <label class="theme-color-item">
+          <input type="color" id="thAccent2" value="${(data.theme && data.theme.accent2) || THEME_DEFAULTS.accent2}">
+          <span>Accent 2</span>
+        </label>
+        <label class="theme-color-item">
+          <input type="color" id="thBg" value="${(data.theme && data.theme.bg) || THEME_DEFAULTS.bg}">
+          <span>Fond</span>
+        </label>
+      </div>
+      <button type="button" class="text-btn muted" id="btnResetTheme" style="margin-top:6px;">Réinitialiser la palette par défaut</button>
+    </div>
+    <div class="field">
       <label class="field-label">Sauvegarde</label>
       <div id="backupInfo" style="font-size:12.5px; color:var(--muted); margin-bottom:8px;">Vérification…</div>
       <div style="display:flex; gap:8px;">
@@ -2130,6 +2185,13 @@ function openSettingsPanel(){
     input.value = '';
     renderSynonymListInto(document.getElementById('synonymList'));
   };
+  document.getElementById('btnResetTheme').onclick = () => {
+    document.getElementById('thPrimary').value = THEME_DEFAULTS.primary;
+    document.getElementById('thSecondary').value = THEME_DEFAULTS.secondary;
+    document.getElementById('thAccent1').value = THEME_DEFAULTS.accent1;
+    document.getElementById('thAccent2').value = THEME_DEFAULTS.accent2;
+    document.getElementById('thBg').value = THEME_DEFAULTS.bg;
+  };
   document.getElementById('btnSaveBackup').onclick = saveBackupNow;
   document.getElementById('btnRestoreBackup').onclick = restoreFromBackup;
   refreshBackupInfo();
@@ -2142,6 +2204,14 @@ function openSettingsPanel(){
     if(due) data.dueDate = due;
     data.headerTagline = document.getElementById('sTagline').value;
     data.homeTodoCount = clamp(parseInt(document.getElementById('sTodoCount').value || '0', 10), 0, 50);
+    data.theme = {
+      primary: document.getElementById('thPrimary').value,
+      secondary: document.getElementById('thSecondary').value,
+      accent1: document.getElementById('thAccent1').value,
+      accent2: document.getElementById('thAccent2').value,
+      bg: document.getElementById('thBg').value
+    };
+    applyTheme(data.theme);
     save(); closeModal(); render(); showToast('Paramètres enregistrés');
   };
 }
@@ -4428,25 +4498,6 @@ function openConfirmModal(title, msg, onConfirm, confirmLabel, confirmIconName){
   document.getElementById('mConfirm').onclick = onConfirm;
 }
 
-function openSizeModal(){
-  openModal(`
-    <h2>Taille du bébé</h2>
-    <p style="color:var(--muted); font-size:13.5px;">Un fruit et un animal pour visualiser la taille de bébé cette semaine.</p>
-    <div class="field"><label class="field-label">Fruit</label><input type="text" id="szFruit" placeholder="Ex. 🥭 Mangue" value="${escapeAttr(data.sizeFruit || '')}"></div>
-    <div class="field"><label class="field-label">Animal</label><input type="text" id="szAnimal" placeholder="Ex. 🐱 Chaton" value="${escapeAttr(data.sizeAnimal || '')}"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="mCancel">Annuler</button>
-      <button class="btn btn-primary" id="mSave">Enregistrer</button>
-    </div>
-  `);
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSave').onclick = () => {
-    data.sizeFruit = document.getElementById('szFruit').value.trim();
-    data.sizeAnimal = document.getElementById('szAnimal').value.trim();
-    save(); closeModal(); render();
-  };
-}
-
 /* ---------- Mode invité (partage familial de la liste de naissance) ---------- */
 let guestData = null;
 let guestReservations = {};
@@ -4529,6 +4580,7 @@ function guestFirebaseInit(){
   photoDbRef = firebase.database().ref('petitNidPhotos');
   firebase.database().ref('petitNidData').on('value', snap => {
     guestData = snap.val();
+    if(guestData) applyTheme(guestData.theme);
     renderGuestView();
   });
   firebase.database().ref('petitNidReservations').on('value', snap => {
