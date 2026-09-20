@@ -185,7 +185,7 @@
   .unit-del-btn{flex-shrink:0; padding:4px !important; width:20px;}
   .unit-photos{display:flex; flex-wrap:nowrap; gap:5px; align-items:center; flex:1 1 auto; min-width:0;}
   .unit-photo-thumb{position:relative; width:40px; height:40px; flex-shrink:0;}
-  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation;}
+  .unit-photo-thumb img{width:100%; height:100%; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:zoom-in; display:block; touch-action:manipulation; background:#EFE8D8;}
   .unit-photo-add-sm{
     width:40px; height:40px; border-radius:8px; border:1.5px dashed var(--muted-2); flex-shrink:0;
     display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:#fff;
@@ -430,7 +430,7 @@
     width:44px; height:44px; border-radius:9px; border:1px solid var(--border); padding:0;
     cursor:pointer; overflow:hidden; flex-shrink:0; background:#fff;
   }
-  .v2-row-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .v2-row-thumb img{width:100%; height:100%; object-fit:cover; display:block; background:#EFE8D8;}
   .v2-row-thumb-more{
     display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800;
     color:var(--sage-dark); background:var(--sage-tint);
@@ -1054,6 +1054,56 @@ let pronosRef = null;
 let adminRef = null;
 let resultRef = null;
 let backupRef = null;
+let photoDbRef = null;
+const photoCache = new Map(); // id -> data URI, une fois recupere depuis Firebase
+const photoWaiters = new Map(); // id -> liste de callbacks en attente pendant le chargement
+
+// Récupère le contenu d'une photo par son id : instantané si déjà en cache,
+// sinon un seul appel réseau par id (mutualisé si demandé plusieurs fois en parallèle).
+function getPhotoSrc(id, cb){
+  if(!id){ cb(''); return; }
+  if(typeof id === 'string' && id.indexOf('data:') === 0){ cb(id); return; } // ancien format (pas encore migré) : c'est déjà la donnée
+  if(photoCache.has(id)){ cb(photoCache.get(id)); return; }
+  if(photoWaiters.has(id)){ photoWaiters.get(id).push(cb); return; }
+  photoWaiters.set(id, [cb]);
+  if(!photoDbRef){ cb(''); photoWaiters.delete(id); return; }
+  photoDbRef.child(id).once('value').then(snap => {
+    const val = snap.val() || '';
+    photoCache.set(id, val);
+    (photoWaiters.get(id) || []).forEach(fn => fn(val));
+    photoWaiters.delete(id);
+  }).catch(() => {
+    (photoWaiters.get(id) || []).forEach(fn => fn(''));
+    photoWaiters.delete(id);
+  });
+}
+// Version Promise, pratique pour résoudre plusieurs photos d'un coup (lightbox, modales).
+function getPhotoSrcAsync(id){
+  return new Promise(resolve => getPhotoSrc(id, resolve));
+}
+// Stocke une nouvelle photo dans son propre nœud Firebase (jamais dans l'arbre
+// principal synchronisé), et renvoie tout de suite son id — l'écriture réseau
+// se fait en tâche de fond.
+function uploadPhoto(dataUri){
+  const id = newId();
+  photoCache.set(id, dataUri);
+  if(photoDbRef) photoDbRef.child(id).set(dataUri).catch(() => {});
+  return id;
+}
+function deletePhotoRef(id){
+  if(!id || (typeof id === 'string' && id.indexOf('data:') === 0)) return;
+  photoCache.delete(id);
+  if(photoDbRef) photoDbRef.child(id).remove().catch(() => {});
+}
+// À appeler après chaque rendu contenant des <img data-photo-src="id"> : remplit
+// leur src au fur et à mesure que chaque photo arrive (cache ou réseau).
+function hydratePhotoImages(root){
+  (root || document).querySelectorAll('[data-photo-src]').forEach(img => {
+    const id = img.dataset.photoSrc;
+    if(!id) return;
+    getPhotoSrc(id, src => { if(src) img.src = src; });
+  });
+}
 let pronosList = [];
 let birthResult = null;
 const ADMIN_UNLOCKED_KEY = 'petitNidAdminUnlocked_v1';
@@ -1097,6 +1147,7 @@ function initFirebase(){
       if(ui.view === 'prono' && isAdminUnlocked) render();
     });
     backupRef = firebase.database().ref('petitNidBackup');
+    photoDbRef = firebase.database().ref('petitNidPhotos');
     firebase.database().ref('.info/connected').on('value', snap => {
       updateConnectionBadge(snap.val() === true ? 'online' : 'offline');
     });
@@ -1175,6 +1226,31 @@ function notifyNewV2Activity(oldData, newData){
   });
 }
 
+function migrateLegacyV2Photos(){
+  if(data.v2PhotosMigratedV1) return false;
+  let changed = false;
+  (data.v2lists || []).forEach(list => {
+    (list.lots || []).forEach(lot => {
+      if(!Array.isArray(lot.photos)) return;
+      const hiddenSet = new Set(lot.hiddenPhotos || []);
+      const newHidden = [];
+      lot.photos = lot.photos.map(p => {
+        if(typeof p === 'string' && p.indexOf('data:') === 0){
+          const id = uploadPhoto(p);
+          if(hiddenSet.has(p)) newHidden.push(id);
+          changed = true;
+          return id;
+        }
+        if(hiddenSet.has(p)) newHidden.push(p);
+        return p;
+      });
+      lot.hiddenPhotos = newHidden;
+    });
+  });
+  data.v2PhotosMigratedV1 = true;
+  return true;
+}
+
 function handleRemoteValue(snapshot){
   const remote = snapshot.val();
   if(isTypingInTextField()) return; // ne pas couper la saisie en cours d'un champ
@@ -1189,9 +1265,11 @@ function handleRemoteValue(snapshot){
   if(remoteStr === lastSentJson) return; // c'est l'écho de notre propre écriture
   const previousData = data;
   data = normalizeData(remote);
+  const migrated = migrateLegacyV2Photos();
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
   if(wasBootstrapped) notifyNewV2Activity(previousData, data);
   render();
+  if(migrated) save();
 }
 
 function handleRemoteError(err){
@@ -1297,6 +1375,7 @@ function render(){
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
+  hydratePhotoImages();
 }
 
 function renderHeader(){
@@ -1422,7 +1501,7 @@ function renderV2PhotoGalleryDash(container){
     <div class="gallery-scroll" id="v2GalleryDashScroll">
       ${photos.map((p, i) => `
         <button class="gallery-item" data-v2-dash-gallery-index="${i}" style="width:152px;">
-          <img src="${p.src}" alt="" style="width:152px; height:152px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
+          <img data-photo-src="${p.src}" alt="" style="width:152px; height:152px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow); background:#EFE8D8;">
           ${renderV2GalleryTags({ categoryLabels: p.categoryLabels, sizeLabels: p.sizeLabels }, 152)}
         </button>
       `).join('')}
@@ -1431,7 +1510,9 @@ function renderV2PhotoGalleryDash(container){
   container.querySelectorAll('[data-v2-dash-gallery-index]').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.v2DashGalleryIndex, 10);
-      openLightbox(photos.map(p => ({ src:p.src })), idx);
+      Promise.all(photos.map(p => getPhotoSrcAsync(p.src))).then(srcs => {
+        openLightbox(srcs.map(src => ({ src })), idx);
+      });
     };
   });
 }
@@ -2733,7 +2814,7 @@ function renderListsV2(){
         <div class="gallery-scroll" id="v2PhotoScroll" style="margin-bottom:0; gap:6px;">
           ${photoRefs.map((r, i) => `
             <button class="gallery-item" data-v2-edit-photo="${i}" style="width:110px;">
-              <img src="${r.src}" alt="" style="width:110px; height:110px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow);">
+              <img data-photo-src="${r.src}" alt="" style="width:110px; height:110px; object-fit:cover; border-radius:var(--r-md); border:1px solid var(--border); box-shadow:var(--shadow); background:#EFE8D8;">
               ${renderV2GalleryTags(v2LotTags(list, r.lot), 110)}
             </button>
           `).join('')}
@@ -2892,7 +2973,7 @@ function renderV2RowThumbs(key, photoRefs){
   const shown = photoRefs.slice(0, maxShown);
   const extra = photoRefs.length - shown.length;
   return `<div class="v2-row-thumbs">
-    ${shown.map((r, i) => `<button class="v2-row-thumb" data-v2-pair-thumb="${key}" data-thumb-index="${i}"><img src="${r.src}" alt=""></button>`).join('')}
+    ${shown.map((r, i) => `<button class="v2-row-thumb" data-v2-pair-thumb="${key}" data-thumb-index="${i}"><img data-photo-src="${r.src}" alt=""></button>`).join('')}
     ${extra > 0 ? `<button class="v2-row-thumb v2-row-thumb-more" data-v2-pair-thumb="${key}" data-thumb-index="${maxShown}">+${extra}</button>` : ''}
   </div>`;
 }
@@ -3040,7 +3121,7 @@ function renderV2EntryRow(lot, entry, excludeCharId){
   return `<div class="unit-row" data-v2-entry-row="${entry.id}">
     <div class="unit-photos">
       ${(lot.photos && lot.photos[0]) ? `
-        <div class="unit-photo-thumb"><img src="${lot.photos[0]}" data-v2-zoom-lot="${lot.id}"></div>
+        <div class="unit-photo-thumb"><img data-photo-src="${lot.photos[0]}" data-v2-zoom-lot="${lot.id}"></div>
       ` : ''}
     </div>
     ${tags.length ? `<div class="v2-entry-tags-inline">${tags.map(t => `<span class="v2-tag">${escapeHtml(t.label)}</span>`).join('')}</div>` : ''}
@@ -3109,11 +3190,13 @@ function bindListsV2Events(photoRefs){
     document.querySelectorAll('[data-v2-edit-photo]').forEach(btn => {
       btn.onclick = () => {
         const idx = parseInt(btn.dataset.v2EditPhoto, 10);
-        openLightbox(photoRefs.map(r => ({
-          src: r.src,
-          gotoLabel: 'Modifier',
-          onGoto: () => openVetementModal(r.lot)
-        })), idx);
+        Promise.all(photoRefs.map(r => getPhotoSrcAsync(r.src))).then(srcs => {
+          openLightbox(photoRefs.map((r, i) => ({
+            src: srcs[i],
+            gotoLabel: 'Modifier',
+            onGoto: () => openVetementModal(r.lot)
+          })), idx);
+        });
       };
     });
   }
@@ -3200,11 +3283,13 @@ function bindListsV2Events(photoRefs){
       const refs = v2PhotoRefsForPair(sizeId, categoryId);
       const startIdx = Math.min(parseInt(btn.dataset.thumbIndex, 10) || 0, refs.length - 1);
       if(refs.length){
-        openLightbox(refs.map(r => ({
-          src: r.src,
-          gotoLabel: 'Modifier',
-          onGoto: () => openVetementModal(r.lot)
-        })), startIdx);
+        Promise.all(refs.map(r => getPhotoSrcAsync(r.src))).then(srcs => {
+          openLightbox(refs.map((r, i) => ({
+            src: srcs[i],
+            gotoLabel: 'Modifier',
+            onGoto: () => openVetementModal(r.lot)
+          })), startIdx);
+        });
       }
     };
   });
@@ -3213,11 +3298,13 @@ function bindListsV2Events(photoRefs){
     imgEl.onclick = () => {
       const lot = (activeV2List().lots || []).find(l => l.id === imgEl.dataset.v2ZoomLot);
       if(lot && lot.photos && lot.photos.length){
-        openLightbox(lot.photos.map(src => ({
-          src,
-          gotoLabel: 'Modifier',
-          onGoto: () => openVetementModal(lot)
-        })), 0);
+        Promise.all(lot.photos.map(getPhotoSrcAsync)).then(srcs => {
+          openLightbox(srcs.map(src => ({
+            src,
+            gotoLabel: 'Modifier',
+            onGoto: () => openVetementModal(lot)
+          })), 0);
+        });
       }
     };
   });
@@ -3227,7 +3314,10 @@ function bindListsV2Events(photoRefs){
       const lot = (activeV2List().lots || []).find(l => l.id === btn.dataset.v2Lot);
       if(lot){
         lot.entries = lot.entries.filter(e => e.id !== btn.dataset.v2DelEntry);
-        if(lot.entries.length === 0) activeV2List().lots = activeV2List().lots.filter(l => l.id !== lot.id);
+        if(lot.entries.length === 0){
+          (lot.photos || []).forEach(deletePhotoRef);
+          activeV2List().lots = activeV2List().lots.filter(l => l.id !== lot.id);
+        }
       }
       save(); closeModal(); render(); showToast('Article supprimé');
     });
@@ -3297,11 +3387,13 @@ function bindListsV2Events(photoRefs){
         const lot = (activeV2List().lots || []).find(l => l.id === imgEl.dataset.v2ZoomLot);
         if(lot && lot.photos && lot.photos.length){
           const entry = (lot.entries || [])[0];
-          openLightbox(lot.photos.map(src => ({
-            src,
-            gotoLabel: 'Modifier',
-            onGoto: () => entry ? openCatalogEntryModal((entry.sizeIds || [])[0], entry.categoryId, { lot, entry }) : null
-          })), 0);
+          Promise.all(lot.photos.map(getPhotoSrcAsync)).then(srcs => {
+            openLightbox(srcs.map(src => ({
+              src,
+              gotoLabel: 'Modifier',
+              onGoto: () => entry ? openCatalogEntryModal((entry.sizeIds || [])[0], entry.categoryId, { lot, entry }) : null
+            })), 0);
+          });
         }
       };
     });
@@ -3311,7 +3403,8 @@ function bindListsV2Events(photoRefs){
 function openVetementModal(existingLot){
   const isNew = !existingLot;
   const list = activeV2List();
-  let photos = isNew ? [] : (existingLot.photos || []).map(src => ({ src, hidden: (existingLot.hiddenPhotos || []).includes(src) }));
+  let photos = isNew ? [] : (existingLot.photos || []).map(id => ({ id, src:null, hidden: (existingLot.hiddenPhotos || []).includes(id) }));
+  let removedExistingPhotoIds = [];
   let lines = isNew
     ? [{ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, expanded:true }]
     : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues), expanded:false }));
@@ -3373,7 +3466,7 @@ function openVetementModal(existingLot){
       <div class="v2-photo-list">
         ${photos.map((p, i) => `
           <div class="v2-photo-row">
-            <img src="${p.src}" class="v2-photo-thumb-lg" data-v2-modal-zoom="${i}">
+            <img ${p.src ? `src="${p.src}"` : `data-photo-src="${p.id}"`} class="v2-photo-thumb-lg" data-v2-modal-zoom="${i}">
             <div class="v2-photo-controls">
               <label class="v2-hide-check"><input type="checkbox" data-photo-hide="${i}" ${p.hidden ? 'checked' : ''}> Masquer sur la galerie photo</label>
               <button type="button" class="text-btn danger" data-del-new-photo="${i}">${icon('trash','icon-sm')} Retirer cette photo</button>
@@ -3412,6 +3505,7 @@ function openVetementModal(existingLot){
   function bindPhotoEvents(){
     const container = document.getElementById('newVetementPhotos');
     container.innerHTML = photosHtml();
+    hydratePhotoImages(container);
     const input = document.getElementById('newVetementPhotoInput');
     if(input) input.onchange = (e) => {
       const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
@@ -3421,20 +3515,29 @@ function openVetementModal(existingLot){
       bindPhotoEvents();
       Promise.allSettled(files.map(compressImageFile)).then(results => {
         let added = 0;
-        results.forEach(r => { if(r.status === 'fulfilled'){ photos.push({ src:r.value, hidden:false }); added++; } });
+        results.forEach(r => { if(r.status === 'fulfilled'){ photos.push({ id:null, src:r.value, hidden:false }); added++; } });
         uploading = false;
         bindPhotoEvents();
         showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter cette photo.');
       });
     };
     container.querySelectorAll('[data-del-new-photo]').forEach(btn => {
-      btn.onclick = () => { photos.splice(parseInt(btn.dataset.delNewPhoto, 10), 1); bindPhotoEvents(); };
+      btn.onclick = () => {
+        const removed = photos.splice(parseInt(btn.dataset.delNewPhoto, 10), 1)[0];
+        if(removed && removed.id) removedExistingPhotoIds.push(removed.id);
+        bindPhotoEvents();
+      };
     });
     container.querySelectorAll('[data-photo-hide]').forEach(cb => {
       cb.onchange = () => { photos[parseInt(cb.dataset.photoHide, 10)].hidden = cb.checked; };
     });
     container.querySelectorAll('[data-v2-modal-zoom]').forEach(imgEl => {
-      imgEl.onclick = () => openLightbox(photos.map(p => ({ src:p.src })), parseInt(imgEl.dataset.v2ModalZoom, 10));
+      imgEl.onclick = () => {
+        const zoomIdx = parseInt(imgEl.dataset.v2ModalZoom, 10);
+        Promise.all(photos.map(p => p.src ? Promise.resolve(p.src) : getPhotoSrcAsync(p.id))).then(srcs => {
+          openLightbox(srcs.map(src => ({ src })), zoomIdx);
+        });
+      };
     });
   }
 
@@ -3495,6 +3598,7 @@ function openVetementModal(existingLot){
   if(cancelBtn) cancelBtn.onclick = closeModal;
   const deleteBtn = document.getElementById('btnDeleteLot');
   if(deleteBtn) deleteBtn.onclick = () => openConfirmModal('Supprimer ce lot ?', 'La ou les photos et tous les articles de ce lot seront définitivement supprimés.', () => {
+    (existingLot.photos || []).forEach(deletePhotoRef);
     activeV2List().lots = activeV2List().lots.filter(l => l.id !== existingLot.id);
     save(); closeModal(); render(); showToast('Lot supprimé');
   });
@@ -3502,15 +3606,17 @@ function openVetementModal(existingLot){
     const price = Math.max(0, parseFloat(document.getElementById('newVetementPrice').value) || 0);
     const validLines = lines.filter(l => l.sizeIds.length && l.categoryId);
     if(!validLines.length){ showToast('Ajoutez au moins un article avec une taille et une catégorie'); return; }
-    const photoSrcs = photos.map(p => p.src);
-    const hiddenSrcs = photos.filter(p => p.hidden).map(p => p.src);
+    photos.forEach(p => { if(!p.id) p.id = uploadPhoto(p.src); });
+    removedExistingPhotoIds.forEach(deletePhotoRef);
+    const photoIds = photos.map(p => p.id);
+    const hiddenIds = photos.filter(p => p.hidden).map(p => p.id);
     const entries = validLines.map(l => ({ id:l.id, sizeIds:l.sizeIds.slice(), categoryId:l.categoryId, brandId:l.brandId || '', qty:l.qty, charValues: Object.assign({}, l.charValues) }));
     if(isNew){
       if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
-      activeV2List().lots.push({ id:newId(), photos:photoSrcs, hiddenPhotos:hiddenSrcs, price, entries });
+      activeV2List().lots.push({ id:newId(), photos:photoIds, hiddenPhotos:hiddenIds, price, entries });
     } else {
-      existingLot.photos = photoSrcs;
-      existingLot.hiddenPhotos = hiddenSrcs;
+      existingLot.photos = photoIds;
+      existingLot.hiddenPhotos = hiddenIds;
       existingLot.price = price;
       existingLot.entries = entries;
     }
@@ -3522,7 +3628,8 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   const isNew = !existing;
   const catLabel = v2CategoryLabel(categoryId);
   const sectionLabel = v2SizeLabel(sizeId);
-  let photos = isNew ? [] : (existing.lot.photos || []).map(src => ({ src }));
+  let photos = isNew ? [] : (existing.lot.photos || []).map(id => ({ id, src:null }));
+  let removedExistingPhotoIds = [];
   let charValues = isNew ? {} : Object.assign({}, existing.entry.charValues);
   const chars = v2CharacteristicsForCategory(categoryId);
 
@@ -3544,7 +3651,7 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
       <div class="v2-photo-list">
         ${photos.map((p, i) => `
           <div class="v2-photo-row">
-            <img src="${p.src}" class="v2-photo-thumb-lg" data-catalog-modal-zoom="${i}">
+            <img ${p.src ? `src="${p.src}"` : `data-photo-src="${p.id}"`} class="v2-photo-thumb-lg" data-catalog-modal-zoom="${i}">
             <div class="v2-photo-controls">
               <button type="button" class="text-btn danger" data-del-catalog-photo="${i}">${icon('trash','icon-sm')} Retirer cette photo</button>
             </div>
@@ -3585,6 +3692,7 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   function bindPhotoEvents(){
     const container = document.getElementById('catalogPhotos');
     container.innerHTML = photosHtml();
+    hydratePhotoImages(container);
     const input = document.getElementById('catalogPhotoInput');
     if(input) input.onchange = (e) => {
       const files = Array.from(e.target.files || []).filter(f => f.type && f.type.startsWith('image/'));
@@ -3594,17 +3702,26 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
       bindPhotoEvents();
       Promise.allSettled(files.map(compressImageFile)).then(results => {
         let added = 0;
-        results.forEach(r => { if(r.status === 'fulfilled'){ photos.push({ src:r.value }); added++; } });
+        results.forEach(r => { if(r.status === 'fulfilled'){ photos.push({ id:null, src:r.value }); added++; } });
         uploading = false;
         bindPhotoEvents();
         showToast(added > 0 ? (added > 1 ? added + ' photos ajoutées' : 'Photo ajoutée') : 'Impossible de traiter cette photo.');
       });
     };
     container.querySelectorAll('[data-del-catalog-photo]').forEach(btn => {
-      btn.onclick = () => { photos.splice(parseInt(btn.dataset.delCatalogPhoto, 10), 1); bindPhotoEvents(); };
+      btn.onclick = () => {
+        const removed = photos.splice(parseInt(btn.dataset.delCatalogPhoto, 10), 1)[0];
+        if(removed && removed.id) removedExistingPhotoIds.push(removed.id);
+        bindPhotoEvents();
+      };
     });
     container.querySelectorAll('[data-catalog-modal-zoom]').forEach(imgEl => {
-      imgEl.onclick = () => openLightbox(photos.map(p => ({ src:p.src })), parseInt(imgEl.dataset.catalogModalZoom, 10));
+      imgEl.onclick = () => {
+        const zoomIdx = parseInt(imgEl.dataset.catalogModalZoom, 10);
+        Promise.all(photos.map(p => p.src ? Promise.resolve(p.src) : getPhotoSrcAsync(p.id))).then(srcs => {
+          openLightbox(srcs.map(src => ({ src })), zoomIdx);
+        });
+      };
     });
   }
   bindPhotoEvents();
@@ -3625,6 +3742,7 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
 
   const deleteBtn = document.getElementById('btnDeleteCatalogEntry');
   if(deleteBtn) deleteBtn.onclick = () => openConfirmModal('Supprimer cet achat ?', 'La photo et les informations associées seront définitivement supprimées.', () => {
+    (existing.lot.photos || []).forEach(deletePhotoRef);
     activeV2List().lots = (activeV2List().lots || []).filter(l => l.id !== existing.lot.id);
     save(); closeModal(); render(); showToast('Achat supprimé');
   });
@@ -3632,15 +3750,17 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   document.getElementById('mSave').onclick = () => {
     const qtyVal = Math.max(1, parseInt(document.getElementById('catalogQty').value, 10) || 1);
     const priceVal = Math.max(0, parseFloat(document.getElementById('catalogPrice').value) || 0);
-    const photoSrcs = photos.map(p => p.src);
+    photos.forEach(p => { if(!p.id) p.id = uploadPhoto(p.src); });
+    removedExistingPhotoIds.forEach(deletePhotoRef);
+    const photoIds = photos.map(p => p.id);
     if(isNew){
       if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
       activeV2List().lots.push({
-        id:newId(), photos:photoSrcs, hiddenPhotos:[], price:priceVal,
+        id:newId(), photos:photoIds, hiddenPhotos:[], price:priceVal,
         entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:'', qty:qtyVal, charValues: Object.assign({}, charValues) }]
       });
     } else {
-      existing.lot.photos = photoSrcs;
+      existing.lot.photos = photoIds;
       existing.lot.price = priceVal;
       existing.entry.qty = qtyVal;
       existing.entry.charValues = Object.assign({}, charValues);
@@ -3919,14 +4039,14 @@ function compressImageFile(file){
     const img = new Image();
     img.onload = () => {
       try{
-        const maxW = 1080;
+        const maxW = 2200;
         const scale = Math.min(1, maxW / img.width);
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(img.width * scale));
         canvas.height = Math.max(1, Math.round(img.height * scale));
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.68));
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
       }catch(err){ reject(err); }
       finally{ URL.revokeObjectURL(objectUrl); }
     };
