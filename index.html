@@ -140,6 +140,18 @@
     border-radius:999px;
   }
   .icon-btn-ghost:active{background:rgba(58,53,41,0.06);}
+  .guest-header{padding:18px 16px 6px; text-align:center;}
+  .guest-header h1{font-family:var(--font-display); font-weight:600; font-size:22px; color:var(--sage-dark); margin:0 0 4px;}
+  .guest-header p{color:var(--muted); font-size:13px; margin:0;}
+  .guest-back{display:inline-flex; align-items:center; gap:4px; background:none; border:none; color:var(--muted); font-weight:800; font-size:13px; cursor:pointer; padding:6px 4px; margin:8px 0 4px;}
+  .guest-need-row{display:flex; flex-direction:column; gap:6px; padding:12px 14px; margin-bottom:8px;}
+  .guest-need-top{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .guest-need-name{font-weight:800; font-size:14px; color:var(--ink);}
+  .guest-need-qty{font-size:12.5px; color:var(--muted); font-weight:700; flex-shrink:0;}
+  .guest-need-comment{font-size:12.5px; color:var(--muted); font-style:italic;}
+  .guest-claim-btn{width:100%; justify-content:center;}
+  .guest-claimed-badge{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--sage-tint); color:var(--sage-dark); font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:var(--r-sm);}
+  .guest-claimed-badge button{background:none; border:none; color:var(--terracotta-dark); font-weight:800; font-size:12px; cursor:pointer; padding:2px 4px;}
   #notifyBtn{position:relative;}
   .notif-badge{
     position:absolute; top:2px; right:2px; min-width:15px; height:15px; padding:0 3px;
@@ -2668,7 +2680,10 @@ function renderV2ListPicker(){
         <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
         ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
       </div>
-      <div class="section-heading" style="margin-top:0;">Choisissez une liste</div>
+      <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <span>Choisissez une liste</span>
+        <button class="chip-btn" id="btnShareGuestLink" style="font-size:11.5px; padding:6px 10px;">🎁 Partager avec la famille</button>
+      </div>
       <div class="cat-grid" id="v2ListGrid">
         ${lists.map(l => {
           const t = v2GlobalTotalsForList(l);
@@ -2697,6 +2712,8 @@ function renderV2ListPicker(){
   document.querySelectorAll('[data-v2-select-list]').forEach(card => {
     card.onclick = () => { ui.activeV2ListId = card.dataset.v2SelectList; saveUi(); render(); };
   });
+  document.getElementById('btnShareGuestLink').onclick = openShareGuestLinkModal;
+
   document.getElementById('btnAddV2List').onclick = () => {
     openModal(`
       <h2>Nouvelle liste</h2>
@@ -2728,6 +2745,33 @@ function renderV2ListPicker(){
       ui.activeV2ListId = list.id;
       save(); saveUi(); closeModal(); render(); showToast('Liste créée');
     };
+  };
+}
+
+function openShareGuestLinkModal(){
+  const link = location.origin + location.pathname + '?cadeaux=1';
+  openModal(`
+    <h2>🎁 Partager avec la famille</h2>
+    <p style="color:var(--muted); font-size:13px; margin:-6px 0 12px;">Ce lien ouvre une page simplifiée, sans code d'accès : la famille y voit uniquement ce qu'il reste à trouver (sans prix, sans les listes "à cocher"), avec un bouton "Je m'en occupe" pour réserver un article et éviter les doublons. Vous ne voyez pas qui a réservé quoi, pour garder la surprise.</p>
+    <div class="field">
+      <label class="field-label">Lien à partager</label>
+      <input type="text" id="guestShareLink" value="${escapeAttr(link)}" readonly onclick="this.select()">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Fermer</button>
+      <button class="btn btn-primary" id="mCopyLink">${icon('link','icon-sm')} Copier le lien</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mCopyLink').onclick = () => {
+    const input = document.getElementById('guestShareLink');
+    input.select();
+    const done = () => showToast('Lien copié !');
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(link).then(done).catch(() => { try{ document.execCommand('copy'); done(); }catch(e){ showToast('Copie manuelle : sélectionnez le texte ci-dessus.'); } });
+    } else {
+      try{ document.execCommand('copy'); done(); }catch(e){ showToast('Copie manuelle : sélectionnez le texte ci-dessus.'); }
+    }
   };
 }
 
@@ -4266,6 +4310,205 @@ function openSizeModal(){
   };
 }
 
+/* ---------- Mode invité (partage familial de la liste de naissance) ---------- */
+let guestData = null;
+let guestReservations = {};
+let guestActiveListId = null;
+
+function guestLabel(arr, id){
+  const x = (arr || []).find(i => i.id === id);
+  return x ? x.label : '';
+}
+function guestAcquiredFor(list, sizeId, categoryId){
+  let n = 0;
+  (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+    if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId) n += Number(e.qty) || 0;
+  }));
+  return n;
+}
+function guestAcquiredForValue(list, sizeId, categoryId, charId, valueId){
+  let n = 0;
+  (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
+    if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId && e.charValues && e.charValues[charId] === valueId) n += Number(e.qty) || 0;
+  }));
+  return n;
+}
+function guestReservationKey(listId, sizeId, categoryId, charId, valueId){
+  return [listId, sizeId, categoryId, charId || '', valueId || ''].join('::');
+}
+function guestCollectNeeds(list){
+  const needs = [];
+  (list.targets || []).forEach(t => {
+    const targetVal = Number(t.target) || 0;
+    if(targetVal <= 0) return;
+    const cat = (list.categories || []).find(c => c.id === t.categoryId);
+    const chars = cat ? v2CharacteristicsForCategoryInList(list, t.categoryId) : [];
+    const mainChar = chars[0] || null;
+    let acquired, valueLabel = '';
+    if(t.charId && mainChar){
+      acquired = guestAcquiredForValue(list, t.sizeId, t.categoryId, t.charId, t.valueId);
+      const val = (mainChar.values || []).find(v => v.id === t.valueId);
+      valueLabel = val ? val.label : '';
+    } else if(!t.charId){
+      // Si des caractéristiques existent, ce total "plat" ne représente que la part
+      // "indifférente" une fois les valeurs déjà comptées séparément — on l'ignore
+      // ici s'il fait doublon avec une ligne à caractéristique déjà listée pour ce couple.
+      acquired = (list.lots || []).reduce((s, lot) => s + (lot.entries || []).reduce((s2, e) => {
+        if(!((e.sizeIds || []).includes(t.sizeId) && e.categoryId === t.categoryId)) return s2;
+        if(mainChar && e.charValues && e.charValues[mainChar.id]) return s2; // déjà compté dans une valeur précise
+        return s2 + (Number(e.qty) || 0);
+      }, 0), 0);
+    } else {
+      acquired = 0;
+    }
+    const remaining = targetVal - acquired;
+    if(remaining <= 0) return;
+    needs.push({
+      sizeId: t.sizeId, categoryId: t.categoryId, charId: t.charId || null, valueId: t.valueId || null,
+      sizeLabel: guestLabel(list.sizes, t.sizeId),
+      categoryLabel: cat ? cat.label : '',
+      valueLabel, remaining,
+      comment: cat ? (cat.comment || '') : ''
+    });
+  });
+  return needs;
+}
+function v2CharacteristicsForCategoryInList(list, categoryId){
+  return (list.characteristics || []).filter(ch => (ch.categoryIds || []).includes(categoryId));
+}
+
+function guestFirebaseInit(){
+  try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+  firebase.database().ref('petitNidData').on('value', snap => {
+    guestData = snap.val();
+    renderGuestView();
+  });
+  firebase.database().ref('petitNidReservations').on('value', snap => {
+    guestReservations = snap.val() || {};
+    renderGuestView();
+  });
+}
+
+function promptGuestName(cb){
+  const stored = localStorage.getItem('nidouxGuestName');
+  if(stored){ cb(stored); return; }
+  openModal(`
+    <h2>Comment vous appelez-vous ?</h2>
+    <p style="color:var(--muted); font-size:13px; margin:-6px 0 10px;">Pour que les autres sachent que c'est déjà prévu.</p>
+    <div class="field"><input type="text" id="guestNameInput" placeholder="Votre prénom"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Valider</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const name = document.getElementById('guestNameInput').value.trim();
+    if(!name){ showToast('Indiquez votre prénom'); return; }
+    localStorage.setItem('nidouxGuestName', name);
+    closeModal();
+    cb(name);
+  };
+}
+
+function renderGuestView(){
+  const main = document.getElementById('mainContent');
+  if(!guestData){
+    main.innerHTML = `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Chargement…</div></div>`;
+    return;
+  }
+  if(guestActiveListId) renderGuestListDetail();
+  else renderGuestListPicker();
+}
+
+function renderGuestListPicker(){
+  const main = document.getElementById('mainContent');
+  const lists = (guestData.v2lists || []).filter(l => l.mode !== 'checklist');
+  const withNeeds = lists.map(l => ({ list:l, needs: guestCollectNeeds(l) }));
+  main.innerHTML = `
+    <div class="guest-header">
+      <h1>🎁 Liste de naissance</h1>
+      <p>Voici ce qu'il reste à trouver — merci de votre aide !</p>
+    </div>
+    <div class="cat-grid" style="padding:0 16px 24px;">
+      ${withNeeds.map(({list, needs}) => `
+        <button type="button" class="cat-card" data-guest-list="${list.id}">
+          <div class="cat-icon" style="background:${list.color || 'var(--sage-dark)'};">${icon(list.icon || 'box','icon-lg')}</div>
+          <div>
+            <div class="cat-name">${escapeHtml(list.name)}</div>
+            <div class="cat-meta">${needs.length ? needs.length + ' article' + (needs.length > 1 ? 's' : '') + ' à offrir' : 'Tout est déjà prévu ✓'}</div>
+          </div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+  document.querySelectorAll('[data-guest-list]').forEach(btn => {
+    btn.onclick = () => { guestActiveListId = btn.dataset.guestList; renderGuestView(); };
+  });
+}
+
+function renderGuestListDetail(){
+  const main = document.getElementById('mainContent');
+  const list = (guestData.v2lists || []).find(l => l.id === guestActiveListId);
+  if(!list){ guestActiveListId = null; renderGuestView(); return; }
+  const needs = guestCollectNeeds(list);
+  const bySize = {};
+  needs.forEach(n => { (bySize[n.sizeId] = bySize[n.sizeId] || []).push(n); });
+  const sizeOrder = (list.sizes || []).map(s => s.id).filter(id => bySize[id]);
+
+  function needRowHtml(n){
+    const resKey = guestReservationKey(list.id, n.sizeId, n.categoryId, n.charId, n.valueId);
+    const res = guestReservations[resKey];
+    const myName = (localStorage.getItem('nidouxGuestName') || '').toLowerCase();
+    const isMine = res && (res.name || '').toLowerCase() === myName;
+    const label = n.valueLabel ? `${n.categoryLabel} · ${n.valueLabel}` : n.categoryLabel;
+    return `
+      <div class="v2-line-card guest-need-row">
+        <div class="guest-need-top">
+          <span class="guest-need-name">${escapeHtml(label)}</span>
+          <span class="guest-need-qty">encore ${n.remaining}</span>
+        </div>
+        ${n.comment ? `<div class="guest-need-comment">${escapeHtml(n.comment)}</div>` : ''}
+        ${res ? `
+          <div class="guest-claimed-badge">
+            <span>${isMine ? 'Réservé par vous' : 'Réservé par ' + escapeHtml(res.name)}</span>
+            ${isMine ? `<button type="button" data-guest-unclaim="${resKey}">Annuler</button>` : ''}
+          </div>
+        ` : `<button type="button" class="btn btn-primary guest-claim-btn" data-guest-claim="${resKey}">${icon('check','icon-sm')} Je m'en occupe</button>`}
+      </div>
+    `;
+  }
+
+  main.innerHTML = `
+    <div class="guest-header" style="text-align:left; padding-bottom:0;">
+      <button type="button" class="guest-back" id="guestBack">${icon('chevronLeft','icon-sm')} Toutes les listes</button>
+      <h1 style="text-align:left; font-size:19px;">${escapeHtml(list.name)}</h1>
+    </div>
+    <div style="padding:6px 16px 24px;">
+      ${needs.length ? sizeOrder.map(sizeId => `
+        <div class="section-heading">${escapeHtml(guestLabel(list.sizes, sizeId))}</div>
+        ${bySize[sizeId].map(needRowHtml).join('')}
+      `).join('') : `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Tout est déjà prévu pour cette liste, merci !</div></div>`}
+    </div>
+  `;
+  document.getElementById('guestBack').onclick = () => { guestActiveListId = null; renderGuestView(); };
+  document.querySelectorAll('[data-guest-claim]').forEach(btn => {
+    btn.onclick = () => {
+      const resKey = btn.dataset.guestClaim;
+      promptGuestName(name => {
+        firebase.database().ref('petitNidReservations/' + resKey).set({ name, at: Date.now() });
+        showToast('Merci ' + name + ' !');
+      });
+    };
+  });
+  document.querySelectorAll('[data-guest-unclaim]').forEach(btn => {
+    btn.onclick = () => {
+      firebase.database().ref('petitNidReservations/' + btn.dataset.guestUnclaim).remove();
+      showToast('Réservation annulée');
+    };
+  });
+}
+
 /* ---------- Nav & boot ---------- */
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.onclick = () => {
@@ -4331,10 +4574,17 @@ function openNotifPanel(){
 
 document.getElementById('notifyBtn').onclick = openNotifPanel;
 
-updateConnectionBadge('offline');
-updateNotifyBadge();
-render();
-initFirebase();
+const isGuestMode = new URLSearchParams(location.search).get('cadeaux') === '1';
+if(isGuestMode){
+  document.querySelector('header.app-header').style.display = 'none';
+  document.querySelector('nav.bottom-nav').style.display = 'none';
+  guestFirebaseInit();
+} else {
+  updateConnectionBadge('offline');
+  updateNotifyBadge();
+  render();
+  initFirebase();
+}
 })();
 </script>
 </body>
