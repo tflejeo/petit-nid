@@ -2892,7 +2892,7 @@ function renderListsV2(){
   if(!list){ renderV2ListPicker(); return; }
   const main = document.getElementById('mainContent');
   const catalogMode = v2UsesSimpleFlow(list);
-  const photoRefs = catalogMode ? [] : collectV2LotPhotoRefs();
+  const photoRefs = collectV2LotPhotoRefs();
   const groupBy = catalogMode ? 'size' : (list.groupBy || 'size');
   main.innerHTML = `
     <div style="display:flex; flex-wrap:nowrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
@@ -2912,7 +2912,7 @@ function renderListsV2(){
       <div style="display:flex; justify-content:flex-end; margin:2px 0 14px;">
         <button class="chip-btn" id="btnManageV2">${icon('gear','icon-sm')} Paramétrage</button>
       </div>
-      ${(!catalogMode && photoRefs.length) ? `
+      ${photoRefs.length ? `
         <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <span>Vos photos</span>
           <button class="chip-btn" id="btnToggleV2PhotoSort" style="font-size:11.5px; padding:6px 10px;">${icon('sort','icon-sm')} ${list.photoSort === 'size' ? 'Par ' + list.sizeLabel.toLowerCase() : 'Plus récentes'}</button>
@@ -3121,6 +3121,17 @@ function anyReservedForPair(sizeId, categoryId){
   return false;
 }
 
+function isUrlLike(str){
+  return /^https?:\/\/\S+$/i.test((str || '').trim());
+}
+function commentFieldHtml(categoryId, catObj){
+  const value = (catObj && catObj.comment) || '';
+  return `<div class="field">
+    <label class="field-label">Commentaire</label>
+    ${isUrlLike(value) ? `<a href="${escapeAttr(value.trim())}" target="_blank" rel="noopener" class="chip-btn" style="margin-bottom:6px; display:inline-flex;">${icon('link','icon-sm')} Ouvrir le lien</a>` : ''}
+    <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel… (un lien collé ici s'ouvrira facilement)" style="min-height:40px;">${escapeHtml(value)}</textarea>
+  </div>`;
+}
 function renderV2PairRow(sizeId, categoryId, label){
   const acquired = v2AcquiredFor(sizeId, categoryId);
   const target = v2TargetFor(sizeId, categoryId);
@@ -3135,10 +3146,12 @@ function renderV2PairRow(sizeId, categoryId, label){
   const charRows = mainChar ? v2CharTargetRows(sizeId, categoryId, mainChar, entries) : [];
   const catalogMode = v2IsCatalog(list);
   const isReserved = anyReservedForPair(sizeId, categoryId);
+  const pairCatObj = (list.categories || []).find(c => c.id === categoryId);
+  const hasComment = !!(pairCatObj && pairCatObj.comment);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
-      <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span>${isReserved ? `<span class="reserved-badge" style="margin-left:6px;">🎁</span>` : ''}</div>
+      <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span>${isReserved ? `<span class="reserved-badge" style="margin-left:6px;">🎁</span>` : ''}${hasComment ? `<span title="Un commentaire est renseigné" style="margin-left:6px;">📝</span>` : ''}</div>
       <div class="item-sub"><span>${acquired} / ${target}</span></div>
     </div>
     ${charRows.length ? renderV2RowCharSummary(charRows) : ''}
@@ -3162,20 +3175,17 @@ function renderV2PairRow(sizeId, categoryId, label){
         </label>
         <div class="field">
           <label class="field-label">Commentaire</label>
-          <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel…" style="min-height:40px;">${escapeHtml((catObj && catObj.comment) || '')}</textarea>
+          ${isUrlLike((catObj && catObj.comment) || '') ? `<a href="${escapeAttr(((catObj && catObj.comment) || '').trim())}" target="_blank" rel="noopener" class="chip-btn" style="margin-bottom:6px; display:inline-flex;">${icon('link','icon-sm')} Ouvrir le lien</a>` : ''}
+          <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel… (un lien collé ici s'ouvrira facilement)" style="min-height:40px;">${escapeHtml((catObj && catObj.comment) || '')}</textarea>
         </div>
         <button type="button" class="text-btn danger" data-v2-delete-pair="${key}" style="margin-top:6px;">${icon('trash','icon-sm')} Supprimer "${escapeHtml(label)}" de cette ${list.sizeLabel.toLowerCase()}</button>
       `;
       html += `</div>`;
       return html;
-    }
-    if(catalogMode){
+    }    if(catalogMode){
       const catObj = (list.categories || []).find(c => c.id === categoryId);
       html += `<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>
-      <div class="field">
-        <label class="field-label">Commentaire</label>
-        <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel…" style="min-height:40px;">${escapeHtml((catObj && catObj.comment) || '')}</textarea>
-      </div>`;
+      ${commentFieldHtml(categoryId, catObj)}`;
     }
     if(mainChar){
       const indiffRow = charRows.find(r => !r.charId);
@@ -3340,7 +3350,14 @@ function bindListsV2Events(photoRefs){
           openLightbox(photoRefs.map((r, i) => ({
             src: srcs[i],
             gotoLabel: 'Modifier',
-            onGoto: () => openVetementModal(r.lot)
+            onGoto: () => {
+              if(v2IsCatalog(activeV2List())){
+                const entry = (r.lot.entries || [])[0];
+                if(entry) openCatalogEntryModal((entry.sizeIds || [])[0], entry.categoryId, { lot: r.lot, entry });
+              } else {
+                openVetementModal(r.lot);
+              }
+            }
           })), idx);
         });
       };
