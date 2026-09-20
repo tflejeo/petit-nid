@@ -152,6 +152,7 @@
   .guest-claim-btn{width:100%; justify-content:center;}
   .guest-claimed-badge{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--sage-tint); color:var(--sage-dark); font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:var(--r-sm);}
   .guest-claimed-badge button{background:none; border:none; color:var(--terracotta-dark); font-weight:800; font-size:12px; cursor:pointer; padding:2px 4px;}
+  .reserved-badge{display:inline-flex; align-items:center; gap:4px; background:var(--lavender); color:#fff; font-size:11px; font-weight:800; padding:4px 9px; border-radius:999px; flex-shrink:0;}
   #notifyBtn{position:relative;}
   .notif-badge{
     position:absolute; top:2px; right:2px; min-width:15px; height:15px; padding:0 3px;
@@ -1058,6 +1059,7 @@ function saveUi(){
 }
 
 let dbRef = null;
+let reservations = {};
 let bootstrapped = false;
 let lastSentJson = null;
 let remoteDebounceTimer = null;
@@ -1160,6 +1162,10 @@ function initFirebase(){
     });
     backupRef = firebase.database().ref('petitNidBackup');
     photoDbRef = firebase.database().ref('petitNidPhotos');
+    firebase.database().ref('petitNidReservations').on('value', snap => {
+      reservations = snap.val() || {};
+      render();
+    });
     firebase.database().ref('.info/connected').on('value', snap => {
       updateConnectionBadge(snap.val() === true ? 'online' : 'offline');
     });
@@ -2752,7 +2758,7 @@ function openShareGuestLinkModal(){
   const link = location.origin + location.pathname + '?cadeaux=1';
   openModal(`
     <h2>🎁 Partager avec la famille</h2>
-    <p style="color:var(--muted); font-size:13px; margin:-6px 0 12px;">Ce lien ouvre une page simplifiée, sans code d'accès : la famille y voit uniquement ce qu'il reste à trouver (sans prix, sans les listes "à cocher"), avec un bouton "Je m'en occupe" pour réserver un article et éviter les doublons. Vous ne voyez pas qui a réservé quoi, pour garder la surprise.</p>
+    <p style="color:var(--muted); font-size:13px; margin:-6px 0 12px;">Ce lien ouvre une page simplifiée, sans code d'accès : la famille y voit uniquement ce qu'il reste à trouver (sans prix, sans les listes "à cocher"), avec un bouton "Je m'en occupe" pour réserver un article et éviter les doublons. De votre côté, un badge 🎁 vous indique qu'un article est réservé — pratique pour ne pas l'acheter en double — mais sans révéler qui l'a réservé, pour garder un peu de surprise.</p>
     <div class="field">
       <label class="field-label">Lien à partager</label>
       <input type="text" id="guestShareLink" value="${escapeAttr(link)}" readonly onclick="this.select()">
@@ -3046,6 +3052,19 @@ function renderV2RowCharSummary(rows){
   </div>`;
 }
 
+function anyReservedForPair(sizeId, categoryId){
+  const list = activeV2List();
+  if(!list) return false;
+  if(reservations[guestReservationKey(list.id, sizeId, categoryId, null, null)]) return true;
+  const mainChar = v2CharacteristicsForCategory(categoryId)[0] || null;
+  if(mainChar){
+    for(const v of mainChar.values){
+      if(reservations[guestReservationKey(list.id, sizeId, categoryId, mainChar.id, v.id)]) return true;
+    }
+  }
+  return false;
+}
+
 function renderV2PairRow(sizeId, categoryId, label){
   const acquired = v2AcquiredFor(sizeId, categoryId);
   const target = v2TargetFor(sizeId, categoryId);
@@ -3059,10 +3078,11 @@ function renderV2PairRow(sizeId, categoryId, label){
   const mainChar = checklistMode ? null : (v2CharacteristicsForCategory(categoryId)[0] || null);
   const charRows = mainChar ? v2CharTargetRows(sizeId, categoryId, mainChar, entries) : [];
   const catalogMode = v2IsCatalog(list);
+  const isReserved = anyReservedForPair(sizeId, categoryId);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
-      <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span></div>
+      <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span>${isReserved ? `<span class="reserved-badge" style="margin-left:6px;">🎁</span>` : ''}</div>
       <div class="item-sub"><span>${acquired} / ${target}</span></div>
     </div>
     ${charRows.length ? renderV2RowCharSummary(charRows) : ''}
@@ -3079,6 +3099,7 @@ function renderV2PairRow(sizeId, categoryId, label){
           <label class="field-label">Objectif</label>
           <input type="number" min="0" data-v2-target="${key}" value="${target}">
         </div>
+        ${reservedBadgeHtml(sizeId, categoryId, null, null)}
         <label class="v2-checklist-check">
           <input type="checkbox" data-v2-checklist-toggle="${key}" ${checked ? 'checked' : ''}>
           <span>Déjà dans la valise</span>
@@ -3118,6 +3139,7 @@ function renderV2PairRow(sizeId, categoryId, label){
         <label class="field-label">Objectif</label>
         <input type="number" min="0" data-v2-target="${key}" value="${target}">
       </div>
+      ${reservedBadgeHtml(sizeId, categoryId, null, null)}
       ${entries.length ? entries.map(({lot, entry}) => renderV2EntryRow(lot, entry)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`}`;
     }
     html += `<button type="button" class="text-btn danger" data-v2-delete-pair="${key}" style="margin-top:10px;">${icon('trash','icon-sm')} Supprimer "${escapeHtml(label)}" de cette ${list.sizeLabel.toLowerCase()}</button>`;
@@ -3152,6 +3174,7 @@ function isV2CharGroupCollapsed(groupKey, hasEntries){
 
 function renderV2CharGroup(pairKey, groupKey, row, groupEntries, excludeCharId){
   const collapsed = isV2CharGroupCollapsed(groupKey, groupEntries.length > 0);
+  const [sizeId, categoryId] = pairKey.split('::');
   const inputAttrs = row.charId
     ? `data-v2-char-target="${pairKey}" data-char-id="${row.charId}" data-value-id="${row.valueId}"`
     : `data-v2-target="${pairKey}"`;
@@ -3164,6 +3187,7 @@ function renderV2CharGroup(pairKey, groupKey, row, groupEntries, excludeCharId){
       </span>
       <span class="chev">${icon('chevronDown','icon-sm')}</span>
     </div>
+    ${reservedBadgeHtml(sizeId, categoryId, row.charId, row.valueId)}
     <div class="v2-char-group-body ${collapsed ? '' : 'open'}">
       ${groupEntries.length ? groupEntries.map(({ lot, entry }) => renderV2EntryRow(lot, entry, excludeCharId)).join('') : `<p style="color:var(--muted); font-size:12px; margin:2px 0 0;">Aucun article ajouté pour l’instant.</p>`}
     </div>
@@ -4335,6 +4359,12 @@ function guestAcquiredForValue(list, sizeId, categoryId, charId, valueId){
 }
 function guestReservationKey(listId, sizeId, categoryId, charId, valueId){
   return [listId, sizeId, categoryId, charId || '', valueId || ''].join('::');
+}
+function reservedBadgeHtml(sizeId, categoryId, charId, valueId){
+  const list = activeV2List();
+  if(!list) return '';
+  const key = guestReservationKey(list.id, sizeId, categoryId, charId, valueId);
+  return reservations[key] ? `<span class="reserved-badge">🎁 Réservé</span>` : '';
 }
 function guestCollectNeeds(list){
   const needs = [];
