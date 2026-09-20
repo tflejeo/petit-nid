@@ -149,6 +149,8 @@
   .guest-need-name{font-weight:800; font-size:14px; color:var(--ink);}
   .guest-need-qty{font-size:12.5px; color:var(--muted); font-weight:700; flex-shrink:0;}
   .guest-need-comment{font-size:12.5px; color:var(--muted); font-style:italic;}
+  .guest-need-photos{display:flex; gap:5px; flex-wrap:wrap;}
+  .guest-need-photo{width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid var(--border); background:#EFE8D8;}
   .guest-claim-btn{width:100%; justify-content:center;}
   .guest-claimed-badge{display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--sage-tint); color:var(--sage-dark); font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:var(--r-sm);}
   .guest-claimed-badge button{background:none; border:none; color:var(--terracotta-dark); font-weight:800; font-size:12px; cursor:pointer; padding:2px 4px;}
@@ -2758,7 +2760,7 @@ function openShareGuestLinkModal(){
   const link = location.origin + location.pathname + '?cadeaux=1';
   openModal(`
     <h2>🎁 Partager avec la famille</h2>
-    <p style="color:var(--muted); font-size:13px; margin:-6px 0 12px;">Ce lien ouvre une page simplifiée, sans code d'accès : la famille y voit uniquement ce qu'il reste à trouver (sans prix, sans les listes "à cocher"), avec un bouton "Je m'en occupe" pour réserver un article et éviter les doublons. De votre côté, un badge 🎁 vous indique qu'un article est réservé — pratique pour ne pas l'acheter en double — mais sans révéler qui l'a réservé, pour garder un peu de surprise.</p>
+    <p style="color:var(--muted); font-size:13px; margin:-6px 0 12px;">Ce lien ouvre une page simplifiée, sans code d'accès : la famille y voit vos articles déjà achetés (avec photo, pour avoir une idée de ce que vous aimez) ainsi que ce qu'il reste à trouver — jamais les prix, ni les listes "à cocher". Un bouton "Je m'en occupe" permet de réserver un article restant pour éviter les doublons. De votre côté, un badge 🎁 vous indique qu'un article est réservé — pratique pour ne pas l'acheter en double — mais sans révéler qui l'a réservé, pour garder un peu de surprise.</p>
     <div class="field">
       <label class="field-label">Lien à partager</label>
       <input type="text" id="guestShareLink" value="${escapeAttr(link)}" readonly onclick="this.select()">
@@ -3870,6 +3872,34 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   };
 }
 
+function v2RemoveCategoryReferences(list, categoryId){
+  list.targets = (list.targets || []).filter(t => t.categoryId !== categoryId);
+  (list.characteristics || []).forEach(ch => { ch.categoryIds = (ch.categoryIds || []).filter(id => id !== categoryId); });
+  (list.lots || []).forEach(lot => {
+    lot.entries = (lot.entries || []).filter(e => e.categoryId !== categoryId);
+  });
+  list.lots = (list.lots || []).filter(lot => {
+    if((lot.entries || []).length === 0){ (lot.photos || []).forEach(deletePhotoRef); return false; }
+    return true;
+  });
+}
+function v2RemoveSizeReferences(list, sizeId){
+  list.targets = (list.targets || []).filter(t => t.sizeId !== sizeId);
+  (list.lots || []).forEach(lot => {
+    lot.entries = (lot.entries || []).map(e => {
+      if(!(e.sizeIds || []).includes(sizeId)) return e;
+      return Object.assign({}, e, { sizeIds: e.sizeIds.filter(id => id !== sizeId) });
+    }).filter(e => (e.sizeIds || []).length > 0);
+  });
+  list.lots = (list.lots || []).filter(lot => {
+    if((lot.entries || []).length === 0){ (lot.photos || []).forEach(deletePhotoRef); return false; }
+    return true;
+  });
+}
+function v2RemoveBrandReferences(list, brandId){
+  (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => { if(e.brandId === brandId) e.brandId = ''; }));
+}
+
 function openManageV2Modal(){
   const list = activeV2List();
   function listHtml(items, delAttr, renameAttr){
@@ -3986,9 +4016,21 @@ function openManageV2Modal(){
     document.getElementById('v2CategoriesList').innerHTML = listHtml(v2SortByLabel(activeV2List().categories), 'del-v2-cat', 'rename-v2-cat');
     document.getElementById('v2BrandsList').innerHTML = listHtml(v2SortByLabel(activeV2List().brands), 'del-v2-brand', 'rename-v2-brand');
     document.getElementById('v2CharsList').innerHTML = charsListHtml();
-    document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => { activeV2List().sizes = activeV2List().sizes.filter(s => s.id !== b.dataset.delV2Size); save(); rebind(); });
-    document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => { activeV2List().categories = activeV2List().categories.filter(c => c.id !== b.dataset.delV2Cat); save(); rebind(); });
-    document.querySelectorAll('[data-del-v2-brand]').forEach(b => b.onclick = () => { activeV2List().brands = activeV2List().brands.filter(x => x.id !== b.dataset.delV2Brand); save(); rebind(); });
+    document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => openConfirmModal('Supprimer cette ' + list.sizeLabel.toLowerCase() + ' ?', 'Les objectifs et articles déjà achetés qui lui sont propres seront aussi supprimés.', () => {
+      v2RemoveSizeReferences(activeV2List(), b.dataset.delV2Size);
+      activeV2List().sizes = activeV2List().sizes.filter(s => s.id !== b.dataset.delV2Size);
+      save(); closeModal(); openManageV2Modal();
+    }));
+    document.querySelectorAll('[data-del-v2-cat]').forEach(b => b.onclick = () => openConfirmModal('Supprimer cette ' + list.categoryLabel.toLowerCase() + ' ?', 'Les objectifs et articles déjà achetés qui lui sont propres seront aussi supprimés.', () => {
+      v2RemoveCategoryReferences(activeV2List(), b.dataset.delV2Cat);
+      activeV2List().categories = activeV2List().categories.filter(c => c.id !== b.dataset.delV2Cat);
+      save(); closeModal(); openManageV2Modal();
+    }));
+    document.querySelectorAll('[data-del-v2-brand]').forEach(b => b.onclick = () => {
+      v2RemoveBrandReferences(activeV2List(), b.dataset.delV2Brand);
+      activeV2List().brands = activeV2List().brands.filter(x => x.id !== b.dataset.delV2Brand);
+      save(); rebind();
+    });
     document.querySelectorAll('[data-rename-v2-size]').forEach(b => b.onclick = () => {
       const item = activeV2List().sizes.find(s => s.id === b.dataset.renameV2Size);
       openRenamePrompt(list.sizeLabel, item.label, (val) => { item.label = val; save(); closeModal(); openManageV2Modal(); });
@@ -4343,19 +4385,30 @@ function guestLabel(arr, id){
   const x = (arr || []).find(i => i.id === id);
   return x ? x.label : '';
 }
-function guestAcquiredFor(list, sizeId, categoryId){
-  let n = 0;
-  (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
-    if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId) n += Number(e.qty) || 0;
-  }));
-  return n;
+function guestEntryMatchesNeed(e, sizeId, categoryId, charId, mainChar, valueId){
+  if(!((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId)) return false;
+  if(charId) return e.charValues && e.charValues[charId] === valueId;
+  if(mainChar) return !(e.charValues && e.charValues[mainChar.id]); // bucket "Indifférent"
+  return true;
 }
-function guestAcquiredForValue(list, sizeId, categoryId, charId, valueId){
-  let n = 0;
-  (list.lots || []).forEach(lot => (lot.entries || []).forEach(e => {
-    if((e.sizeIds || []).includes(sizeId) && e.categoryId === categoryId && e.charValues && e.charValues[charId] === valueId) n += Number(e.qty) || 0;
-  }));
-  return n;
+function guestNeedStats(list, sizeId, categoryId, charId, mainChar, valueId){
+  let acquired = 0;
+  const photoIds = [];
+  (list.lots || []).forEach(lot => {
+    let matched = false;
+    (lot.entries || []).forEach(e => {
+      if(guestEntryMatchesNeed(e, sizeId, categoryId, charId, mainChar, valueId)){
+        acquired += Number(e.qty) || 0;
+        matched = true;
+      }
+    });
+    if(matched){
+      (lot.photos || []).forEach(id => {
+        if(!(lot.hiddenPhotos || []).includes(id) && photoIds.length < 4) photoIds.push(id);
+      });
+    }
+  });
+  return { acquired, photoIds };
 }
 function guestReservationKey(listId, sizeId, categoryId, charId, valueId){
   return [listId, sizeId, categoryId, charId || '', valueId || ''].join('::');
@@ -4372,33 +4425,26 @@ function guestCollectNeeds(list){
     const targetVal = Number(t.target) || 0;
     if(targetVal <= 0) return;
     const cat = (list.categories || []).find(c => c.id === t.categoryId);
-    const chars = cat ? v2CharacteristicsForCategoryInList(list, t.categoryId) : [];
+    if(!cat) return; // objectif orphelin (catégorie supprimée) : on l'ignore
+    const sizeExists = (list.sizes || []).some(s => s.id === t.sizeId);
+    if(!sizeExists) return; // idem pour une taille supprimée
+    const chars = v2CharacteristicsForCategoryInList(list, t.categoryId);
     const mainChar = chars[0] || null;
-    let acquired, valueLabel = '';
+    let valueLabel = '';
     if(t.charId && mainChar){
-      acquired = guestAcquiredForValue(list, t.sizeId, t.categoryId, t.charId, t.valueId);
       const val = (mainChar.values || []).find(v => v.id === t.valueId);
       valueLabel = val ? val.label : '';
-    } else if(!t.charId){
-      // Si des caractéristiques existent, ce total "plat" ne représente que la part
-      // "indifférente" une fois les valeurs déjà comptées séparément — on l'ignore
-      // ici s'il fait doublon avec une ligne à caractéristique déjà listée pour ce couple.
-      acquired = (list.lots || []).reduce((s, lot) => s + (lot.entries || []).reduce((s2, e) => {
-        if(!((e.sizeIds || []).includes(t.sizeId) && e.categoryId === t.categoryId)) return s2;
-        if(mainChar && e.charValues && e.charValues[mainChar.id]) return s2; // déjà compté dans une valeur précise
-        return s2 + (Number(e.qty) || 0);
-      }, 0), 0);
-    } else {
-      acquired = 0;
+    } else if(t.charId && !mainChar){
+      return; // objectif orphelin lié à une caractéristique disparue
     }
-    const remaining = targetVal - acquired;
-    if(remaining <= 0) return;
+    const { acquired, photoIds } = guestNeedStats(list, t.sizeId, t.categoryId, t.charId, mainChar, t.valueId);
     needs.push({
       sizeId: t.sizeId, categoryId: t.categoryId, charId: t.charId || null, valueId: t.valueId || null,
       sizeLabel: guestLabel(list.sizes, t.sizeId),
-      categoryLabel: cat ? cat.label : '',
-      valueLabel, remaining,
-      comment: cat ? (cat.comment || '') : ''
+      categoryLabel: cat.label,
+      valueLabel, acquired, target: targetVal, remaining: Math.max(0, targetVal - acquired),
+      photoIds,
+      comment: cat.comment || ''
     });
   });
   return needs;
@@ -4409,6 +4455,7 @@ function v2CharacteristicsForCategoryInList(list, categoryId){
 
 function guestFirebaseInit(){
   try{ firebase.initializeApp(firebaseConfig); }catch(e){}
+  photoDbRef = firebase.database().ref('petitNidPhotos');
   firebase.database().ref('petitNidData').on('value', snap => {
     guestData = snap.val();
     renderGuestView();
@@ -4458,18 +4505,19 @@ function renderGuestListPicker(){
   main.innerHTML = `
     <div class="guest-header">
       <h1>🎁 Liste de naissance</h1>
-      <p>Voici ce qu'il reste à trouver — merci de votre aide !</p>
+      <p>Ce qu'on a déjà, et ce qu'il reste à trouver.</p>
     </div>
     <div class="cat-grid" style="padding:0 16px 24px;">
-      ${withNeeds.map(({list, needs}) => `
-        <button type="button" class="cat-card" data-guest-list="${list.id}">
+      ${withNeeds.map(({list, needs}) => {
+        const remaining = needs.filter(n => n.remaining > 0).length;
+        return `<button type="button" class="cat-card" data-guest-list="${list.id}">
           <div class="cat-icon" style="background:${list.color || 'var(--sage-dark)'};">${icon(list.icon || 'box','icon-lg')}</div>
           <div>
             <div class="cat-name">${escapeHtml(list.name)}</div>
-            <div class="cat-meta">${needs.length ? needs.length + ' article' + (needs.length > 1 ? 's' : '') + ' à offrir' : 'Tout est déjà prévu ✓'}</div>
+            <div class="cat-meta">${remaining ? remaining + ' article' + (remaining > 1 ? 's' : '') + ' à offrir' : 'Tout est déjà prévu ✓'}</div>
           </div>
-        </button>
-      `).join('')}
+        </button>`;
+      }).join('')}
     </div>
   `;
   document.querySelectorAll('[data-guest-list]').forEach(btn => {
@@ -4492,19 +4540,21 @@ function renderGuestListDetail(){
     const myName = (localStorage.getItem('nidouxGuestName') || '').toLowerCase();
     const isMine = res && (res.name || '').toLowerCase() === myName;
     const label = n.valueLabel ? `${n.categoryLabel} · ${n.valueLabel}` : n.categoryLabel;
+    const complete = n.remaining <= 0;
     return `
       <div class="v2-line-card guest-need-row">
         <div class="guest-need-top">
           <span class="guest-need-name">${escapeHtml(label)}</span>
-          <span class="guest-need-qty">encore ${n.remaining}</span>
+          <span class="guest-need-qty">${complete ? '✓ complet' : 'encore ' + n.remaining}</span>
         </div>
+        ${n.photoIds.length ? `<div class="guest-need-photos">${n.photoIds.map(id => `<img data-photo-src="${id}" alt="" class="guest-need-photo">`).join('')}</div>` : ''}
         ${n.comment ? `<div class="guest-need-comment">${escapeHtml(n.comment)}</div>` : ''}
-        ${res ? `
+        ${complete ? '' : (res ? `
           <div class="guest-claimed-badge">
             <span>${isMine ? 'Réservé par vous' : 'Réservé par ' + escapeHtml(res.name)}</span>
             ${isMine ? `<button type="button" data-guest-unclaim="${resKey}">Annuler</button>` : ''}
           </div>
-        ` : `<button type="button" class="btn btn-primary guest-claim-btn" data-guest-claim="${resKey}">${icon('check','icon-sm')} Je m'en occupe</button>`}
+        ` : `<button type="button" class="btn btn-primary guest-claim-btn" data-guest-claim="${resKey}">${icon('check','icon-sm')} Je m'en occupe</button>`)}
       </div>
     `;
   }
@@ -4518,7 +4568,7 @@ function renderGuestListDetail(){
       ${needs.length ? sizeOrder.map(sizeId => `
         <div class="section-heading">${escapeHtml(guestLabel(list.sizes, sizeId))}</div>
         ${bySize[sizeId].map(needRowHtml).join('')}
-      `).join('') : `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Tout est déjà prévu pour cette liste, merci !</div></div>`}
+      `).join('') : `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucun objectif renseigné pour cette liste pour l’instant.</div></div>`}
     </div>
   `;
   document.getElementById('guestBack').onclick = () => { guestActiveListId = null; renderGuestView(); };
@@ -4537,6 +4587,7 @@ function renderGuestListDetail(){
       showToast('Réservation annulée');
     };
   });
+  hydratePhotoImages(main);
 }
 
 /* ---------- Nav & boot ---------- */
