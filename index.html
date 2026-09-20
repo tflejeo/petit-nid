@@ -3043,6 +3043,7 @@ function renderV2PairRow(sizeId, categoryId, label){
           <label class="field-label">Commentaire</label>
           <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel…" style="min-height:40px;">${escapeHtml((catObj && catObj.comment) || '')}</textarea>
         </div>
+        <button type="button" class="text-btn danger" data-v2-delete-pair="${key}" style="margin-top:6px;">${icon('trash','icon-sm')} Supprimer "${escapeHtml(label)}" de cette ${list.sizeLabel.toLowerCase()}</button>
       `;
       html += `</div>`;
       return html;
@@ -3075,17 +3076,38 @@ function renderV2PairRow(sizeId, categoryId, label){
       </div>
       ${entries.length ? entries.map(({lot, entry}) => renderV2EntryRow(lot, entry)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:0;">Aucun article ajouté pour l’instant.</p>`}`;
     }
+    html += `<button type="button" class="text-btn danger" data-v2-delete-pair="${key}" style="margin-top:10px;">${icon('trash','icon-sm')} Supprimer "${escapeHtml(label)}" de cette ${list.sizeLabel.toLowerCase()}</button>`;
     html += `</div>`;
   }
   return html;
 }
 
-function isV2CharGroupCollapsed(groupKey){
-  return ui.collapsedSections[groupKey] === true;
+function v2DeletePairGrouping(sizeId, categoryId){
+  const list = activeV2List();
+  list.targets = (list.targets || []).filter(t => !(t.sizeId === sizeId && t.categoryId === categoryId));
+  (list.lots || []).forEach(lot => {
+    lot.entries = (lot.entries || []).map(e => {
+      if(e.categoryId !== categoryId || !(e.sizeIds || []).includes(sizeId)) return e;
+      return Object.assign({}, e, { sizeIds: e.sizeIds.filter(id => id !== sizeId) });
+    }).filter(e => e.categoryId !== categoryId || (e.sizeIds || []).length > 0);
+  });
+  list.lots = (list.lots || []).filter(lot => {
+    if((lot.entries || []).length === 0){
+      (lot.photos || []).forEach(deletePhotoRef);
+      return false;
+    }
+    return true;
+  });
+}
+
+function isV2CharGroupCollapsed(groupKey, hasEntries){
+  const explicit = ui.collapsedSections[groupKey];
+  if(explicit === true || explicit === false) return explicit;
+  return !hasEntries; // par défaut : replié si vide, déplié dès qu'il y a au moins un article
 }
 
 function renderV2CharGroup(pairKey, groupKey, row, groupEntries, excludeCharId){
-  const collapsed = isV2CharGroupCollapsed(groupKey);
+  const collapsed = isV2CharGroupCollapsed(groupKey, groupEntries.length > 0);
   const inputAttrs = row.charId
     ? `data-v2-char-target="${pairKey}" data-char-id="${row.charId}" data-value-id="${row.valueId}"`
     : `data-v2-target="${pairKey}"`;
@@ -3228,8 +3250,19 @@ function bindListsV2Events(photoRefs){
   document.querySelectorAll('[data-v2-chargroup-toggle]').forEach(el => {
     el.onclick = () => {
       const key = el.dataset.v2ChargroupToggle;
-      ui.collapsedSections[key] = !isV2CharGroupCollapsed(key);
+      const currentlyOpen = el.classList.contains('open');
+      ui.collapsedSections[key] = currentlyOpen; // on mémorise l'état explicite inverse de ce qui est affiché
       saveUi(); render();
+    };
+  });
+
+  document.querySelectorAll('[data-v2-delete-pair]').forEach(btn => {
+    btn.onclick = () => {
+      const [sizeId, categoryId] = btn.dataset.v2DeletePair.split('::');
+      openConfirmModal('Supprimer cette catégorie ?', 'L’objectif et les éventuels articles déjà achetés pour cette combinaison seront définitivement supprimés.', () => {
+        v2DeletePairGrouping(sizeId, categoryId);
+        save(); closeModal(); render(); showToast('Catégorie supprimée');
+      });
     };
   });
 
