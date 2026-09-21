@@ -191,6 +191,26 @@
   .leave-cal-legend{display:flex; flex-wrap:wrap; gap:8px 12px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border);}
   .leave-cal-legend span{display:flex; align-items:center; gap:4px; font-size:11px; color:var(--muted); font-weight:700;}
   .leave-cal-legend i{width:8px; height:8px; border-radius:999px; display:inline-block;}
+  .daycare-counts{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;}
+  .daycare-counts span{color:#fff; font-size:11px; font-weight:800; padding:5px 10px; border-radius:999px;}
+  .daycare-tips{background:var(--card); border:1px solid var(--border); border-radius:var(--r-md); padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:var(--ink);}
+  .daycare-tips summary{font-weight:800; cursor:pointer; color:var(--sage-dark); list-style:none;}
+  .daycare-tips summary::-webkit-details-marker{display:none;}
+  .daycare-tips ul{margin:10px 0 0; padding-left:18px; display:flex; flex-direction:column; gap:6px;}
+  .daycare-card{background:var(--card); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow); padding:14px; margin-bottom:12px; cursor:pointer;}
+  .daycare-card-top{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;}
+  .daycare-stars{font-size:14px; letter-spacing:1px;}
+  .daycare-status-pill{color:#fff; font-size:10.5px; font-weight:800; padding:4px 9px; border-radius:999px; flex-shrink:0;}
+  .daycare-name{font-weight:800; font-size:15px; color:var(--ink); margin-bottom:2px;}
+  .daycare-type{font-size:11.5px; color:var(--muted); font-weight:700; margin:2px 0;}
+  .daycare-link{display:inline-flex; align-items:center; gap:4px; font-size:12.5px; color:var(--sage-dark); font-weight:700; text-decoration:none; margin:2px 12px 2px 0;}
+  .daycare-contacts{display:flex; flex-wrap:wrap; margin-top:2px;}
+  .daycare-comment{font-size:12px; color:var(--muted); font-style:italic; margin-top:6px;}
+  .daycare-next{font-size:11.5px; font-weight:700; color:var(--muted); margin-top:6px;}
+  .daycare-next.overdue{color:var(--terracotta-dark);}
+  .daycare-star-picker{display:flex; gap:4px;}
+  .daycare-star-picker button{background:none; border:none; font-size:28px; color:var(--border); cursor:pointer; line-height:1; padding:0;}
+  .daycare-star-picker button.active{color:var(--amber);}
   .theme-preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .theme-preset-card{
     display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:10px 12px;
@@ -568,9 +588,10 @@
     max-width:640px; margin:0 auto;
   }
   .nav-btn{
-    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
-    background:none; border:none; color:var(--muted-2); font-size:11px; font-weight:800; padding:6px 0; cursor:pointer;
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+    background:none; border:none; color:var(--muted-2); font-size:9.5px; font-weight:800; padding:6px 0; cursor:pointer;
   }
+  .nav-btn .icon{width:19px; height:19px;}
   .nav-btn.active{color:var(--sage-dark);}
 
   /* Modal */
@@ -730,6 +751,10 @@
     <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 17h2M14 17h2"/></svg>
     Congés
   </button>
+  <button class="nav-btn" data-nav="daycare">
+    <svg class="icon" viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/><circle cx="12" cy="7" r="1"/></svg>
+    Crèche
+  </button>
   <button class="nav-btn" data-nav="prono">
     <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 8h18M12 8v13M7.5 8a2.5 2.5 0 010-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 010 5"/></svg>
     Prono
@@ -845,6 +870,7 @@ function buildDefaultData(){
     headerTagline: 'votre liste de naissance',
     homeTodoCount: 3,
     leavePlanner: buildDefaultLeavePlanner(),
+    daycares: [],
     v2lists: buildDefaultV2Lists()
   };
 }
@@ -1339,6 +1365,150 @@ function bindLeaveEvents(){
   });
 }
 
+function daycareStatusCounts(list){
+  const counts = {};
+  DAYCARE_STATUSES.forEach(s => { counts[s.id] = 0; });
+  list.forEach(d => { counts[d.status] = (counts[d.status] || 0) + 1; });
+  return counts;
+}
+
+function renderDaycareCard(dc){
+  const st = DAYCARE_STATUSES.find(s => s.id === dc.status) || DAYCARE_STATUSES[0];
+  const todayIso = toISODate(new Date());
+  const overdue = dc.nextContact && dc.nextContact < todayIso;
+  const mapsUrl = dc.address ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(dc.address) : '';
+  return `<div class="daycare-card" data-daycare-edit="${dc.id}">
+    <div class="daycare-card-top">
+      <div class="daycare-stars">${[1,2,3,4,5].map(n => `<span style="color:${n <= dc.priority ? 'var(--amber)' : 'var(--border)'}">★</span>`).join('')}</div>
+      <span class="daycare-status-pill" style="background:${st.color};">${escapeHtml(st.label)}</span>
+    </div>
+    <div class="daycare-name">${escapeHtml(dc.name || 'Sans nom')}</div>
+    ${dc.type ? `<div class="daycare-type">${escapeHtml(dc.type)}${dc.capacity ? ' · ' + escapeHtml(dc.capacity) : ''}</div>` : (dc.capacity ? `<div class="daycare-type">${escapeHtml(dc.capacity)}</div>` : '')}
+    ${dc.address ? `<a href="${escapeAttr(mapsUrl)}" target="_blank" rel="noopener" class="daycare-link" onclick="event.stopPropagation()">${icon('link','icon-sm')} ${escapeHtml(dc.address)}</a>` : ''}
+    <div class="daycare-contacts">
+      ${dc.phone ? `<a href="tel:${escapeAttr(dc.phone.replace(/\s+/g,''))}" class="daycare-link" onclick="event.stopPropagation()">📞 ${escapeHtml(dc.phone)}</a>` : ''}
+      ${dc.email ? `<a href="mailto:${escapeAttr(dc.email)}" class="daycare-link" onclick="event.stopPropagation()">✉️ ${escapeHtml(dc.email)}</a>` : ''}
+    </div>
+    ${dc.hours ? `<div class="daycare-type">🕒 ${escapeHtml(dc.hours)}</div>` : ''}
+    ${dc.comment ? `<div class="daycare-comment">${escapeHtml(dc.comment)}</div>` : ''}
+    ${dc.nextContact ? `<div class="daycare-next ${overdue ? 'overdue' : ''}">🔔 Relance : ${formatDateShort(dc.nextContact)}${overdue ? ' (dépassée)' : ''}</div>` : ''}
+  </div>`;
+}
+
+function renderDaycares(){
+  const main = document.getElementById('mainContent');
+  const list = data.daycares || [];
+  const counts = daycareStatusCounts(list);
+  const sorted = list.slice().sort((a, b) => (b.priority - a.priority) || a.name.localeCompare(b.name, 'fr'));
+  main.innerHTML = `
+    <button class="btn btn-primary" id="btnAddDaycare" style="width:100%; margin:2px 0 16px; padding:13px;">${icon('plus','icon-sm')} Ajouter une crèche</button>
+    ${list.length ? `<div class="daycare-counts">${DAYCARE_STATUSES.map(s => counts[s.id] ? `<span style="background:${s.color};">${counts[s.id]} ${escapeHtml(s.label.toLowerCase())}</span>` : '').join('')}</div>` : ''}
+    <details class="daycare-tips">
+      <summary>💡 Conseils pour la recherche de crèche</summary>
+      <ul>
+        <li>Contactez les crèches idéalement 6 à 12 mois avant la date de garde souhaitée — les places se remplissent tôt, surtout pour une rentrée en septembre.</li>
+        <li>Inscrivez-vous en parallèle sur le portail famille de votre mairie pour les crèches municipales/collectives — la préinscription y est souvent possible dès la grossesse déclarée.</li>
+        <li>Le mode de garde n'est pas exclusif : vous pouvez mener plusieurs démarches en parallèle (crèche et assistante maternelle) et choisir une fois les réponses reçues.</li>
+        <li>Les commissions d'attribution ont souvent lieu au printemps pour une rentrée de septembre — pensez à relancer si vous n'avez pas de nouvelles après plusieurs semaines.</li>
+        <li>Si vous envisagez une assistante maternelle ou une garde à domicile, renseignez-vous sur le complément de libre choix du mode de garde (CMG) auprès de la CAF.</li>
+      </ul>
+      <p style="color:var(--muted); font-size:11.5px; margin-top:8px;">Les délais et modalités exactes dépendent de votre commune et de votre CAF — ces conseils restent généraux.</p>
+    </details>
+    <div id="daycareList">
+      ${sorted.length ? sorted.map(renderDaycareCard).join('') : `<div class="empty-state">${icon('sparkle','icon-lg')}<div>Aucune crèche ajoutée pour l’instant.</div></div>`}
+    </div>
+  `;
+  bindDaycareEvents();
+}
+
+function bindDaycareEvents(){
+  document.getElementById('btnAddDaycare').onclick = () => openDaycareModal(null);
+  document.querySelectorAll('[data-daycare-edit]').forEach(card => {
+    card.addEventListener('click', () => {
+      const dc = (data.daycares || []).find(d => d.id === card.dataset.daycareEdit);
+      if(dc) openDaycareModal(dc);
+    });
+  });
+}
+
+function openDaycareModal(existing){
+  const isNew = !existing;
+  const dc = existing || { id:null, name:'', type:'', address:'', phone:'', email:'', status:'to_contact', priority:0, capacity:'', hours:'', comment:'', nextContact:'' };
+  let priority = dc.priority;
+  openModal(`
+    <h2>${isNew ? 'Ajouter une crèche' : 'Modifier cette crèche'}</h2>
+    <div class="field"><label class="field-label">Nom</label><input type="text" id="dcName" value="${escapeAttr(dc.name)}" placeholder="Ex. Crèche Les Petits Pas"></div>
+    <div class="field">
+      <label class="field-label">Type</label>
+      <select id="dcType">
+        <option value="">—</option>
+        ${DAYCARE_TYPES.map(t => `<option value="${escapeAttr(t)}" ${dc.type===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label class="field-label">Adresse</label><input type="text" id="dcAddress" value="${escapeAttr(dc.address)}" placeholder="N° et rue, ville"></div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label class="field-label">Téléphone</label><input type="tel" id="dcPhone" value="${escapeAttr(dc.phone)}"></div>
+      <div class="field" style="flex:1;"><label class="field-label">Email</label><input type="email" id="dcEmail" value="${escapeAttr(dc.email)}"></div>
+    </div>
+    <div class="field">
+      <label class="field-label">Statut</label>
+      <select id="dcStatus">
+        ${DAYCARE_STATUSES.map(s => `<option value="${s.id}" ${dc.status===s.id?'selected':''}>${escapeHtml(s.label)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label class="field-label">Priorité</label>
+      <div class="daycare-star-picker" id="dcStarPicker">
+        ${[1,2,3,4,5].map(n => `<button type="button" data-star="${n}" class="${n<=dc.priority?'active':''}">★</button>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label class="field-label">Places / capacité</label><input type="text" id="dcCapacity" value="${escapeAttr(dc.capacity)}" placeholder="Ex. 2 places dispo"></div>
+      <div class="field" style="flex:1;"><label class="field-label">Horaires</label><input type="text" id="dcHours" value="${escapeAttr(dc.hours)}" placeholder="Ex. 7h30-18h30"></div>
+    </div>
+    <div class="field"><label class="field-label">Prochaine relance</label><input type="date" id="dcNextContact" value="${escapeAttr(dc.nextContact)}"></div>
+    <div class="field"><label class="field-label">Commentaire</label><textarea id="dcComment" placeholder="Impressions, dossier à fournir…" style="min-height:60px;">${escapeHtml(dc.comment)}</textarea></div>
+    <div class="modal-actions">
+      ${!isNew ? `<button type="button" class="btn btn-danger" id="btnDeleteDaycare">${icon('trash','icon-sm')} Supprimer</button>` : `<button class="btn btn-secondary" id="mCancel">Annuler</button>`}
+      <button class="btn btn-primary" id="mSave">Enregistrer</button>
+    </div>
+  `);
+  document.querySelectorAll('#dcStarPicker button').forEach(btn => {
+    btn.onclick = () => {
+      priority = parseInt(btn.dataset.star, 10);
+      document.querySelectorAll('#dcStarPicker button').forEach(b => b.classList.toggle('active', parseInt(b.dataset.star, 10) <= priority));
+    };
+  });
+  const cancelBtn = document.getElementById('mCancel');
+  if(cancelBtn) cancelBtn.onclick = closeModal;
+  const deleteBtn = document.getElementById('btnDeleteDaycare');
+  if(deleteBtn) deleteBtn.onclick = () => openConfirmModal('Supprimer cette crèche ?', 'Toutes les informations saisies pour cette crèche seront définitivement perdues.', () => {
+    data.daycares = (data.daycares || []).filter(d => d.id !== dc.id);
+    save(); closeModal(); render(); showToast('Crèche supprimée');
+  });
+  document.getElementById('mSave').onclick = () => {
+    const name = document.getElementById('dcName').value.trim();
+    if(!name){ showToast('Donnez un nom à cette crèche'); return; }
+    const payload = {
+      name,
+      type: document.getElementById('dcType').value,
+      address: document.getElementById('dcAddress').value.trim(),
+      phone: document.getElementById('dcPhone').value.trim(),
+      email: document.getElementById('dcEmail').value.trim(),
+      status: document.getElementById('dcStatus').value,
+      priority,
+      capacity: document.getElementById('dcCapacity').value.trim(),
+      hours: document.getElementById('dcHours').value.trim(),
+      comment: document.getElementById('dcComment').value.trim(),
+      nextContact: document.getElementById('dcNextContact').value
+    };
+    if(!Array.isArray(data.daycares)) data.daycares = [];
+    if(isNew) data.daycares.push(Object.assign({ id:newId() }, payload));
+    else Object.assign(dc, payload);
+    save(); closeModal(); render(); showToast(isNew ? 'Crèche ajoutée' : 'Crèche mise à jour');
+  };
+}
+
 /* ---------- Firebase config ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyAKjE0E3-4gehxRwncDz7ZhLYXFWVEl3tY",
@@ -1400,6 +1570,16 @@ function applyTheme(themeObj){
   root.setProperty('--lavender-tint', lightenHex(accent2, 0.9));
   root.setProperty('--bg', bg);
 }
+
+const DAYCARE_STATUSES = [
+  { id:'to_contact',     label:'À contacter',              color:'var(--terracotta-dark)' },
+  { id:'info_requested', label:'Renseignements demandés',  color:'var(--amber)' },
+  { id:'preregistered',  label:'Préinscrit(e)',            color:'var(--blue)' },
+  { id:'waitlist',       label:"Liste d'attente",          color:'var(--lavender)' },
+  { id:'accepted',       label:'Accepté(e)',               color:'var(--sage-dark)' },
+  { id:'declined',       label:'Refusé / complet',         color:'var(--muted-2)' }
+];
+const DAYCARE_TYPES = ['Crèche collective', 'Crèche municipale', 'Micro-crèche', 'Crèche parentale', 'Crèche familiale', 'Assistante maternelle', 'Autre'];
 
 let data = loadLocalData();
 applyTheme(data.theme);
@@ -1574,8 +1754,7 @@ function normalizeData(d){
   if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
   d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
   if(!d.theme || typeof d.theme !== 'object') d.theme = {};
-  if(!d.leavePlanner || typeof d.leavePlanner !== 'object') d.leavePlanner = buildDefaultLeavePlanner();
-  {
+  if(!d.leavePlanner || typeof d.leavePlanner !== 'object') d.leavePlanner = buildDefaultLeavePlanner();  {
     const lp = d.leavePlanner;
     if(typeof lp.birthDate !== 'string') lp.birthDate = '';
     if(typeof lp.multipleBirth !== 'boolean') lp.multipleBirth = false;
@@ -1594,6 +1773,21 @@ function normalizeData(d){
     if(!Array.isArray(lp.cpPeriods)) lp.cpPeriods = [];
     lp.cpPeriods.forEach(p => { p.id = p.id || newId(); p.owner = p.owner === 'mother' ? 'mother' : 'father'; p.start = p.start || ''; p.end = p.end || ''; });
   }
+  if(!Array.isArray(d.daycares)) d.daycares = [];
+  d.daycares.forEach(dc => {
+    dc.id = dc.id || newId();
+    dc.name = dc.name || '';
+    dc.type = dc.type || '';
+    dc.address = dc.address || '';
+    dc.phone = dc.phone || '';
+    dc.email = dc.email || '';
+    dc.status = DAYCARE_STATUSES.some(s => s.id === dc.status) ? dc.status : 'to_contact';
+    dc.priority = Number(dc.priority) || 0;
+    dc.capacity = dc.capacity || '';
+    dc.hours = dc.hours || '';
+    dc.comment = dc.comment || '';
+    dc.nextContact = dc.nextContact || '';
+  });
   normalizeV2(d);
   if(!Array.isArray(d.synonyms)) d.synonyms = [];
   d.synonyms.forEach(g => { g.terms = Array.isArray(g.terms) ? g.terms.filter(Boolean) : []; });
@@ -2026,9 +2220,10 @@ function render(){
   else if(ui.view === 'echo') renderEcho();
   else if(ui.view === 'todo') renderTodo();
   else if(ui.view === 'leaves') renderLeaves();
+  else if(ui.view === 'daycare') renderDaycares();
   else { ui.view = 'dashboard'; renderDashboard(); }
   document.querySelectorAll('.nav-btn').forEach(b=>{
-    const activeMap = { dashboard:'dashboard', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo', leaves:'leaves' };
+    const activeMap = { dashboard:'dashboard', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo', leaves:'leaves', daycare:'daycare' };
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
@@ -2051,6 +2246,8 @@ function renderHeader(){
     h.innerHTML = `<div class="brand"><h1>À faire</h1></div>`;
   } else if(ui.view === 'leaves'){
     h.innerHTML = `<div class="brand"><h1>Calendrier congés</h1></div>`;
+  } else if(ui.view === 'daycare'){
+    h.innerHTML = `<div class="brand"><h1>Crèche</h1></div>`;
   }
 }
 
