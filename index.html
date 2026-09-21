@@ -170,6 +170,27 @@
   }
 
   .progress-block{margin-top:16px;}
+  .leave-result{font-size:12.5px; color:var(--ink); margin:6px 0 0;}
+  .leave-result strong{color:var(--sage-dark);}
+  .leave-period-row{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-top:1px solid var(--border);}
+  .leave-period-row:first-child{border-top:none;}
+  .leave-period-dates{font-size:12.5px; font-weight:700; color:var(--ink);}
+  .leave-period-detail{font-size:11.5px; color:var(--muted);}
+  .leave-cal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .leave-cal-month{font-weight:800; font-size:14px; color:var(--ink); text-transform:capitalize;}
+  .leave-cal-grid{display:grid; grid-template-columns:repeat(7, 1fr); gap:2px;}
+  .leave-cal-cell{
+    aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:10.5px; color:var(--ink); border-radius:6px; gap:2px;
+  }
+  .leave-cal-cell.dow{font-weight:800; color:var(--muted); aspect-ratio:auto; padding:2px 0;}
+  .leave-cal-cell.empty{visibility:hidden;}
+  .leave-cal-cell.weekend .leave-cal-daynum{color:var(--muted);}
+  .leave-cal-dots{display:flex; gap:1.5px;}
+  .leave-cal-dots i{width:4px; height:4px; border-radius:999px; display:block;}
+  .leave-cal-legend{display:flex; flex-wrap:wrap; gap:8px 12px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border);}
+  .leave-cal-legend span{display:flex; align-items:center; gap:4px; font-size:11px; color:var(--muted); font-weight:700;}
+  .leave-cal-legend i{width:8px; height:8px; border-radius:999px; display:inline-block;}
   .theme-preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .theme-preset-card{
     display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:10px 12px;
@@ -705,6 +726,10 @@
     <svg class="icon" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>
     À faire
   </button>
+  <button class="nav-btn" data-nav="leaves">
+    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 17h2M14 17h2"/></svg>
+    Congés
+  </button>
   <button class="nav-btn" data-nav="prono">
     <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 8h18M12 8v13M7.5 8a2.5 2.5 0 010-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 010 5"/></svg>
     Prono
@@ -819,8 +844,447 @@ function buildDefaultData(){
     todos: [],
     headerTagline: 'votre liste de naissance',
     homeTodoCount: 3,
+    leavePlanner: buildDefaultLeavePlanner(),
     v2lists: buildDefaultV2Lists()
   };
+}
+function buildDefaultLeavePlanner(){
+  return {
+    birthDate: '',
+    multipleBirth: false,
+    childRank: '1-2',
+    cpMode: 'ouvres',
+    father: { naissanceStart: '', optionalPeriods: [], csnPeriods: [] },
+    mother: { maternityStart: '', csnPeriods: [] },
+    cpPeriods: []
+  };
+}
+
+/* ---------- Moteur de dates / règles légales congés (France, en vigueur mi-2026) ---------- */
+function easterDateISO(year){
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19*a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2*e + 2*i - h - k) % 7;
+  const m = Math.floor((a + 11*h + 22*l) / 451);
+  const month = Math.floor((h + l - 7*m + 114) / 31);
+  const day = ((h + l - 7*m + 114) % 31) + 1;
+  return year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+}
+function parseISODate(s){ return s ? new Date(s + 'T00:00:00') : null; }
+function toISODate(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function addDaysISO(s, n){ const d = parseISODate(s); d.setDate(d.getDate() + n); return toISODate(d); }
+function addMonthsISO(s, n){ const d = parseISODate(s); d.setMonth(d.getMonth() + n); return toISODate(d); }
+const _frenchHolidayCache = {};
+function frenchHolidaysForYear(year){
+  if(_frenchHolidayCache[year]) return _frenchHolidayCache[year];
+  const easter = easterDateISO(year);
+  const pad2 = (n) => String(n).padStart(2,'0');
+  const list = new Set([
+    year + '-01-01',
+    addDaysISO(easter, 1),
+    year + '-05-01',
+    year + '-05-08',
+    addDaysISO(easter, 39),
+    addDaysISO(easter, 50),
+    year + '-07-14',
+    year + '-08-15',
+    year + '-11-01',
+    year + '-11-11',
+    year + '-12-25'
+  ]);
+  _frenchHolidayCache[year] = list;
+  return list;
+}
+function isHolidayISO(iso){
+  return frenchHolidaysForYear(parseInt(iso.slice(0,4), 10)).has(iso);
+}
+function dowISO(iso){ return parseISODate(iso).getDay(); } // 0=dimanche..6=samedi
+// Renvoie la date du n-ième jour ouvrable (tous les jours sauf dimanche et feries) a partir de start inclus.
+function nthOuvrableFromISO(startIso, n){
+  let d = startIso, count = 0;
+  while(true){
+    if(dowISO(d) !== 0 && !isHolidayISO(d)){
+      count++;
+      if(count >= n) return d;
+    }
+    d = addDaysISO(d, 1);
+  }
+}
+// Compte les jours "consommés" (ouvrés ou ouvrables selon le mode) sur une periode donnee, bornes incluses.
+function countConsumedDaysISO(startIso, endIso, mode){
+  if(!startIso || !endIso || endIso < startIso) return 0;
+  let d = startIso, count = 0;
+  while(d <= endIso){
+    const dow = dowISO(d);
+    const excluded = mode === 'ouvrables' ? (dow === 0) : (dow === 0 || dow === 6);
+    if(!excluded && !isHolidayISO(d)) count++;
+    d = addDaysISO(d, 1);
+  }
+  return count;
+}
+const MATERNITE_DUREES = {
+  '1-2':      { label:'1er ou 2e enfant',   before:6,  after:10 },
+  '3+':       { label:'3e enfant ou plus',  before:8,  after:18 },
+  'twins':    { label:'Jumeaux',            before:12, after:22 },
+  'triplets': { label:'Triplés ou plus',    before:24, after:22 }
+};
+function paterniteJoursTotal(multiple){ return multiple ? 28 : 21; } // jours facultatifs fractionnables (hors 4 obligatoires)
+function paterniteJoursObligatoires(){ return 4; }
+
+function leaveComputed(lp){
+  const birth = lp.birthDate || data.dueDate || '';
+  const naissanceStart = lp.father.naissanceStart || birth;
+  const naissanceEnd = naissanceStart ? nthOuvrableFromISO(naissanceStart, 3) : '';
+  const obligStart = naissanceEnd ? addDaysISO(naissanceEnd, 1) : '';
+  const obligEnd = obligStart ? addDaysISO(obligStart, paterniteJoursObligatoires() - 1) : '';
+  const paterniteTotal = paterniteJoursTotal(lp.multipleBirth);
+  const paterniteUsed = lp.father.optionalPeriods.reduce((s, p) => s + (Number(p.days) || 0), 0);
+  const paterniteDeadline = birth ? addMonthsISO(birth, 6) : '';
+  const mat = MATERNITE_DUREES[lp.childRank];
+  let maternityStart, maternityBirthDay, maternityEnd;
+  if(lp.mother.maternityStart){
+    maternityStart = lp.mother.maternityStart;
+    maternityBirthDay = addDaysISO(maternityStart, mat.before * 7);
+    maternityEnd = addDaysISO(maternityStart, (mat.before + mat.after) * 7 - 1);
+  } else if(birth){
+    maternityBirthDay = birth;
+    maternityStart = addDaysISO(birth, -mat.before * 7);
+    maternityEnd = addDaysISO(birth, mat.after * 7 - 1);
+  } else {
+    maternityStart = maternityBirthDay = maternityEnd = '';
+  }
+  return { birth, naissanceStart, naissanceEnd, obligStart, obligEnd, paterniteTotal, paterniteUsed, paterniteDeadline, mat, maternityStart, maternityBirthDay, maternityEnd };
+}
+
+function collectLeaveBlocks(lp){
+  const c = leaveComputed(lp);
+  const blocks = [];
+  if(c.naissanceStart && c.naissanceEnd) blocks.push({ start:c.naissanceStart, end:c.naissanceEnd, color:'var(--amber)', label:'Naissance (papa)' });
+  if(c.obligStart && c.obligEnd) blocks.push({ start:c.obligStart, end:c.obligEnd, color:'var(--terracotta-dark)', label:'Paternité obligatoire' });
+  lp.father.optionalPeriods.forEach(p => {
+    if(!p.start) return;
+    blocks.push({ start:p.start, end:addDaysISO(p.start, (Number(p.days)||5) - 1), color:'var(--sage-dark)', label:'Paternité (facultatif)' });
+  });
+  lp.father.csnPeriods.forEach(p => {
+    if(!p.start) return;
+    blocks.push({ start:p.start, end:addDaysISO(addMonthsISO(p.start, Number(p.months)||1), -1), color:'var(--lavender)', label:'Congé suppl. naissance (papa)' });
+  });
+  if(c.maternityStart && c.maternityEnd) blocks.push({ start:c.maternityStart, end:c.maternityEnd, color:'var(--blue)', label:'Maternité' });
+  lp.mother.csnPeriods.forEach(p => {
+    if(!p.start) return;
+    blocks.push({ start:p.start, end:addDaysISO(addMonthsISO(p.start, Number(p.months)||1), -1), color:'var(--lavender)', label:'Congé suppl. naissance (maman)' });
+  });
+  lp.cpPeriods.forEach(p => {
+    if(!p.start || !p.end || p.end < p.start) return;
+    blocks.push({ start:p.start, end:p.end, color:'var(--muted-2)', label:'CP ' + (p.owner === 'mother' ? 'maman' : 'papa') });
+  });
+  return blocks;
+}
+
+function renderLeaveMonthGrid(year, month, blocks){
+  const first = new Date(year, month, 1);
+  const startDow = (first.getDay() + 6) % 7; // lundi=0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = first.toLocaleDateString('fr-FR', { month:'long', year:'numeric' });
+  let cells = '';
+  for(let i = 0; i < startDow; i++) cells += `<div class="leave-cal-cell empty"></div>`;
+  for(let day = 1; day <= daysInMonth; day++){
+    const iso = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    const dayBlocks = blocks.filter(b => iso >= b.start && iso <= b.end);
+    const isWeekend = [0,6].includes(new Date(year, month, day).getDay());
+    cells += `<div class="leave-cal-cell ${isWeekend ? 'weekend' : ''}" title="${dayBlocks.map(b=>b.label).join(', ')}">
+      <span class="leave-cal-daynum">${day}</span>
+      ${dayBlocks.length ? `<span class="leave-cal-dots">${dayBlocks.slice(0,4).map(b => `<i style="background:${b.color}"></i>`).join('')}</span>` : ''}
+    </div>`;
+  }
+  return `
+    <div class="leave-cal-header">
+      <button type="button" class="text-btn" data-leave-cal-nav="-1">${icon('chevronLeft','icon-sm')}</button>
+      <span class="leave-cal-month">${escapeHtml(monthLabel)}</span>
+      <button type="button" class="text-btn" data-leave-cal-nav="1" style="transform:scaleX(-1);">${icon('chevronLeft','icon-sm')}</button>
+    </div>
+    <div class="leave-cal-grid">
+      ${['L','M','M','J','V','S','D'].map(d => `<div class="leave-cal-cell dow">${d}</div>`).join('')}
+      ${cells}
+    </div>
+  `;
+}
+
+let leaveCalYearMonth = null;
+
+function leaveNextOuvrableAfter(iso){
+  let d = addDaysISO(iso, 1);
+  while(dowISO(d) === 0 || dowISO(d) === 6 || isHolidayISO(d)) d = addDaysISO(d, 1);
+  return d;
+}
+
+function renderLeaves(){
+  const main = document.getElementById('mainContent');
+  const lp = data.leavePlanner;
+  const c = leaveComputed(lp);
+  const blocks = collectLeaveBlocks(lp);
+
+  const fatherEnds = blocks.filter(b => b.label.indexOf('papa') >= 0 || b.label.indexOf('Naissance') >= 0 || b.label.indexOf('Paternité') >= 0).map(b => b.end);
+  const motherEnds = blocks.filter(b => b.label.indexOf('maman') >= 0 || b.label === 'Maternité').map(b => b.end);
+  const fatherLastDay = fatherEnds.length ? fatherEnds.sort().slice(-1)[0] : '';
+  const motherLastDay = motherEnds.length ? motherEnds.sort().slice(-1)[0] : '';
+
+  if(!leaveCalYearMonth){
+    const ref = c.birth ? parseISODate(c.birth) : new Date();
+    leaveCalYearMonth = { year: ref.getFullYear(), month: ref.getMonth() };
+  }
+
+  main.innerHTML = `
+    <p style="color:var(--muted); font-size:12.5px; margin:0 0 14px;">Estimation indicative basée sur les règles en vigueur mi-2026 (Code du travail, LFSS 2026). Vérifiez vos droits exacts auprès de votre employeur ou de votre CPAM.</p>
+
+    <div class="field">
+      <label class="field-label">Date de naissance (réelle ou prévue)</label>
+      <input type="date" id="lpBirthDate" value="${escapeAttr(lp.birthDate || data.dueDate || '')}">
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;">
+        <label class="field-label">Situation</label>
+        <select id="lpChildRank">
+          ${Object.entries(MATERNITE_DUREES).map(([k,v]) => `<option value="${k}" ${lp.childRank===k?'selected':''}>${escapeHtml(v.label)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="flex:1;">
+        <label class="field-label">Décompte des CP</label>
+        <select id="lpCpMode">
+          <option value="ouvres" ${lp.cpMode==='ouvres'?'selected':''}>Jours ouvrés (5j/sem.)</option>
+          <option value="ouvrables" ${lp.cpMode==='ouvrables'?'selected':''}>Jours ouvrables (6j/sem.)</option>
+        </select>
+      </div>
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:2px 0 16px;">
+      <input type="checkbox" id="lpMultiple" ${lp.multipleBirth?'checked':''} style="width:18px; height:18px; accent-color:var(--sage-dark);">
+      <span style="font-size:13px;">Naissance multiple (jumeaux, triplés…)</span>
+    </label>
+
+    <div class="section-heading" style="margin-top:0;">👨 Congés du papa</div>
+
+    <div class="section-card" style="padding:14px;">
+      <div class="field-label" style="margin-bottom:6px;">Congé de naissance <span style="font-weight:600; color:var(--muted);">(3 jours ouvrables, employeur)</span></div>
+      <div class="field"><label class="field-label">Début</label><input type="date" id="lpNaissanceStart" value="${escapeAttr(lp.father.naissanceStart)}" placeholder="Par défaut : date de naissance"></div>
+      ${c.naissanceEnd ? `<p class="leave-result">Du <strong>${formatDateShort(c.naissanceStart)}</strong> au <strong>${formatDateShort(c.naissanceEnd)}</strong></p>` : ''}
+    </div>
+
+    <div class="section-card" style="padding:14px;">
+      <div class="field-label" style="margin-bottom:6px;">Congé paternité <span style="font-weight:600; color:var(--muted);">(${c.paterniteTotal + 4} jours calendaires au total)</span></div>
+      ${c.obligEnd ? `<p class="leave-result">Bloc obligatoire (4j) : <strong>${formatDateShort(c.obligStart)}</strong> → <strong>${formatDateShort(c.obligEnd)}</strong></p>` : `<p class="leave-result">Renseignez la date de naissance ou de congé de naissance pour calculer le bloc obligatoire.</p>`}
+      <div class="field-label" style="margin:10px 0 4px;">Solde facultatif : ${c.paterniteUsed} / ${c.paterniteTotal} jours utilisés ${c.paterniteDeadline ? '· à prendre avant le ' + formatDateShort(c.paterniteDeadline) : ''}</div>
+      <div id="lpPaterniteOptList">${renderLeavePeriodList(lp.father.optionalPeriods, 'father-opt')}</div>
+      <button type="button" class="add-row-btn" id="btnAddPaterniteOpt" ${lp.father.optionalPeriods.length >= 2 ? 'disabled style="opacity:0.5;"' : ''}>${icon('plus','icon-sm')} Ajouter une période (max 2, min 5 jours)</button>
+    </div>
+
+    <div class="section-card" style="padding:14px;">
+      <div class="field-label" style="margin-bottom:6px;">Congé supplémentaire de naissance <span style="font-weight:600; color:var(--muted);">(optionnel, 1 ou 2 mois, après épuisement du congé paternité)</span></div>
+      <div id="lpFatherCsnList">${renderLeavePeriodList(lp.father.csnPeriods, 'father-csn')}</div>
+      <button type="button" class="add-row-btn" id="btnAddFatherCsn" ${lp.father.csnPeriods.length >= 2 ? 'disabled style="opacity:0.5;"' : ''}>${icon('plus','icon-sm')} Ajouter une période</button>
+    </div>
+
+    ${fatherLastDay ? `<p class="leave-result">📅 Dernier jour de congé (papa) : <strong>${formatDateShort(fatherLastDay)}</strong> — reprise possible le <strong>${formatDateShort(leaveNextOuvrableAfter(fatherLastDay))}</strong></p>` : ''}
+
+    <div class="section-heading">👩 Congés de la maman</div>
+
+    <div class="section-card" style="padding:14px;">
+      <div class="field-label" style="margin-bottom:6px;">Congé maternité <span style="font-weight:600; color:var(--muted);">(${c.mat.before + c.mat.after} semaines : ${c.mat.before} avant + ${c.mat.after} après)</span></div>
+      <div class="field"><label class="field-label">Début (laisser vide pour calculer depuis la date de naissance)</label><input type="date" id="lpMaternityStart" value="${escapeAttr(lp.mother.maternityStart)}"></div>
+      ${c.maternityStart && c.maternityEnd ? `<p class="leave-result">Du <strong>${formatDateShort(c.maternityStart)}</strong> au <strong>${formatDateShort(c.maternityEnd)}</strong> (accouchement estimé le ${formatDateShort(c.maternityBirthDay)})</p>` : ''}
+    </div>
+
+    <div class="section-card" style="padding:14px;">
+      <div class="field-label" style="margin-bottom:6px;">Congé supplémentaire de naissance <span style="font-weight:600; color:var(--muted);">(optionnel, 1 ou 2 mois, après épuisement du congé maternité)</span></div>
+      <div id="lpMotherCsnList">${renderLeavePeriodList(lp.mother.csnPeriods, 'mother-csn')}</div>
+      <button type="button" class="add-row-btn" id="btnAddMotherCsn" ${lp.mother.csnPeriods.length >= 2 ? 'disabled style="opacity:0.5;"' : ''}>${icon('plus','icon-sm')} Ajouter une période</button>
+    </div>
+
+    ${motherLastDay ? `<p class="leave-result">📅 Dernier jour de congé (maman) : <strong>${formatDateShort(motherLastDay)}</strong> — reprise possible le <strong>${formatDateShort(leaveNextOuvrableAfter(motherLastDay))}</strong></p>` : ''}
+
+    <div class="section-heading">🏖️ Congés payés</div>
+    <div class="section-card" style="padding:14px;">
+      <div id="lpCpList">${renderCpPeriodList(lp.cpPeriods, lp.cpMode)}</div>
+      <button type="button" class="add-row-btn" id="btnAddCp">${icon('plus','icon-sm')} Ajouter une période de CP</button>
+    </div>
+
+    <div class="section-heading">🗓️ Calendrier</div>
+    <div class="section-card" style="padding:14px;" id="lpCalendarWrap">
+      ${renderLeaveMonthGrid(leaveCalYearMonth.year, leaveCalYearMonth.month, blocks)}
+      <div class="leave-cal-legend">
+        <span><i style="background:var(--amber)"></i> Naissance</span>
+        <span><i style="background:var(--terracotta-dark)"></i> Paternité oblig.</span>
+        <span><i style="background:var(--sage-dark)"></i> Paternité facult.</span>
+        <span><i style="background:var(--blue)"></i> Maternité</span>
+        <span><i style="background:var(--lavender)"></i> Cong. suppl. naissance</span>
+        <span><i style="background:var(--muted-2)"></i> CP</span>
+      </div>
+    </div>
+  `;
+  bindLeaveEvents();
+}
+
+function formatDateShort(iso){
+  if(!iso) return '';
+  return parseISODate(iso).toLocaleDateString('fr-FR', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function renderLeavePeriodList(periods, kind){
+  if(!periods.length) return `<p style="color:var(--muted); font-size:12px; margin:4px 0;">Aucune période ajoutée.</p>`;
+  return periods.map(p => {
+    let endIso, detail;
+    if(kind === 'father-opt'){
+      endIso = p.start ? addDaysISO(p.start, (Number(p.days) || 5) - 1) : '';
+      detail = (Number(p.days) || 5) + ' jours';
+    } else {
+      endIso = p.start ? addDaysISO(addMonthsISO(p.start, Number(p.months) || 1), -1) : '';
+      detail = (Number(p.months) || 1) + ' mois';
+    }
+    return `<div class="leave-period-row">
+      <div>
+        <div class="leave-period-dates">${p.start ? formatDateShort(p.start) + (endIso ? ' → ' + formatDateShort(endIso) : '') : 'Date non renseignée'}</div>
+        <div class="leave-period-detail">${detail}</div>
+      </div>
+      <button type="button" class="text-btn danger" data-leave-del-period="${kind}::${p.id}">${icon('x','icon-sm')}</button>
+    </div>`;
+  }).join('');
+}
+
+function renderCpPeriodList(periods, mode){
+  if(!periods.length) return `<p style="color:var(--muted); font-size:12px; margin:4px 0;">Aucune période ajoutée.</p>`;
+  return periods.map(p => {
+    const consumed = countConsumedDaysISO(p.start, p.end, mode);
+    return `<div class="leave-period-row">
+      <div>
+        <div class="leave-period-dates">${p.owner === 'mother' ? '👩' : '👨'} ${p.start ? formatDateShort(p.start) : '?'} → ${p.end ? formatDateShort(p.end) : '?'}</div>
+        <div class="leave-period-detail">${consumed} jour${consumed > 1 ? 's' : ''} de CP consommés</div>
+      </div>
+      <button type="button" class="text-btn danger" data-leave-del-cp="${p.id}">${icon('x','icon-sm')}</button>
+    </div>`;
+  }).join('');
+}
+
+function openLeavePeriodModal(opts, onSave){
+  openModal(`
+    <h2>${escapeHtml(opts.title)}</h2>
+    <div class="field"><label class="field-label">Date de début</label><input type="date" id="lpModalStart"></div>
+    <div class="field">
+      <label class="field-label">${opts.kind === 'days' ? 'Durée (jours)' : 'Durée (mois)'}</label>
+      ${opts.kind === 'months' ? `
+        <select id="lpModalVal">
+          <option value="1">1 mois</option>
+          <option value="2">2 mois</option>
+        </select>
+      ` : `<input type="number" id="lpModalVal" min="${opts.minVal}" value="${opts.defaultVal}">`}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Ajouter</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const start = document.getElementById('lpModalStart').value;
+    if(!start){ showToast('Choisissez une date de début'); return; }
+    const val = parseInt(document.getElementById('lpModalVal').value, 10) || opts.defaultVal;
+    if(opts.kind === 'days' && val < opts.minVal){ showToast('Minimum ' + opts.minVal + ' jours pour cette période'); return; }
+    closeModal();
+    onSave(start, val);
+  };
+}
+
+function openCpPeriodModal(onSave){
+  openModal(`
+    <h2>Ajouter une période de CP</h2>
+    <div class="field">
+      <label class="field-label">Qui pose ce congé ?</label>
+      <select id="cpModalOwner">
+        <option value="father">Papa</option>
+        <option value="mother">Maman</option>
+      </select>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="field" style="flex:1;"><label class="field-label">Début</label><input type="date" id="cpModalStart"></div>
+      <div class="field" style="flex:1;"><label class="field-label">Fin</label><input type="date" id="cpModalEnd"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="mCancel">Annuler</button>
+      <button class="btn btn-primary" id="mSave">Ajouter</button>
+    </div>
+  `);
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = () => {
+    const owner = document.getElementById('cpModalOwner').value;
+    const start = document.getElementById('cpModalStart').value;
+    const end = document.getElementById('cpModalEnd').value;
+    if(!start || !end || end < start){ showToast('Vérifiez les dates saisies'); return; }
+    closeModal();
+    onSave(owner, start, end);
+  };
+}
+
+function bindLeaveEvents(){
+  const lp = data.leavePlanner;
+  document.getElementById('lpBirthDate').addEventListener('change', (e) => { lp.birthDate = e.target.value; save(); render(); });
+  document.getElementById('lpChildRank').addEventListener('change', (e) => { lp.childRank = e.target.value; save(); render(); });
+  document.getElementById('lpCpMode').addEventListener('change', (e) => { lp.cpMode = e.target.value; save(); render(); });
+  document.getElementById('lpMultiple').addEventListener('change', (e) => { lp.multipleBirth = e.target.checked; save(); render(); });
+  document.getElementById('lpNaissanceStart').addEventListener('change', (e) => { lp.father.naissanceStart = e.target.value; save(); render(); });
+  document.getElementById('lpMaternityStart').addEventListener('change', (e) => { lp.mother.maternityStart = e.target.value; save(); render(); });
+
+  document.getElementById('btnAddPaterniteOpt').onclick = () => {
+    if(lp.father.optionalPeriods.length >= 2) return;
+    openLeavePeriodModal({ kind:'days', title:'Période de congé paternité facultative', defaultVal:5, minVal:5 }, (start, val) => {
+      lp.father.optionalPeriods.push({ id:newId(), start, days:val });
+      save(); render();
+    });
+  };
+  document.getElementById('btnAddFatherCsn').onclick = () => {
+    if(lp.father.csnPeriods.length >= 2) return;
+    openLeavePeriodModal({ kind:'months', title:'Congé supplémentaire de naissance (papa)', defaultVal:1, minVal:1 }, (start, val) => {
+      lp.father.csnPeriods.push({ id:newId(), start, months:val });
+      save(); render();
+    });
+  };
+  document.getElementById('btnAddMotherCsn').onclick = () => {
+    if(lp.mother.csnPeriods.length >= 2) return;
+    openLeavePeriodModal({ kind:'months', title:'Congé supplémentaire de naissance (maman)', defaultVal:1, minVal:1 }, (start, val) => {
+      lp.mother.csnPeriods.push({ id:newId(), start, months:val });
+      save(); render();
+    });
+  };
+  document.getElementById('btnAddCp').onclick = () => {
+    openCpPeriodModal((owner, start, end) => {
+      lp.cpPeriods.push({ id:newId(), owner, start, end });
+      save(); render();
+    });
+  };
+  document.querySelectorAll('[data-leave-del-period]').forEach(btn => {
+    btn.onclick = () => {
+      const [kind, id] = btn.dataset.leaveDelPeriod.split('::');
+      const arr = kind === 'father-opt' ? lp.father.optionalPeriods : kind === 'father-csn' ? lp.father.csnPeriods : lp.mother.csnPeriods;
+      const idx = arr.findIndex(p => p.id === id);
+      if(idx >= 0) arr.splice(idx, 1);
+      save(); render();
+    };
+  });
+  document.querySelectorAll('[data-leave-del-cp]').forEach(btn => {
+    btn.onclick = () => {
+      lp.cpPeriods = lp.cpPeriods.filter(p => p.id !== btn.dataset.leaveDelCp);
+      save(); render();
+    };
+  });
+  document.querySelectorAll('[data-leave-cal-nav]').forEach(btn => {
+    btn.onclick = () => {
+      const delta = parseInt(btn.dataset.leaveCalNav, 10);
+      let { year, month } = leaveCalYearMonth;
+      month += delta;
+      if(month < 0){ month = 11; year--; } else if(month > 11){ month = 0; year++; }
+      leaveCalYearMonth = { year, month };
+      render();
+    };
+  });
 }
 
 /* ---------- Firebase config ---------- */
@@ -1058,6 +1522,26 @@ function normalizeData(d){
   if(!Array.isArray(d.ultrasounds)) d.ultrasounds = [];
   d.ultrasounds.forEach(u => { if(!Array.isArray(u.photos)) u.photos = []; });
   if(!d.theme || typeof d.theme !== 'object') d.theme = {};
+  if(!d.leavePlanner || typeof d.leavePlanner !== 'object') d.leavePlanner = buildDefaultLeavePlanner();
+  {
+    const lp = d.leavePlanner;
+    if(typeof lp.birthDate !== 'string') lp.birthDate = '';
+    if(typeof lp.multipleBirth !== 'boolean') lp.multipleBirth = false;
+    if(!['1-2','3+','twins','triplets'].includes(lp.childRank)) lp.childRank = '1-2';
+    if(!['ouvres','ouvrables'].includes(lp.cpMode)) lp.cpMode = 'ouvres';
+    if(!lp.father || typeof lp.father !== 'object') lp.father = { naissanceStart:'', optionalPeriods:[], csnPeriods:[] };
+    if(typeof lp.father.naissanceStart !== 'string') lp.father.naissanceStart = '';
+    if(!Array.isArray(lp.father.optionalPeriods)) lp.father.optionalPeriods = [];
+    lp.father.optionalPeriods.forEach(p => { p.id = p.id || newId(); p.start = p.start || ''; p.days = Number(p.days) || 5; });
+    if(!Array.isArray(lp.father.csnPeriods)) lp.father.csnPeriods = [];
+    lp.father.csnPeriods.forEach(p => { p.id = p.id || newId(); p.start = p.start || ''; p.months = Number(p.months) || 1; });
+    if(!lp.mother || typeof lp.mother !== 'object') lp.mother = { maternityStart:'', csnPeriods:[] };
+    if(typeof lp.mother.maternityStart !== 'string') lp.mother.maternityStart = '';
+    if(!Array.isArray(lp.mother.csnPeriods)) lp.mother.csnPeriods = [];
+    lp.mother.csnPeriods.forEach(p => { p.id = p.id || newId(); p.start = p.start || ''; p.months = Number(p.months) || 1; });
+    if(!Array.isArray(lp.cpPeriods)) lp.cpPeriods = [];
+    lp.cpPeriods.forEach(p => { p.id = p.id || newId(); p.owner = p.owner === 'mother' ? 'mother' : 'father'; p.start = p.start || ''; p.end = p.end || ''; });
+  }
   normalizeV2(d);
   if(!Array.isArray(d.synonyms)) d.synonyms = [];
   d.synonyms.forEach(g => { g.terms = Array.isArray(g.terms) ? g.terms.filter(Boolean) : []; });
@@ -1489,9 +1973,10 @@ function render(){
   else if(ui.view === 'prono') renderProno();
   else if(ui.view === 'echo') renderEcho();
   else if(ui.view === 'todo') renderTodo();
+  else if(ui.view === 'leaves') renderLeaves();
   else { ui.view = 'dashboard'; renderDashboard(); }
   document.querySelectorAll('.nav-btn').forEach(b=>{
-    const activeMap = { dashboard:'dashboard', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo' };
+    const activeMap = { dashboard:'dashboard', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo', leaves:'leaves' };
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
   });
@@ -1512,6 +1997,8 @@ function renderHeader(){
     h.innerHTML = `<div class="brand"><h1>Échographies</h1></div>`;
   } else if(ui.view === 'todo'){
     h.innerHTML = `<div class="brand"><h1>À faire</h1></div>`;
+  } else if(ui.view === 'leaves'){
+    h.innerHTML = `<div class="brand"><h1>Calendrier congés</h1></div>`;
   }
 }
 
