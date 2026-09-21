@@ -1081,8 +1081,7 @@ function renderLeaves(){
 
     <div class="section-card" style="padding:14px;">
       <div class="field-label" style="margin-bottom:6px;">Congé supplémentaire de naissance <span style="font-weight:600; color:var(--muted);">(optionnel, 1 ou 2 mois, après épuisement du congé paternité)</span></div>
-      <div id="lpFatherCsnList">${renderLeavePeriodList(lp.father.csnPeriods, 'father-csn')}</div>
-      <button type="button" class="add-row-btn" id="btnAddFatherCsn" ${lp.father.csnPeriods.length >= 2 ? 'disabled style="opacity:0.5;"' : ''}>${icon('plus','icon-sm')} Ajouter une période</button>
+      ${renderCsnSection(lp.father.csnPeriods, 'lpFatherCsn')}
     </div>
 
     ${fatherLastDay ? `<p class="leave-result">📅 Dernier jour de congé (papa) : <strong>${formatDateShort(fatherLastDay)}</strong> — reprise possible le <strong>${formatDateShort(leaveNextOuvrableAfter(fatherLastDay))}</strong></p>` : ''}
@@ -1097,8 +1096,7 @@ function renderLeaves(){
 
     <div class="section-card" style="padding:14px;">
       <div class="field-label" style="margin-bottom:6px;">Congé supplémentaire de naissance <span style="font-weight:600; color:var(--muted);">(optionnel, 1 ou 2 mois, après épuisement du congé maternité)</span></div>
-      <div id="lpMotherCsnList">${renderLeavePeriodList(lp.mother.csnPeriods, 'mother-csn')}</div>
-      <button type="button" class="add-row-btn" id="btnAddMotherCsn" ${lp.mother.csnPeriods.length >= 2 ? 'disabled style="opacity:0.5;"' : ''}>${icon('plus','icon-sm')} Ajouter une période</button>
+      ${renderCsnSection(lp.mother.csnPeriods, 'lpMotherCsn')}
     </div>
 
     ${motherLastDay ? `<p class="leave-result">📅 Dernier jour de congé (maman) : <strong>${formatDateShort(motherLastDay)}</strong> — reprise possible le <strong>${formatDateShort(leaveNextOuvrableAfter(motherLastDay))}</strong></p>` : ''}
@@ -1123,6 +1121,72 @@ function renderLeaves(){
     </div>
   `;
   bindLeaveEvents();
+}
+
+function renderCsnSection(periods, prefix){
+  const splitMode = periods.length === 2;
+  const p1 = periods[0] || { start:'', months:1 };
+  const p2 = periods[1] || { start:'', months:1 };
+  const p1End = p1.start ? addDaysISO(addMonthsISO(p1.start, splitMode ? 1 : (Number(p1.months)||1)), -1) : '';
+  const p2End = p2.start ? addDaysISO(addMonthsISO(p2.start, 1), -1) : '';
+  return `
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:10px;">
+      <input type="checkbox" id="${prefix}Split" ${splitMode ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
+      <span style="font-size:12.5px;">Le prendre en 2 périodes séparées d'1 mois chacune (pas forcément à la suite)</span>
+    </label>
+    ${splitMode ? `
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label class="field-label">Période 1 (1 mois)</label><input type="date" id="${prefix}Start1" value="${escapeAttr(p1.start)}"></div>
+        <div class="field" style="flex:1;"><label class="field-label">Période 2 (1 mois)</label><input type="date" id="${prefix}Start2" value="${escapeAttr(p2.start)}"></div>
+      </div>
+      ${p1End ? `<p class="leave-result">Période 1 : <strong>${formatDateShort(p1.start)}</strong> → <strong>${formatDateShort(p1End)}</strong></p>` : ''}
+      ${p2End ? `<p class="leave-result">Période 2 : <strong>${formatDateShort(p2.start)}</strong> → <strong>${formatDateShort(p2End)}</strong></p>` : ''}
+    ` : `
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label class="field-label">Début</label><input type="date" id="${prefix}Start1" value="${escapeAttr(p1.start)}"></div>
+        <div class="field" style="flex:1;">
+          <label class="field-label">Durée</label>
+          <select id="${prefix}Months1">
+            <option value="1" ${(Number(p1.months)||1)===1?'selected':''}>1 mois</option>
+            <option value="2" ${(Number(p1.months)||1)===2?'selected':''}>2 mois</option>
+          </select>
+        </div>
+      </div>
+      ${p1End ? `<p class="leave-result">Du <strong>${formatDateShort(p1.start)}</strong> au <strong>${formatDateShort(p1End)}</strong></p>` : ''}
+    `}
+  `;
+}
+function bindCsnSection(periodsArr, prefix){
+  const splitEl = document.getElementById(prefix + 'Split');
+  splitEl.addEventListener('change', (e) => {
+    const existingStart = periodsArr[0] ? periodsArr[0].start : '';
+    periodsArr.length = 0;
+    if(e.target.checked){
+      periodsArr.push({ id:newId(), start:existingStart, months:1 });
+      periodsArr.push({ id:newId(), start:'', months:1 });
+    } else if(existingStart){
+      periodsArr.push({ id:newId(), start:existingStart, months:1 });
+    }
+    save(); render();
+  });
+  const start1 = document.getElementById(prefix + 'Start1');
+  start1.addEventListener('change', (e) => {
+    if(!periodsArr[0]) periodsArr.push({ id:newId(), start:'', months:1 });
+    periodsArr[0].start = e.target.value;
+    save(); render();
+  });
+  const start2 = document.getElementById(prefix + 'Start2');
+  if(start2) start2.addEventListener('change', (e) => {
+    if(!periodsArr[1]) periodsArr.push({ id:newId(), start:'', months:1 });
+    periodsArr[1].start = e.target.value;
+    save(); render();
+  });
+  const months1 = document.getElementById(prefix + 'Months1');
+  if(months1) months1.addEventListener('change', (e) => {
+    if(!periodsArr[0]) periodsArr.push({ id:newId(), start:'', months:1 });
+    periodsArr[0].months = parseInt(e.target.value, 10);
+    save(); render();
+  });
 }
 
 function formatDateShort(iso){
@@ -1240,20 +1304,8 @@ function bindLeaveEvents(){
       save(); render();
     });
   };
-  document.getElementById('btnAddFatherCsn').onclick = () => {
-    if(lp.father.csnPeriods.length >= 2) return;
-    openLeavePeriodModal({ kind:'months', title:'Congé supplémentaire de naissance (papa)', defaultVal:1, minVal:1 }, (start, val) => {
-      lp.father.csnPeriods.push({ id:newId(), start, months:val });
-      save(); render();
-    });
-  };
-  document.getElementById('btnAddMotherCsn').onclick = () => {
-    if(lp.mother.csnPeriods.length >= 2) return;
-    openLeavePeriodModal({ kind:'months', title:'Congé supplémentaire de naissance (maman)', defaultVal:1, minVal:1 }, (start, val) => {
-      lp.mother.csnPeriods.push({ id:newId(), start, months:val });
-      save(); render();
-    });
-  };
+  bindCsnSection(lp.father.csnPeriods, 'lpFatherCsn');
+  bindCsnSection(lp.mother.csnPeriods, 'lpMotherCsn');
   document.getElementById('btnAddCp').onclick = () => {
     openCpPeriodModal((owner, start, end) => {
       lp.cpPeriods.push({ id:newId(), owner, start, end });
@@ -1263,7 +1315,7 @@ function bindLeaveEvents(){
   document.querySelectorAll('[data-leave-del-period]').forEach(btn => {
     btn.onclick = () => {
       const [kind, id] = btn.dataset.leaveDelPeriod.split('::');
-      const arr = kind === 'father-opt' ? lp.father.optionalPeriods : kind === 'father-csn' ? lp.father.csnPeriods : lp.mother.csnPeriods;
+      const arr = lp.father.optionalPeriods;
       const idx = arr.findIndex(p => p.id === id);
       if(idx >= 0) arr.splice(idx, 1);
       save(); render();
