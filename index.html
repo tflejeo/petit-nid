@@ -317,7 +317,7 @@
   .status-surplus{background:var(--lavender);}
   .item-thumb{width:32px; height:32px; border-radius:9px; object-fit:cover; flex-shrink:0; border:1px solid var(--border);}
 
-  .item-main{flex:1; min-width:0; cursor:pointer;}
+  .item-main{flex:1; min-width:52px; cursor:pointer;}
   .item-name-row{display:flex; align-items:center; gap:6px;}
   .item-name{font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .badge-bonus{
@@ -3627,7 +3627,7 @@ function v2PhotoRefsForPair(sizeId, categoryId){
 }
 
 function renderV2RowThumbs(key, photoRefs){
-  const maxShown = 4;
+  const maxShown = 2;
   const shown = photoRefs.slice(0, maxShown);
   const extra = photoRefs.length - shown.length;
   return `<div class="v2-row-thumbs">
