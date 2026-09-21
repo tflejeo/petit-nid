@@ -871,6 +871,7 @@ function buildDefaultData(){
     homeTodoCount: 3,
     leavePlanner: buildDefaultLeavePlanner(),
     daycares: [],
+    hiddenTabs: [],
     v2lists: buildDefaultV2Lists()
   };
 }
@@ -1581,6 +1582,15 @@ const DAYCARE_STATUSES = [
 ];
 const DAYCARE_TYPES = ['Crèche collective', 'Crèche municipale', 'Micro-crèche', 'Crèche parentale', 'Crèche familiale', 'Assistante maternelle', 'Autre'];
 
+const APP_TABS = [
+  { id:'listsv2', label:'Mes listes' },
+  { id:'echo', label:'Écho' },
+  { id:'todo', label:'À faire' },
+  { id:'leaves', label:'Congés' },
+  { id:'daycare', label:'Crèche' },
+  { id:'prono', label:'Prono' }
+];
+
 let data = loadLocalData();
 applyTheme(data.theme);
 // `ui` is per-device navigation state (current screen, open sections) — never synced.
@@ -1773,8 +1783,7 @@ function normalizeData(d){
     if(!Array.isArray(lp.cpPeriods)) lp.cpPeriods = [];
     lp.cpPeriods.forEach(p => { p.id = p.id || newId(); p.owner = p.owner === 'mother' ? 'mother' : 'father'; p.start = p.start || ''; p.end = p.end || ''; });
   }
-  if(!Array.isArray(d.daycares)) d.daycares = [];
-  d.daycares.forEach(dc => {
+  if(!Array.isArray(d.daycares)) d.daycares = [];  d.daycares.forEach(dc => {
     dc.id = dc.id || newId();
     dc.name = dc.name || '';
     dc.type = dc.type || '';
@@ -1788,6 +1797,8 @@ function normalizeData(d){
     dc.comment = dc.comment || '';
     dc.nextContact = dc.nextContact || '';
   });
+  if(!Array.isArray(d.hiddenTabs)) d.hiddenTabs = [];
+  d.hiddenTabs = d.hiddenTabs.filter(id => APP_TABS.some(t => t.id === id));
   normalizeV2(d);
   if(!Array.isArray(d.synonyms)) d.synonyms = [];
   d.synonyms.forEach(g => { g.terms = Array.isArray(g.terms) ? g.terms.filter(Boolean) : []; });
@@ -2213,6 +2224,7 @@ function showToast(msg){
 
 /* ---------- Rendering ---------- */
 function render(){
+  if((data.hiddenTabs || []).includes(ui.view)) ui.view = 'dashboard';
   renderHeader();
   if(ui.view === 'dashboard') renderDashboard();
   else if(ui.view === 'listsv2') renderListsV2();
@@ -2226,6 +2238,7 @@ function render(){
     const activeMap = { dashboard:'dashboard', listsv2:'listsv2', prono:'prono', echo:'echo', todo:'todo', leaves:'leaves', daycare:'daycare' };
     const active = activeMap[ui.view] || 'dashboard';
     b.classList.toggle('active', b.dataset.nav === active);
+    if(b.dataset.nav !== 'dashboard') b.style.display = (data.hiddenTabs || []).includes(b.dataset.nav) ? 'none' : '';
   });
   hydratePhotoImages();
 }
@@ -2871,6 +2884,18 @@ function openSettingsPanel(){
       <input type="number" min="0" max="20" id="sTodoCount" value="${data.homeTodoCount}">
     </div>
     <div class="field">
+      <label class="field-label">Onglets visibles</label>
+      <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Masquer un onglet le retire de la barre de navigation pour tout le monde, sans perdre son contenu.</p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${APP_TABS.map(t => `
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" data-tab-toggle="${t.id}" ${(data.hiddenTabs || []).includes(t.id) ? '' : 'checked'} style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
+            <span style="font-size:13px;">${escapeHtml(t.label)}</span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+    <div class="field">
       <label class="field-label">Synonymes de recherche</label>
       <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">Ex. « turbulette, gigoteuse » pour que l’un trouve aussi l’autre.</p>
       <div id="synonymList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
@@ -2940,6 +2965,7 @@ function openSettingsPanel(){
     if(due) data.dueDate = due;
     data.headerTagline = document.getElementById('sTagline').value;
     data.homeTodoCount = clamp(parseInt(document.getElementById('sTodoCount').value || '0', 10), 0, 50);
+    data.hiddenTabs = APP_TABS.filter(t => !document.querySelector(`[data-tab-toggle="${t.id}"]`).checked).map(t => t.id);
     const preset = THEME_PRESETS.find(p => p.id === selectedThemePreset) || THEME_PRESETS[0];
     data.theme = { presetId:preset.id, primary:preset.primary, secondary:preset.secondary, accent1:preset.accent1, accent2:preset.accent2, bg:preset.bg };
     applyTheme(data.theme);
