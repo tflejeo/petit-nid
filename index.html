@@ -170,15 +170,15 @@
   }
 
   .progress-block{margin-top:16px;}
-  .theme-color-grid{display:flex; flex-wrap:wrap; gap:14px;}
-  .theme-color-item{display:flex; flex-direction:column; align-items:center; gap:5px; font-size:11.5px; color:var(--muted); font-weight:700;}
-  .theme-color-item input[type=color]{
-    width:44px; height:44px; border:2px solid var(--border); border-radius:999px; padding:0;
-    cursor:pointer; background:none; -webkit-appearance:none; appearance:none;
+  .theme-preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .theme-preset-card{
+    display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:10px 12px;
+    border:1.5px solid var(--border); border-radius:var(--r-sm); background:var(--card); cursor:pointer; text-align:left;
   }
-  .theme-color-item input[type=color]::-webkit-color-swatch-wrapper{padding:0; border-radius:999px;}
-  .theme-color-item input[type=color]::-webkit-color-swatch{border:none; border-radius:999px;}
-  .theme-color-item input[type=color]::-moz-color-swatch{border:none; border-radius:999px;}
+  .theme-preset-card.selected{border-color:var(--sage-dark); box-shadow:0 0 0 2px var(--sage-tint) inset;}
+  .theme-preset-swatches{display:flex; gap:4px;}
+  .theme-preset-swatches span{width:18px; height:18px; border-radius:999px; flex-shrink:0;}
+  .theme-preset-name{font-size:12px; font-weight:700; color:var(--ink);}
   .milestone-note{
     display:flex; align-items:flex-start; gap:6px; margin-top:10px;
     font-size:12.5px; color:var(--sage-dark); font-weight:700; line-height:1.4;
@@ -841,12 +841,21 @@ const UI_STORAGE_KEY = 'petitNidUi_v1';
 function newId(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
 
 // `data` is the shared content, synced to Firebase for both parents.
+const THEME_PRESETS = [
+  { id:'sauge',    name:'Sauge & Terracotta', primary:'#5D7A54', secondary:'#C06E48', accent1:'#E3A44F', accent2:'#B79BCB', bg:'#FAF6EC' },
+  { id:'lavande',  name:'Lavande douce',      primary:'#8E7CC3', secondary:'#E8A0BF', accent1:'#F4C572', accent2:'#7FB3B8', bg:'#FAF5FB' },
+  { id:'ciel',     name:'Bleu ciel',          primary:'#6FA8C9', secondary:'#F0A868', accent1:'#F6D186', accent2:'#9BC4A8', bg:'#F4FAFC' },
+  { id:'poudre',   name:'Rose poudré',        primary:'#D98CA0', secondary:'#8FA998', accent1:'#E8B75E', accent2:'#A99BC9', bg:'#FDF6F5' },
+  { id:'menthe',   name:'Menthe & Corail',    primary:'#6FB89A', secondary:'#E38B7A', accent1:'#F0C46E', accent2:'#8FA9C9', bg:'#F5FBF8' },
+  { id:'miel',     name:'Miel & Chocolat',    primary:'#C99A5B', secondary:'#8C6B54', accent1:'#D9B26A', accent2:'#A8C4B8', bg:'#FBF6EE' },
+  { id:'perle',    name:'Gris perle & Moutarde', primary:'#93A19D', secondary:'#D9A441', accent1:'#C97D60', accent2:'#B7A6C9', bg:'#F7F6F3' }
+];
 const THEME_DEFAULTS = {
-  primary: '#5D7A54',
-  secondary: '#C06E48',
-  accent1: '#E3A44F',
-  accent2: '#B79BCB',
-  bg: '#FAF6EC'
+  primary: THEME_PRESETS[0].primary,
+  secondary: THEME_PRESETS[0].secondary,
+  accent1: THEME_PRESETS[0].accent1,
+  accent2: THEME_PRESETS[0].accent2,
+  bg: THEME_PRESETS[0].bg
 };
 function lightenHex(hex, amount){
   hex = String(hex || '').replace('#', '');
@@ -2137,29 +2146,20 @@ function openSettingsPanel(){
     <div class="field">
       <label class="field-label">Palette de couleurs de l'app</label>
       <p style="color:var(--muted); font-size:12px; margin:0 0 8px;">S'applique pour tout le monde, sur tous les appareils.</p>
-      <div class="theme-color-grid">
-        <label class="theme-color-item">
-          <input type="color" id="thPrimary" value="${(data.theme && data.theme.primary) || THEME_DEFAULTS.primary}">
-          <span>Principale</span>
-        </label>
-        <label class="theme-color-item">
-          <input type="color" id="thSecondary" value="${(data.theme && data.theme.secondary) || THEME_DEFAULTS.secondary}">
-          <span>Secondaire</span>
-        </label>
-        <label class="theme-color-item">
-          <input type="color" id="thAccent1" value="${(data.theme && data.theme.accent1) || THEME_DEFAULTS.accent1}">
-          <span>Accent 1</span>
-        </label>
-        <label class="theme-color-item">
-          <input type="color" id="thAccent2" value="${(data.theme && data.theme.accent2) || THEME_DEFAULTS.accent2}">
-          <span>Accent 2</span>
-        </label>
-        <label class="theme-color-item">
-          <input type="color" id="thBg" value="${(data.theme && data.theme.bg) || THEME_DEFAULTS.bg}">
-          <span>Fond</span>
-        </label>
+      <div class="theme-preset-grid" id="themePresetGrid">
+        ${THEME_PRESETS.map(p => `
+          <button type="button" class="theme-preset-card ${((data.theme && data.theme.presetId) || 'sauge') === p.id ? 'selected' : ''}" data-theme-preset="${p.id}">
+            <div class="theme-preset-swatches">
+              <span style="background:${p.primary};"></span>
+              <span style="background:${p.secondary};"></span>
+              <span style="background:${p.accent1};"></span>
+              <span style="background:${p.accent2};"></span>
+              <span style="background:${p.bg}; border:1px solid var(--border);"></span>
+            </div>
+            <span class="theme-preset-name">${escapeHtml(p.name)}</span>
+          </button>
+        `).join('')}
       </div>
-      <button type="button" class="text-btn muted" id="btnResetTheme" style="margin-top:6px;">Réinitialiser la palette par défaut</button>
     </div>
     <div class="field">
       <label class="field-label">Sauvegarde</label>
@@ -2185,13 +2185,13 @@ function openSettingsPanel(){
     input.value = '';
     renderSynonymListInto(document.getElementById('synonymList'));
   };
-  document.getElementById('btnResetTheme').onclick = () => {
-    document.getElementById('thPrimary').value = THEME_DEFAULTS.primary;
-    document.getElementById('thSecondary').value = THEME_DEFAULTS.secondary;
-    document.getElementById('thAccent1').value = THEME_DEFAULTS.accent1;
-    document.getElementById('thAccent2').value = THEME_DEFAULTS.accent2;
-    document.getElementById('thBg').value = THEME_DEFAULTS.bg;
-  };
+  let selectedThemePreset = (data.theme && data.theme.presetId) || 'sauge';
+  document.querySelectorAll('[data-theme-preset]').forEach(btn => {
+    btn.onclick = () => {
+      selectedThemePreset = btn.dataset.themePreset;
+      document.querySelectorAll('[data-theme-preset]').forEach(b => b.classList.toggle('selected', b === btn));
+    };
+  });
   document.getElementById('btnSaveBackup').onclick = saveBackupNow;
   document.getElementById('btnRestoreBackup').onclick = restoreFromBackup;
   refreshBackupInfo();
@@ -2204,13 +2204,8 @@ function openSettingsPanel(){
     if(due) data.dueDate = due;
     data.headerTagline = document.getElementById('sTagline').value;
     data.homeTodoCount = clamp(parseInt(document.getElementById('sTodoCount').value || '0', 10), 0, 50);
-    data.theme = {
-      primary: document.getElementById('thPrimary').value,
-      secondary: document.getElementById('thSecondary').value,
-      accent1: document.getElementById('thAccent1').value,
-      accent2: document.getElementById('thAccent2').value,
-      bg: document.getElementById('thBg').value
-    };
+    const preset = THEME_PRESETS.find(p => p.id === selectedThemePreset) || THEME_PRESETS[0];
+    data.theme = { presetId:preset.id, primary:preset.primary, secondary:preset.secondary, accent1:preset.accent1, accent2:preset.accent2, bg:preset.bg };
     applyTheme(data.theme);
     save(); closeModal(); render(); showToast('Paramètres enregistrés');
   };
