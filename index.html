@@ -211,6 +211,8 @@
   .daycare-star-picker{display:flex; gap:4px;}
   .daycare-star-picker button{background:none; border:none; font-size:28px; color:var(--border); cursor:pointer; line-height:1; padding:0;}
   .daycare-star-picker button.active{color:var(--amber);}
+  .daycare-flags{display:flex; flex-wrap:wrap; gap:5px; margin:2px 0 4px;}
+  .daycare-flag{background:var(--sage-tint); color:var(--sage-dark); font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px;}
   .theme-preset-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .theme-preset-card{
     display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:10px 12px;
@@ -871,7 +873,7 @@ function buildDefaultData(){
     homeTodoCount: 3,
     leavePlanner: buildDefaultLeavePlanner(),
     daycares: [],
-    daycareStatusLabels: {},
+    daycareStatuses: DAYCARE_DEFAULT_STATUSES.map(s => Object.assign({}, s)),
     hiddenTabs: [],
     v2lists: buildDefaultV2Lists()
   };
@@ -1369,22 +1371,26 @@ function bindLeaveEvents(){
 
 function daycareStatusCounts(list){
   const counts = {};
-  DAYCARE_STATUSES.forEach(s => { counts[s.id] = 0; });
+  (data.daycareStatuses || []).forEach(s => { counts[s.id] = 0; });
   list.forEach(d => { counts[d.status] = (counts[d.status] || 0) + 1; });
   return counts;
 }
 
 function renderDaycareCard(dc){
-  const st = DAYCARE_STATUSES.find(s => s.id === dc.status) || DAYCARE_STATUSES[0];
+  const st = daycareStatusById(dc.status);
   const todayIso = toISODate(new Date());
   const overdue = dc.nextContact && dc.nextContact < todayIso;
   const mapsUrl = dc.address ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(dc.address) : '';
   return `<div class="daycare-card" data-daycare-edit="${dc.id}">
     <div class="daycare-card-top">
       <div class="daycare-stars">${[1,2,3,4,5].map(n => `<span style="color:${n <= dc.priority ? 'var(--amber)' : 'var(--border)'}">★</span>`).join('')}</div>
-      <span class="daycare-status-pill" style="background:${st.color};">${escapeHtml(daycareStatusLabel(st.id))}</span>
+      <span class="daycare-status-pill" style="background:${st.color};">${escapeHtml(st.label)}</span>
     </div>
     <div class="daycare-name">${escapeHtml(dc.name || 'Sans nom')}</div>
+    ${(dc.employerReservation || dc.municipalCommission) ? `<div class="daycare-flags">
+      ${dc.employerReservation ? `<span class="daycare-flag">🏢 Réservation employeur</span>` : ''}
+      ${dc.municipalCommission ? `<span class="daycare-flag">🏛️ Commission mairie</span>` : ''}
+    </div>` : ''}
     ${dc.type ? `<div class="daycare-type">${escapeHtml(dc.type)}${dc.capacity ? ' · ' + escapeHtml(dc.capacity) : ''}</div>` : (dc.capacity ? `<div class="daycare-type">${escapeHtml(dc.capacity)}</div>` : '')}
     ${dc.address ? `<a href="${escapeAttr(mapsUrl)}" target="_blank" rel="noopener" class="daycare-link" onclick="event.stopPropagation()">${icon('link','icon-sm')} ${escapeHtml(dc.address)}</a>` : ''}
     ${dc.website ? `<div><a href="${escapeAttr(dc.website)}" target="_blank" rel="noopener" class="daycare-link" onclick="event.stopPropagation()">🌐 Site internet</a></div>` : ''}
@@ -1406,9 +1412,9 @@ function renderDaycares(){
   main.innerHTML = `
     <button class="btn btn-primary" id="btnAddDaycare" style="width:100%; margin:2px 0 12px; padding:13px;">${icon('plus','icon-sm')} Ajouter une crèche</button>
     <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-      <button class="chip-btn" id="btnDaycareStatusSettings">${icon('gear','icon-sm')} Libellés des statuts</button>
+      <button class="chip-btn" id="btnDaycareStatusSettings">${icon('gear','icon-sm')} Statuts</button>
     </div>
-    ${list.length ? `<div class="daycare-counts">${DAYCARE_STATUSES.map(s => counts[s.id] ? `<span style="background:${s.color};">${counts[s.id]} ${escapeHtml(daycareStatusLabel(s.id).toLowerCase())}</span>` : '').join('')}</div>` : ''}
+    ${list.length ? `<div class="daycare-counts">${(data.daycareStatuses || []).map(s => counts[s.id] ? `<span style="background:${s.color};">${counts[s.id]} ${escapeHtml(s.label.toLowerCase())}</span>` : '').join('')}</div>` : ''}
     <details class="daycare-tips">
       <summary>💡 Conseils pour la recherche de crèche</summary>
       <ul>
@@ -1439,35 +1445,51 @@ function bindDaycareEvents(){
 }
 
 function openDaycareStatusSettingsModal(){
-  openModal(`
-    <h2>Libellés des statuts</h2>
-    <p style="color:var(--muted); font-size:12.5px; margin:-6px 0 10px;">Personnalisez le texte affiché pour chaque statut (la couleur reste liée au statut).</p>
-    ${DAYCARE_STATUSES.map(s => `
+  let working = (data.daycareStatuses || []).map(s => Object.assign({}, s));
+  function fieldsHtml(){
+    return working.map(s => `
       <div class="field">
-        <label class="field-label"><span style="display:inline-block; width:9px; height:9px; border-radius:999px; background:${s.color}; margin-right:6px;"></span>${escapeHtml(s.label)} <span style="color:var(--muted); font-weight:600;">(par défaut)</span></label>
-        <input type="text" data-status-label="${s.id}" value="${escapeAttr(daycareStatusLabel(s.id))}">
+        <label class="field-label"><span style="display:inline-block; width:9px; height:9px; border-radius:999px; background:${s.color}; margin-right:6px;"></span>Statut</label>
+        <input type="text" data-status-field="${s.id}" value="${escapeAttr(s.label)}">
       </div>
-    `).join('')}
+    `).join('');
+  }
+  openModal(`
+    <h2>Statuts</h2>
+    <p style="color:var(--muted); font-size:12.5px; margin:-6px 0 10px;">Renommez un statut existant, ou ajoutez-en un nouveau ci-dessous.</p>
+    <div id="statusFieldsWrap">${fieldsHtml()}</div>
+    <div style="display:flex; gap:8px; margin:4px 0 16px;">
+      <input type="text" id="newStatusInput" placeholder="Nom du nouveau statut" style="flex:1;">
+      <button type="button" class="chip-btn" id="btnAddStatus">${icon('plus','icon-sm')} Ajouter</button>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="mCancel">Annuler</button>
       <button class="btn btn-primary" id="mSave">Enregistrer</button>
     </div>
   `);
   document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('btnAddStatus').onclick = () => {
+    const input = document.getElementById('newStatusInput');
+    const label = input.value.trim();
+    if(!label){ showToast('Donnez un nom au nouveau statut'); return; }
+    const color = DAYCARE_STATUS_COLOR_CYCLE[working.length % DAYCARE_STATUS_COLOR_CYCLE.length];
+    working.push({ id:newId(), label, color });
+    input.value = '';
+    document.getElementById('statusFieldsWrap').innerHTML = fieldsHtml();
+  };
   document.getElementById('mSave').onclick = () => {
-    const labels = {};
-    document.querySelectorAll('[data-status-label]').forEach(input => {
-      const val = input.value.trim();
-      if(val) labels[input.dataset.statusLabel] = val;
+    document.querySelectorAll('[data-status-field]').forEach(inp => {
+      const s = working.find(x => x.id === inp.dataset.statusField);
+      if(s){ const v = inp.value.trim(); if(v) s.label = v; }
     });
-    data.daycareStatusLabels = labels;
-    save(); closeModal(); render(); showToast('Libellés mis à jour');
+    data.daycareStatuses = working;
+    save(); closeModal(); render(); showToast('Statuts mis à jour');
   };
 }
 
 function openDaycareModal(existing){
   const isNew = !existing;
-  const dc = existing || { id:null, name:'', type:'', address:'', phone:'', email:'', status:'to_contact', priority:0, capacity:'', hours:'', comment:'', nextContact:'' };
+  const dc = existing || { id:null, name:'', type:'', address:'', phone:'', email:'', status:(data.daycareStatuses[0] || {}).id, priority:0, capacity:'', hours:'', comment:'', nextContact:'', website:'', employerReservation:false, municipalCommission:false };
   let priority = dc.priority;
   openModal(`
     <h2>${isNew ? 'Ajouter une crèche' : 'Modifier cette crèche'}</h2>
@@ -1488,9 +1510,17 @@ function openDaycareModal(existing){
     <div class="field">
       <label class="field-label">Statut</label>
       <select id="dcStatus">
-        ${DAYCARE_STATUSES.map(s => `<option value="${s.id}" ${dc.status===s.id?'selected':''}>${escapeHtml(daycareStatusLabel(s.id))}</option>`).join('')}
+        ${(data.daycareStatuses || []).map(s => `<option value="${s.id}" ${dc.status===s.id?'selected':''}>${escapeHtml(s.label)}</option>`).join('')}
       </select>
     </div>
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:2px 0;">
+      <input type="checkbox" id="dcEmployerReservation" ${dc.employerReservation ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
+      <span style="font-size:13px;">🏢 Réservation employeur</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:2px 0 14px;">
+      <input type="checkbox" id="dcMunicipalCommission" ${dc.municipalCommission ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--sage-dark); flex-shrink:0;">
+      <span style="font-size:13px;">🏛️ Commission d'attribution mairie</span>
+    </label>
     <div class="field">
       <label class="field-label">Priorité</label>
       <div class="daycare-star-picker" id="dcStarPicker">
@@ -1532,6 +1562,8 @@ function openDaycareModal(existing){
       email: document.getElementById('dcEmail').value.trim(),
       status: document.getElementById('dcStatus').value,
       priority,
+      employerReservation: document.getElementById('dcEmployerReservation').checked,
+      municipalCommission: document.getElementById('dcMunicipalCommission').checked,
       capacity: document.getElementById('dcCapacity').value.trim(),
       hours: document.getElementById('dcHours').value.trim(),
       website: document.getElementById('dcWebsite').value.trim(),
@@ -1607,7 +1639,8 @@ function applyTheme(themeObj){
   root.setProperty('--bg', bg);
 }
 
-const DAYCARE_STATUSES = [
+const DAYCARE_TYPES = ['Crèche collective', 'Crèche municipale', 'Micro-crèche', 'Crèche parentale', 'Crèche familiale', 'Assistante maternelle', 'Autre'];
+const DAYCARE_DEFAULT_STATUSES = [
   { id:'to_contact',     label:'À contacter',              color:'var(--terracotta-dark)' },
   { id:'info_requested', label:'Renseignements demandés',  color:'var(--amber)' },
   { id:'preregistered',  label:'Préinscrit(e)',            color:'var(--blue)' },
@@ -1615,12 +1648,9 @@ const DAYCARE_STATUSES = [
   { id:'accepted',       label:'Accepté(e)',               color:'var(--sage-dark)' },
   { id:'declined',       label:'Refusé / complet',         color:'var(--muted-2)' }
 ];
-const DAYCARE_TYPES = ['Crèche collective', 'Crèche municipale', 'Micro-crèche', 'Crèche parentale', 'Crèche familiale', 'Assistante maternelle', 'Autre'];
-function daycareStatusLabel(id){
-  const custom = (data.daycareStatusLabels || {})[id];
-  if(custom) return custom;
-  const def = DAYCARE_STATUSES.find(s => s.id === id);
-  return def ? def.label : id;
+const DAYCARE_STATUS_COLOR_CYCLE = ['var(--sage-dark)','var(--terracotta-dark)','var(--amber)','var(--lavender)','var(--blue)','var(--pink)','var(--muted-2)'];
+function daycareStatusById(id){
+  return (data.daycareStatuses || []).find(s => s.id === id) || { id, label:id, color:'var(--muted-2)' };
 }
 
 const APP_TABS = [
@@ -1824,22 +1854,30 @@ function normalizeData(d){
     if(!Array.isArray(lp.cpPeriods)) lp.cpPeriods = [];
     lp.cpPeriods.forEach(p => { p.id = p.id || newId(); p.owner = p.owner === 'mother' ? 'mother' : 'father'; p.start = p.start || ''; p.end = p.end || ''; });
   }
-  if(!Array.isArray(d.daycares)) d.daycares = [];  d.daycares.forEach(dc => {
+  if(!Array.isArray(d.daycareStatuses) || !d.daycareStatuses.length){
+    const oldLabels = (d.daycareStatusLabels && typeof d.daycareStatusLabels === 'object') ? d.daycareStatusLabels : {};
+    d.daycareStatuses = DAYCARE_DEFAULT_STATUSES.map(s => ({ id:s.id, label:oldLabels[s.id] || s.label, color:s.color }));
+  }
+  d.daycareStatuses.forEach(s => { s.id = s.id || newId(); s.label = s.label || s.id; s.color = s.color || 'var(--muted-2)'; });
+  delete d.daycareStatusLabels;
+  if(!Array.isArray(d.daycares)) d.daycares = [];
+  d.daycares.forEach(dc => {
     dc.id = dc.id || newId();
     dc.name = dc.name || '';
     dc.type = dc.type || '';
     dc.address = dc.address || '';
     dc.phone = dc.phone || '';
     dc.email = dc.email || '';
-    dc.status = DAYCARE_STATUSES.some(s => s.id === dc.status) ? dc.status : 'to_contact';
+    dc.status = d.daycareStatuses.some(s => s.id === dc.status) ? dc.status : d.daycareStatuses[0].id;
     dc.priority = Number(dc.priority) || 0;
     dc.capacity = dc.capacity || '';
     dc.hours = dc.hours || '';
     dc.comment = dc.comment || '';
     dc.nextContact = dc.nextContact || '';
     dc.website = dc.website || '';
+    dc.employerReservation = !!dc.employerReservation;
+    dc.municipalCommission = !!dc.municipalCommission;
   });
-  if(!d.daycareStatusLabels || typeof d.daycareStatusLabels !== 'object') d.daycareStatusLabels = {};
   if(!Array.isArray(d.hiddenTabs)) d.hiddenTabs = [];
   d.hiddenTabs = d.hiddenTabs.filter(id => APP_TABS.some(t => t.id === id));
   normalizeV2(d);
