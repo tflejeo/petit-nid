@@ -797,7 +797,8 @@ const ICONS = {
   bell:'<path d="M6 8a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M9.5 20a2.5 2.5 0 005 0"/>',
   sort:'<path d="M7 16l5 5 5-5"/><path d="M7 8l5-5 5 5"/><path d="M12 3v18"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>',
-  trophy:'<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4"/>'
+  trophy:'<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4"/>',
+  users:'<circle cx="9" cy="8" r="3.4"/><path d="M2.6 20a6.4 6.4 0 0112.8 0"/><path d="M16 5.2a3.4 3.4 0 010 6.6"/><path d="M17 14.4c2.4.5 4.1 2.2 4.4 5.6"/>'
 };
 function icon(name, cls){ return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
 
@@ -825,6 +826,20 @@ const V2_DEFAULT_TARGETS = {
   'Sans taille': { 'Lange':10, 'Bavoir':8, 'Cape de bain':2, 'Serviette':2, 'Gigoteuse':5, 'Couverture':2, 'Chapeau':1, 'Bonnet':1, 'Manteau':1 }
 };
 
+// Statuts optionnels pour les articles des listes de vêtements (mode "lots") : prêt/don entre proches.
+const V2_STATUS_OPTIONS = [
+  { id:'', label:'Aucun statut' },
+  { id:'offert', label:'Offert' },
+  { id:'prete', label:'Prêté' },
+  { id:'donne', label:'Donné' },
+  { id:'a_preter', label:'À prêter' },
+  { id:'a_donner', label:'À donner' },
+  { id:'a_vendre', label:'À vendre' }
+];
+const V2_STATUS_IDS = V2_STATUS_OPTIONS.map(s => s.id);
+const V2_STATUS_WITH_PERSON = ['prete', 'donne'];
+function v2StatusLabel(id){ const s = V2_STATUS_OPTIONS.find(x => x.id === id); return s ? s.label : ''; }
+
 function buildDefaultV2(){
   const sizes = V2_DEFAULT_SIZES.map(label => ({ id:newId(), label }));
   const categories = V2_DEFAULT_CATEGORIES.map(label => ({ id:newId(), label }));
@@ -842,14 +857,14 @@ function buildDefaultV2(){
   const brands = ['Petit Bateau','Vertbaudet','Jacadi'].map(label => ({ id:newId(), label }));
   return {
     id:newId(), name:'Vêtements bébé', sizeLabel:'Taille', categoryLabel:'Catégorie', mode:'lots',
-    sizes, categories, brands, targets, lots: [], characteristics: [], groupBy: 'size', photoSort: 'date'
+    sizes, categories, brands, people: [], targets, lots: [], characteristics: [], groupBy: 'size', photoSort: 'date'
   };
 }
 
 function buildEmptyV2List(name){
   return {
     id:newId(), name, sizeLabel:'Catégorie', categoryLabel:'Article', mode:'catalog', icon:'box', color:'var(--sage-dark)',
-    sizes:[], categories:[], brands:[], targets:[], lots:[], characteristics:[], groupBy:'size', photoSort:'date'
+    sizes:[], categories:[], brands:[], people: [], targets:[], lots:[], characteristics:[], groupBy:'size', photoSort:'date'
   };
 }
 
@@ -1721,6 +1736,7 @@ function normalizeV2List(v2){
   v2.sizes = denseArrayFrom(v2.sizes).filter(Boolean);
   v2.categories = denseArrayFrom(v2.categories).filter(Boolean);
   v2.brands = denseArrayFrom(v2.brands).filter(Boolean);
+  v2.people = denseArrayFrom(v2.people).filter(Boolean).map(p => ({ id: p.id || newId(), label: p.label || '' }));
   v2.groupBy = (v2.groupBy === 'category') ? 'category' : 'size';
   v2.photoSort = (v2.photoSort === 'size') ? 'size' : 'date';
   v2.targets = denseArrayFrom(v2.targets).filter(Boolean).map(t => {
@@ -1751,13 +1767,16 @@ function normalizeV2List(v2){
     lot.entries = denseArrayFrom(lot.entries).filter(Boolean).map(e => {
       let sizeIds = denseArrayFrom(e.sizeIds).filter(Boolean);
       if(!sizeIds.length && e.sizeId) sizeIds = [e.sizeId]; // migration depuis l'ancien format (une seule taille)
+      const status = V2_STATUS_IDS.includes(e.status) ? e.status : '';
       return {
         id: e.id || newId(),
         sizeIds,
         categoryId: e.categoryId || '',
         brandId: e.brandId || '',
         qty: Math.max(1, parseInt(e.qty,10) || 1),
-        charValues: (e.charValues && typeof e.charValues === 'object') ? e.charValues : {}
+        charValues: (e.charValues && typeof e.charValues === 'object') ? e.charValues : {},
+        status,
+        personId: V2_STATUS_WITH_PERSON.includes(status) ? (e.personId || '') : ''
       };
     });
     return lot;
@@ -3374,6 +3393,7 @@ function openEditTodoModal(t){
 function v2SizeLabel(id){ const s = (activeV2List().sizes||[]).find(x=>x.id===id); return s ? s.label : '—'; }
 function v2CategoryLabel(id){ const c = (activeV2List().categories||[]).find(x=>x.id===id); return c ? c.label : '—'; }
 function v2BrandLabel(id){ if(!id) return ''; const b = (activeV2List().brands||[]).find(x=>x.id===id); return b ? b.label : ''; }
+function v2PersonLabel(id, list){ if(!id) return ''; const p = ((list || activeV2List()).people||[]).find(x=>x.id===id); return p ? p.label : ''; }
 function v2LotTags(list, lot){
   const categoryLabels = [...new Set((lot.entries || []).map(e => {
     const c = (list.categories || []).find(x => x.id === e.categoryId);
@@ -3650,9 +3670,12 @@ function renderV2ListPicker(){
         <div class="track"><div class="fill" style="width:${g.pct}%; background:${progressColor(g.pct)}"></div></div>
         ${budget.projected > 0 ? `<div class="budget-summary">${icon('wallet','icon-sm')} Dépensé : <strong>${formatPrice(budget.spent)}</strong> sur un budget estimé de <strong>${formatPrice(budget.projected)}</strong></div>` : ''}
       </div>
-      <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div class="section-heading" style="margin-top:0; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
         <span>Choisissez une liste</span>
-        <button class="chip-btn" id="btnShareGuestLink" style="font-size:11.5px; padding:6px 10px;">🎁 Partager avec la famille</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${lists.some(l => l.mode === 'lots') ? `<button class="chip-btn" id="btnOpenLendGive" style="font-size:11.5px; padding:6px 10px;">${icon('users','icon-sm')} Prêts &amp; dons</button>` : ''}
+          <button class="chip-btn" id="btnShareGuestLink" style="font-size:11.5px; padding:6px 10px;">🎁 Partager avec la famille</button>
+        </div>
       </div>
       <div class="cat-grid" id="v2ListGrid">
         ${lists.map(l => {
@@ -3679,6 +3702,8 @@ function renderV2ListPicker(){
   const clearBtn = document.getElementById('btnClearSearchV2');
   if(clearBtn) clearBtn.onclick = () => { searchQueryV2 = ''; render(); };
   renderSearchStateV2Global();
+  const lendGiveBtn = document.getElementById('btnOpenLendGive');
+  if(lendGiveBtn) lendGiveBtn.onclick = () => openLendGiveModal();
   document.querySelectorAll('[data-v2-select-list]').forEach(card => {
     card.onclick = () => { ui.activeV2ListId = card.dataset.v2SelectList; saveUi(); render(); };
   });
@@ -4488,8 +4513,8 @@ function openVetementModal(existingLot){
   let photos = isNew ? [] : (existingLot.photos || []).map(id => ({ id, src:null, hidden: (existingLot.hiddenPhotos || []).includes(id) }));
   let removedExistingPhotoIds = [];
   let lines = isNew
-    ? [{ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, expanded:true }]
-    : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues), expanded:false }));
+    ? [{ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, status:'', personId:'', expanded:true }]
+    : (existingLot.entries || []).map(e => ({ id:e.id, sizeIds:(e.sizeIds || []).slice(), categoryId:e.categoryId, brandId:e.brandId || '', qty:e.qty, charValues: Object.assign({}, e.charValues), status: e.status || '', personId: e.personId || '', expanded:false }));
 
   function catOptions(selected){
     return `<option value="" ${selected ? '' : 'selected'}>Choisir : ${escapeHtml(list.categoryLabel)}…</option>` +
@@ -4497,6 +4522,15 @@ function openVetementModal(existingLot){
   }
   function brandOptions(selected){
     return `<option value="">Marque —</option>` + v2SortByLabel(activeV2List().brands).map(b => `<option value="${b.id}" ${b.id===selected?'selected':''}>${escapeHtml(b.label)}</option>`).join('');
+  }
+  function statusOptions(selected){
+    return V2_STATUS_OPTIONS.map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
+  }
+  function personOptions(selected){
+    const people = activeV2List().people || [];
+    return `<option value="">Choisir une personne…</option>` +
+      v2SortByLabel(people).map(p => `<option value="${p.id}" ${p.id===selected?'selected':''}>${escapeHtml(p.label)}</option>`).join('') +
+      `<option value="__new__" ${selected==='__new__'?'selected':''}>+ Ajouter une personne…</option>`;
   }
   function sizeChips(line){
     return (activeV2List().sizes || []).map(s => `<button type="button" class="chip-toggle ${line.sizeIds.includes(s.id) ? 'selected' : ''}" data-line-size="${line.id}" data-size-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
@@ -4517,7 +4551,15 @@ function openVetementModal(existingLot){
     const catLabel = l.categoryId ? v2CategoryLabel(l.categoryId) : `${list.categoryLabel} non choisi(e)`;
     const sizesLabel = l.sizeIds.length ? l.sizeIds.map(id => v2SizeLabel(id)).join(', ') : `${list.sizeLabel} non choisi(e)`;
     const brandLabel = l.brandId ? v2BrandLabel(l.brandId) : '';
-    return `${catLabel} · ${sizesLabel}${brandLabel ? ' · ' + brandLabel : ''} · Qté ${l.qty}`;
+    let statusLabel = '';
+    if(l.status){
+      statusLabel = v2StatusLabel(l.status);
+      if(V2_STATUS_WITH_PERSON.includes(l.status) && l.personId && l.personId !== '__new__'){
+        const pLabel = v2PersonLabel(l.personId, list);
+        if(pLabel) statusLabel += ' (' + pLabel + ')';
+      }
+    }
+    return `${catLabel} · ${sizesLabel}${brandLabel ? ' · ' + brandLabel : ''} · Qté ${l.qty}${statusLabel ? ' · ' + statusLabel : ''}`;
   }
   function linesHtml(){
     return lines.map(l => `
@@ -4538,6 +4580,22 @@ function openVetementModal(existingLot){
             <input type="number" min="1" data-line-field="qty" data-line="${l.id}" value="${l.qty}" style="width:56px; text-align:center; flex-shrink:0;">
             ${lines.length > 1 ? `<button type="button" class="text-btn danger" data-del-line="${l.id}" style="flex-shrink:0;">${icon('x','icon-sm')}</button>` : ''}
           </div>
+          <div style="margin-top:8px;">
+            <div class="field-label" style="margin-bottom:4px;">Statut</div>
+            <select data-line-field="status" data-line="${l.id}" style="width:100%;">${statusOptions(l.status)}</select>
+          </div>
+          ${V2_STATUS_WITH_PERSON.includes(l.status) ? `
+            <div style="margin-top:8px;">
+              <div class="field-label" style="margin-bottom:4px;">${l.status === 'prete' ? 'Prêté par' : 'Donné par'}</div>
+              <select data-line-field="personId" data-line="${l.id}" style="width:100%;">${personOptions(l.personId)}</select>
+              ${l.personId === '__new__' ? `
+                <div style="display:flex; gap:8px; margin-top:6px;">
+                  <input type="text" data-line-newperson="${l.id}" placeholder="Nom de la personne" style="flex:1;">
+                  <button type="button" class="chip-btn" data-line-newperson-add="${l.id}">Ajouter</button>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
         </div>
       </div>
     `).join('');
@@ -4640,7 +4698,23 @@ function openVetementModal(existingLot){
         if(!line) return;
         const field = el.dataset.lineField;
         line[field] = field === 'qty' ? Math.max(1, parseInt(el.value, 10) || 1) : el.value;
-        if(field === 'categoryId') bindLineEvents();
+        if(field === 'status' && !V2_STATUS_WITH_PERSON.includes(line.status)) line.personId = '';
+        if(field === 'categoryId' || field === 'status' || field === 'personId') bindLineEvents();
+      };
+    });
+    container.querySelectorAll('[data-line-newperson-add]').forEach(btn => {
+      btn.onclick = () => {
+        const line = lines.find(l => l.id === btn.dataset.lineNewpersonAdd);
+        if(!line) return;
+        const input = container.querySelector(`[data-line-newperson="${btn.dataset.lineNewpersonAdd}"]`);
+        const label = input.value.trim();
+        if(!label){ showToast('Indiquez un nom'); return; }
+        const curList = activeV2List();
+        if(!Array.isArray(curList.people)) curList.people = [];
+        let person = curList.people.find(p => p.label.toLowerCase() === label.toLowerCase());
+        if(!person){ person = { id:newId(), label }; curList.people.push(person); }
+        line.personId = person.id;
+        bindLineEvents();
       };
     });
     container.querySelectorAll('[data-line-size]').forEach(btn => {
@@ -4673,7 +4747,7 @@ function openVetementModal(existingLot){
 
   document.getElementById('btnAddLine').onclick = () => {
     lines.forEach(l => { l.expanded = false; });
-    lines.push({ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, expanded:true });
+    lines.push({ id:newId(), sizeIds: [], categoryId:'', brandId:'', qty:1, charValues:{}, status:'', personId:'', expanded:true });
     bindLineEvents();
   };
   const cancelBtn = document.getElementById('mCancel');
@@ -4692,7 +4766,11 @@ function openVetementModal(existingLot){
     removedExistingPhotoIds.forEach(deletePhotoRef);
     const photoIds = photos.map(p => p.id);
     const hiddenIds = photos.filter(p => p.hidden).map(p => p.id);
-    const entries = validLines.map(l => ({ id:l.id, sizeIds:l.sizeIds.slice(), categoryId:l.categoryId, brandId:l.brandId || '', qty:l.qty, charValues: Object.assign({}, l.charValues) }));
+    const entries = validLines.map(l => {
+      const status = V2_STATUS_IDS.includes(l.status) ? l.status : '';
+      const personId = (V2_STATUS_WITH_PERSON.includes(status) && l.personId && l.personId !== '__new__') ? l.personId : '';
+      return { id:l.id, sizeIds:l.sizeIds.slice(), categoryId:l.categoryId, brandId:l.brandId || '', qty:l.qty, charValues: Object.assign({}, l.charValues), status, personId };
+    });
     if(isNew){
       if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
       activeV2List().lots.push({ id:newId(), photos:photoIds, hiddenPhotos:hiddenIds, price, entries });
@@ -4936,6 +5014,15 @@ function openManageV2Modal(){
         <div style="display:flex; gap:8px;"><input type="text" id="newV2Brand" placeholder="ex. Petit Bateau" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Brand">Ajouter</button></div>
       </div>
     </div>
+    ${list.mode === 'lots' ? `
+    <div class="v2-manage-section">
+      ${sectionHeader('people', 'Personnes (prêts / dons)')}
+      <div class="v2-manage-body" data-manage-body="people" style="display:none;">
+        <div id="v2PeopleList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px;"><input type="text" id="newV2Person" placeholder="ex. Mamie Josette" style="flex:1;"><button type="button" class="chip-btn" id="btnAddV2Person">Ajouter</button></div>
+      </div>
+    </div>
+    ` : ''}
     <div class="v2-manage-section">
       ${sectionHeader('chars', 'Caractéristiques')}
       <div class="v2-manage-body" data-manage-body="chars" style="display:none;">
@@ -4994,6 +5081,8 @@ function openManageV2Modal(){
     document.getElementById('v2SizesList').innerHTML = listHtml(activeV2List().sizes, 'del-v2-size', 'rename-v2-size');
     document.getElementById('v2CategoriesList').innerHTML = listHtml(v2SortByLabel(activeV2List().categories), 'del-v2-cat', 'rename-v2-cat');
     document.getElementById('v2BrandsList').innerHTML = listHtml(v2SortByLabel(activeV2List().brands), 'del-v2-brand', 'rename-v2-brand');
+    const peopleListEl = document.getElementById('v2PeopleList');
+    if(peopleListEl) peopleListEl.innerHTML = listHtml(v2SortByLabel(activeV2List().people), 'del-v2-person', 'rename-v2-person');
     document.getElementById('v2CharsList').innerHTML = charsListHtml();
     document.querySelectorAll('[data-del-v2-size]').forEach(b => b.onclick = () => openConfirmModal('Supprimer cette ' + list.sizeLabel.toLowerCase() + ' ?', 'Les objectifs et articles déjà achetés qui lui sont propres seront aussi supprimés.', () => {
       v2RemoveSizeReferences(activeV2List(), b.dataset.delV2Size);
@@ -5010,6 +5099,12 @@ function openManageV2Modal(){
       activeV2List().brands = activeV2List().brands.filter(x => x.id !== b.dataset.delV2Brand);
       save(); rebind();
     });
+    document.querySelectorAll('[data-del-v2-person]').forEach(b => b.onclick = () => {
+      const list2 = activeV2List();
+      (list2.lots || []).forEach(lot => (lot.entries || []).forEach(e => { if(e.personId === b.dataset.delV2Person) e.personId = ''; }));
+      list2.people = list2.people.filter(x => x.id !== b.dataset.delV2Person);
+      save(); rebind();
+    });
     document.querySelectorAll('[data-rename-v2-size]').forEach(b => b.onclick = () => {
       const item = activeV2List().sizes.find(s => s.id === b.dataset.renameV2Size);
       openRenamePrompt(list.sizeLabel, item.label, (val) => { item.label = val; save(); closeModal(); openManageV2Modal(); });
@@ -5021,6 +5116,10 @@ function openManageV2Modal(){
     document.querySelectorAll('[data-rename-v2-brand]').forEach(b => b.onclick = () => {
       const item = activeV2List().brands.find(x => x.id === b.dataset.renameV2Brand);
       openRenamePrompt('Marque', item.label, (val) => { item.label = val; save(); closeModal(); openManageV2Modal(); });
+    });
+    document.querySelectorAll('[data-rename-v2-person]').forEach(b => b.onclick = () => {
+      const item = activeV2List().people.find(x => x.id === b.dataset.renameV2Person);
+      openRenamePrompt('Personne', item.label, (val) => { item.label = val; save(); closeModal(); openManageV2Modal(); });
     });
     document.querySelectorAll('[data-edit-char]').forEach(b => b.onclick = () => {
       const ch = activeV2List().characteristics.find(c => c.id === b.dataset.editChar);
@@ -5046,6 +5145,104 @@ function openManageV2Modal(){
     if(!label){ showToast('Indiquez un nom'); return; }
     activeV2List().brands.push({ id:newId(), label }); save(); input.value = ''; rebind();
   };
+  const addPersonBtn = document.getElementById('btnAddV2Person');
+  if(addPersonBtn) addPersonBtn.onclick = () => {
+    const input = document.getElementById('newV2Person'); const label = input.value.trim();
+    if(!label){ showToast('Indiquez un nom'); return; }
+    if(!Array.isArray(activeV2List().people)) activeV2List().people = [];
+    activeV2List().people.push({ id:newId(), label }); save(); input.value = ''; rebind();
+  };
+}
+
+// Rassemble, sur toutes les listes de vêtements (mode "lots"), chaque article marqué
+// « Prêté » ou « Donné », pour l'écran de synthèse « Prêts & dons ».
+function v2LendGiveCollect(){
+  const rows = [];
+  (data.v2lists || []).forEach(list => {
+    if(list.mode !== 'lots') return;
+    (list.lots || []).forEach(lot => {
+      (lot.entries || []).forEach(entry => {
+        if(!V2_STATUS_WITH_PERSON.includes(entry.status)) return;
+        const person = (list.people || []).find(p => p.id === entry.personId);
+        rows.push({ list, lot, entry, personLabel: person ? person.label : '' });
+      });
+    });
+  });
+  return rows;
+}
+
+function openLendGiveModal(){
+  let personFilter = '';
+  let statusFilter = '';
+
+  function draw(){
+    const allRows = v2LendGiveCollect();
+    const people = Array.from(new Set(allRows.map(r => r.personLabel).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    const filtered = allRows.filter(r =>
+      (!personFilter || r.personLabel === personFilter) &&
+      (!statusFilter || r.entry.status === statusFilter)
+    );
+    openModal(`
+      <h2>${icon('users','icon-sm')} Prêts &amp; dons</h2>
+      ${!allRows.length ? `<p style="color:var(--muted); font-size:13px;">Aucun article marqué « Prêté » ou « Donné » pour l’instant.</p>` : `
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+          <select id="lgPersonFilter" style="flex:1; min-width:140px;">
+            <option value="">Toutes les personnes</option>
+            ${people.map(p => `<option value="${escapeAttr(p)}" ${p === personFilter ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+          </select>
+          <select id="lgStatusFilter" style="flex:1; min-width:140px;">
+            <option value="">Prêté &amp; Donné</option>
+            <option value="prete" ${statusFilter === 'prete' ? 'selected' : ''}>Prêté seulement</option>
+            <option value="donne" ${statusFilter === 'donne' ? 'selected' : ''}>Donné seulement</option>
+          </select>
+        </div>
+        ${!filtered.length ? `<p style="color:var(--muted); font-size:13px;">Aucun article ne correspond à ce filtre.</p>` : `
+          <div style="display:flex; flex-direction:column; gap:8px; max-height:55vh; overflow-y:auto;" id="lgRows">
+            ${filtered.map(r => {
+              const cat = (r.list.categories || []).find(c => c.id === r.entry.categoryId);
+              const catLabel = cat ? cat.label : '—';
+              const sizesLabel = (r.entry.sizeIds || []).map(id => {
+                const s = (r.list.sizes || []).find(x => x.id === id);
+                return s ? s.label : '—';
+              }).join(', ');
+              const thumbId = (r.lot.photos || []).find(Boolean);
+              const thumb = thumbId
+                ? `<img data-photo-src="${thumbId}" style="width:44px; height:44px; border-radius:10px; object-fit:cover; flex-shrink:0;">`
+                : `<div style="width:44px; height:44px; border-radius:10px; background:var(--sage-dark); flex-shrink:0; display:flex; align-items:center; justify-content:center;">${icon('box','icon-sm')}</div>`;
+              return `<button type="button" class="search-result-row" data-lg-goto="${r.list.id}::${r.lot.id}" style="align-items:center;">
+                ${thumb}
+                <div class="search-result-main">
+                  <div class="item-name">${escapeHtml(catLabel)}${sizesLabel ? ' · ' + escapeHtml(sizesLabel) : ''}${r.entry.qty > 1 ? ' · Qté ' + r.entry.qty : ''}</div>
+                  <div class="search-result-breadcrumb">${escapeHtml(r.list.name)} · ${v2StatusLabel(r.entry.status)}${r.personLabel ? ' · ' + escapeHtml(r.personLabel) : ''}</div>
+                </div>
+              </button>`;
+            }).join('')}
+          </div>
+        `}
+      `}
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="mCancel">Fermer</button>
+      </div>
+    `);
+    document.getElementById('mCancel').onclick = closeModal;
+    const rowsEl = document.getElementById('lgRows');
+    if(rowsEl) hydratePhotoImages(rowsEl);
+    const pf = document.getElementById('lgPersonFilter');
+    if(pf) pf.onchange = () => { personFilter = pf.value; draw(); };
+    const sf = document.getElementById('lgStatusFilter');
+    if(sf) sf.onchange = () => { statusFilter = sf.value; draw(); };
+    document.querySelectorAll('[data-lg-goto]').forEach(btn => {
+      btn.onclick = () => {
+        const [listId, lotId] = btn.dataset.lgGoto.split('::');
+        const targetList = (data.v2lists || []).find(l => l.id === listId);
+        const lot = targetList && (targetList.lots || []).find(l => l.id === lotId);
+        if(!targetList || !lot) return;
+        ui.activeV2ListId = listId; saveUi();
+        openVetementModal(lot);
+      };
+    });
+  }
+  draw();
 }
 
 function openEditCharacteristicModal(existingChar){
