@@ -831,13 +831,19 @@ const V2_STATUS_OPTIONS = [
   { id:'', label:'Aucun statut' },
   { id:'offert', label:'Offert' },
   { id:'prete', label:'Prêté' },
-  { id:'donne', label:'Donné' },
   { id:'a_preter', label:'À prêter' },
   { id:'a_donner', label:'À donner' },
   { id:'a_vendre', label:'À vendre' }
 ];
 const V2_STATUS_IDS = V2_STATUS_OPTIONS.map(s => s.id);
-const V2_STATUS_WITH_PERSON = ['prete', 'donne'];
+// Statuts pour lesquels on propose de préciser une personne (facultatif, jamais obligatoire) :
+// qui nous l'a offert/prêté, ou à qui on prévoit de le prêter.
+const V2_STATUS_WITH_PERSON = ['offert', 'prete', 'a_preter'];
+// Sens différent pour l'affichage du sélecteur de personne selon le statut.
+const V2_STATUS_PERSON_LABEL = { offert:'Offert par', prete:'Prêté par', a_preter:'À prêter à' };
+// Statuts affichés dans l'écran de synthèse "Prêts & dons" : uniquement ce qui nous a été
+// donné/prêté par quelqu'un (pas les statuts prospectifs comme "à prêter").
+const V2_LEND_GIVE_STATUSES = ['offert', 'prete'];
 function v2StatusLabel(id){ const s = V2_STATUS_OPTIONS.find(x => x.id === id); return s ? s.label : ''; }
 
 function buildDefaultV2(){
@@ -1767,7 +1773,8 @@ function normalizeV2List(v2){
     lot.entries = denseArrayFrom(lot.entries).filter(Boolean).map(e => {
       let sizeIds = denseArrayFrom(e.sizeIds).filter(Boolean);
       if(!sizeIds.length && e.sizeId) sizeIds = [e.sizeId]; // migration depuis l'ancien format (une seule taille)
-      const status = V2_STATUS_IDS.includes(e.status) ? e.status : '';
+      const rawStatus = (e.status === 'donne') ? 'offert' : e.status; // migration : "Donné" fusionné avec "Offert"
+      const status = V2_STATUS_IDS.includes(rawStatus) ? rawStatus : '';
       return {
         id: e.id || newId(),
         sizeIds,
@@ -4586,7 +4593,7 @@ function openVetementModal(existingLot){
           </div>
           ${V2_STATUS_WITH_PERSON.includes(l.status) ? `
             <div style="margin-top:8px;">
-              <div class="field-label" style="margin-bottom:4px;">${l.status === 'prete' ? 'Prêté par' : 'Donné par'}</div>
+              <div class="field-label" style="margin-bottom:4px;">${V2_STATUS_PERSON_LABEL[l.status] || 'Personne'} <span style="font-weight:400; color:var(--muted);">(facultatif)</span></div>
               <select data-line-field="personId" data-line="${l.id}" style="width:100%;">${personOptions(l.personId)}</select>
               ${l.personId === '__new__' ? `
                 <div style="display:flex; gap:8px; margin-top:6px;">
@@ -5162,7 +5169,7 @@ function v2LendGiveCollect(){
     if(list.mode !== 'lots') return;
     (list.lots || []).forEach(lot => {
       (lot.entries || []).forEach(entry => {
-        if(!V2_STATUS_WITH_PERSON.includes(entry.status)) return;
+        if(!V2_LEND_GIVE_STATUSES.includes(entry.status)) return;
         const person = (list.people || []).find(p => p.id === entry.personId);
         rows.push({ list, lot, entry, personLabel: person ? person.label : '' });
       });
@@ -5184,16 +5191,16 @@ function openLendGiveModal(){
     );
     openModal(`
       <h2>${icon('users','icon-sm')} Prêts &amp; dons</h2>
-      ${!allRows.length ? `<p style="color:var(--muted); font-size:13px;">Aucun article marqué « Prêté » ou « Donné » pour l’instant.</p>` : `
+      ${!allRows.length ? `<p style="color:var(--muted); font-size:13px;">Aucun article marqué « Offert » ou « Prêté » pour l’instant.</p>` : `
         <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
           <select id="lgPersonFilter" style="flex:1; min-width:140px;">
             <option value="">Toutes les personnes</option>
             ${people.map(p => `<option value="${escapeAttr(p)}" ${p === personFilter ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
           </select>
           <select id="lgStatusFilter" style="flex:1; min-width:140px;">
-            <option value="">Prêté &amp; Donné</option>
+            <option value="">Offert &amp; Prêté</option>
+            <option value="offert" ${statusFilter === 'offert' ? 'selected' : ''}>Offert seulement</option>
             <option value="prete" ${statusFilter === 'prete' ? 'selected' : ''}>Prêté seulement</option>
-            <option value="donne" ${statusFilter === 'donne' ? 'selected' : ''}>Donné seulement</option>
           </select>
         </div>
         ${!filtered.length ? `<p style="color:var(--muted); font-size:13px;">Aucun article ne correspond à ce filtre.</p>` : `
