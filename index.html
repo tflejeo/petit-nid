@@ -798,6 +798,7 @@ const ICONS = {
   sort:'<path d="M7 16l5 5 5-5"/><path d="M7 8l5-5 5 5"/><path d="M12 3v18"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>',
   trophy:'<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4"/>',
+  hanger:'<path d="M12 7.5a2.4 2.4 0 10-2.4-2.4"/><path d="M12 7.5v2L20.4 15a1.4 1.4 0 01-.8 2.6H4.4a1.4 1.4 0 01-.8-2.6L12 9.5"/>',
   users:'<circle cx="9" cy="8" r="3.4"/><path d="M2.6 20a6.4 6.4 0 0112.8 0"/><path d="M16 5.2a3.4 3.4 0 010 6.6"/><path d="M17 14.4c2.4.5 4.1 2.2 4.4 5.6"/>'
 };
 function icon(name, cls){ return '<svg class="icon '+(cls||'')+'" viewBox="0 0 24 24">'+ICONS[name]+'</svg>'; }
@@ -836,6 +837,8 @@ const V2_STATUS_OPTIONS = [
   { id:'a_vendre', label:'À vendre' }
 ];
 const V2_STATUS_IDS = V2_STATUS_OPTIONS.map(s => s.id);
+// Les vêtements se gèrent désormais sur l'app dédiée ; la liste « lots » de Nidoux n'est plus qu'une archive.
+const DRESSING_APP_URL = 'https://mon-petit-dressing.fr';
 // Statuts pour lesquels on propose de préciser une personne (facultatif, jamais obligatoire) :
 // qui nous l'a offert/prêté, ou à qui on prévoit de le prêter.
 const V2_STATUS_WITH_PERSON = ['offert', 'prete', 'a_preter'];
@@ -3688,6 +3691,18 @@ function renderV2ListPicker(){
         ${lists.map(l => {
           const t = v2GlobalTotalsForList(l);
           const b = budgetTotalsForV2List(l);
+          if(l.mode === 'lots'){
+            return `<a class="cat-card" href="${DRESSING_APP_URL}" target="_blank" rel="noopener" style="text-decoration:none; color:inherit;">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:6px;">
+                <div class="cat-icon" style="background:${l.color || 'var(--sage-dark)'};">${icon('hanger','icon-lg')}</div>
+                <div style="color:var(--muted); margin-top:5px;">${icon('link','icon-sm')}</div>
+              </div>
+              <div>
+                <div class="cat-name">Mon petit dressing</div>
+                <div class="cat-meta">Gérer les vêtements sur l’app dédiée</div>
+              </div>
+            </a>`;
+          }
           return `<button type="button" class="cat-card" data-v2-select-list="${l.id}">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:6px;">
               <div class="cat-icon" style="background:${l.color || 'var(--sage-dark)'};">${icon(l.icon || 'box','icon-lg')}</div>
@@ -3702,6 +3717,7 @@ function renderV2ListPicker(){
         }).join('')}
         <button class="cat-card add-card" id="btnAddV2List">${icon('plus','icon-lg')}<span>Nouvelle liste</span></button>
       </div>
+      ${lists.some(l => l.mode === 'lots') ? `<div style="text-align:center; margin-top:14px;"><button type="button" class="text-btn" id="btnOpenLegacyClothes" style="font-size:12px; color:var(--muted);">Consulter l’ancienne liste de vêtements (archive)</button></div>` : ''}
     </div>
   `;
   const searchInput = document.getElementById('searchInputV2');
@@ -3714,6 +3730,11 @@ function renderV2ListPicker(){
   document.querySelectorAll('[data-v2-select-list]').forEach(card => {
     card.onclick = () => { ui.activeV2ListId = card.dataset.v2SelectList; saveUi(); render(); };
   });
+  const legacyBtn = document.getElementById('btnOpenLegacyClothes');
+  if(legacyBtn) legacyBtn.onclick = () => {
+    const legacy = lists.find(l => l.mode === 'lots');
+    if(legacy){ ui.activeV2ListId = legacy.id; saveUi(); render(); }
+  };
   document.getElementById('btnShareGuestLink').onclick = openShareGuestLinkModal;
 
   document.getElementById('btnAddV2List').onclick = () => {
