@@ -573,6 +573,24 @@
     border:1.5px dashed var(--muted-2); background:transparent; color:var(--sage-dark); font-weight:800; font-size:13.5px; cursor:pointer;
   }
   .add-row-btn:active{background:var(--sage-tint);}
+  .buy-card{display:flex; align-items:center; gap:11px; background:#fff; border:1px solid var(--border); border-radius:14px; padding:9px; margin-bottom:8px; cursor:pointer;}
+  .buy-card:active{background:var(--sage-tint);}
+  .buy-photo{width:56px; height:56px; border-radius:12px; flex-shrink:0; background:#EFE8D8; border:1px solid var(--border); overflow:hidden; display:flex; align-items:center; justify-content:center; color:var(--muted-2);}
+  .buy-photo img{width:100%; height:100%; object-fit:cover; display:block;}
+  .buy-main{flex:1; min-width:0;}
+  .buy-brand{font-weight:800; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .buy-brand.none{color:var(--muted); font-weight:700;}
+  .buy-meta{font-size:12px; color:var(--muted); margin-top:1px;}
+  .buy-price{font-weight:800; font-size:16px; white-space:nowrap; text-align:right;}
+  .buy-price.none{font-size:12px; color:var(--muted-2); font-weight:700;}
+  .buy-chev{color:var(--muted-2); flex-shrink:0;}
+  .buy-total{display:flex; justify-content:space-between; align-items:center; margin:0 2px 10px; font-size:12.5px; color:var(--muted); font-weight:700;}
+  .buy-total b{color:var(--ink);}
+  .set-fold{display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; margin-top:8px; padding:11px 13px; border-radius:14px; border:none; background:#F5EFE0; font:800 13px var(--font-body); color:var(--muted); cursor:pointer; text-align:left;}
+  .set-fold .chev-s{transition:transform .2s;} .set-fold.open .chev-s{transform:rotate(90deg);}
+  .set-body{padding:4px 2px 0;}
+  .del-pair-btn{display:flex; align-items:flex-start; gap:6px; width:100%; margin-top:14px; padding:11px 13px; border-radius:14px; border:1.5px solid var(--terracotta-tint); background:var(--terracotta-tint); color:var(--terracotta-dark); font:800 13px var(--font-body); text-align:left; white-space:normal; cursor:pointer;}
+  .size-paid{display:inline-block; margin-left:8px; font-size:11px; font-weight:800; color:var(--sage-dark); background:var(--sage-tint); border-radius:99px; padding:2px 8px; vertical-align:middle; white-space:nowrap;}
 
   .cat-actions-row{display:flex; gap:8px; margin:14px 0 4px;}
   .chip-btn{
@@ -781,6 +799,7 @@ const ICONS = {
   check:'<path d="M4 12l5 5L20 6"/>',
   chevronDown:'<path d="M6 9l6 6 6-6"/>',
   chevronLeft:'<path d="M15 18l-6-6 6-6"/>',
+  chevronRight:'<path d="M9 18l6-6-6-6"/>',
   camera:'<path d="M4 8h3l2-3h6l2 3h3v11a1 1 0 01-1 1H5a1 1 0 01-1-1V8z"/><circle cx="12" cy="14" r="3.4"/>',
   link:'<path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/>',
   trash:'<path d="M4 7h16M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13"/>',
@@ -3964,7 +3983,7 @@ function renderV2SizeCard(size){
     <div class="section-card">
       <div class="section-head ${collapsed ? '' : 'open'}" data-v2-size-toggle="${size.id}">
         <div class="section-info">
-          <div class="section-title-row"><span class="section-title">${escapeHtml(size.label)}</span></div>
+          <div class="section-title-row"><span class="section-title">${escapeHtml(size.label)}</span>${(v2IsCatalog(activeV2List()) && v2SizePaid(size.id) > 0) ? `<span class="size-paid">💰 Payé ${formatPrice(v2SizePaid(size.id))}</span>` : ''}</div>
           <div class="section-progress"><div class="track thin"><div class="fill" style="width:${t.pct}%; background:${progressColor(t.pct)}"></div></div></div>
         </div>
         <span class="section-count">${t.acquired}/${t.target}</span>
@@ -4093,6 +4112,31 @@ function commentFieldHtml(categoryId, catObj){
     <textarea data-v2-cat-comment="${categoryId}" placeholder="Optionnel… (un lien collé ici s'ouvrira facilement)" style="min-height:40px;">${escapeHtml(value)}</textarea>
   </div>`;
 }
+function v2PairPaid(sizeId, categoryId){
+  const seen = new Set(); let sum = 0, n = 0;
+  v2EntriesFor(sizeId, categoryId).forEach(({ lot }) => { if(seen.has(lot.id)) return; seen.add(lot.id); sum += Number(lot.price) || 0; n++; });
+  return { sum, n };
+}
+function v2SizePaid(sizeId){
+  const seen = new Set(); let sum = 0;
+  (activeV2List().lots || []).forEach(lot => {
+    if(seen.has(lot.id)) return;
+    if((lot.entries || []).some(e => (e.sizeIds || []).includes(sizeId))){ seen.add(lot.id); sum += Number(lot.price) || 0; }
+  });
+  return sum;
+}
+function renderV2SettingsFold(key, label, categoryId, catObj, targetHtml){
+  const open = !!ui.expandedItems['v2set-' + key];
+  const list = activeV2List();
+  const hasComment = !!(catObj && catObj.comment);
+  return `<button type="button" class="set-fold ${open ? 'open' : ''}" data-v2-set-toggle="${key}"><span>⚙ Objectif &amp; commentaire${hasComment ? ' 📝' : ''}</span><span class="chev-s">▸</span></button>
+    ${open ? `<div class="set-body">
+      ${targetHtml}
+      ${commentFieldHtml(categoryId, catObj)}
+      <button type="button" class="del-pair-btn" data-v2-delete-pair="${key}" data-v2-delete-label="${escapeAttr(label)}">${icon('trash','icon-sm')}<span>Retirer « ${escapeHtml(label)} » de cette ${escapeHtml(list.sizeLabel.toLowerCase())}</span></button>
+    </div>` : ''}`;
+}
+
 function renderV2PairRow(sizeId, categoryId, label){
   const acquired = v2AcquiredFor(sizeId, categoryId);
   const target = v2TargetFor(sizeId, categoryId);
@@ -4109,12 +4153,14 @@ function renderV2PairRow(sizeId, categoryId, label){
   const isReserved = anyReservedForPair(sizeId, categoryId);
   const pairCatObj = (list.categories || []).find(c => c.id === categoryId);
   const hasComment = !!(pairCatObj && pairCatObj.comment);
+  const pairPaid = v2PairPaid(sizeId, categoryId);
   let html = `<div class="item-row" data-v2-cat-row="${key}">
     <span class="status-dot status-${status}"></span>
     <div class="item-main" data-v2-cat-toggle="${key}">
       <div class="item-name-row"><span class="item-name">${escapeHtml(label)}</span>${isReserved ? `<span class="reserved-badge" style="margin-left:6px;">🎁</span>` : ''}${hasComment ? `<span title="Un commentaire est renseigné" style="margin-left:6px;">📝</span>` : ''}</div>
       <div class="item-sub"><span>${acquired} / ${target}</span></div>
     </div>
+    ${(catalogMode && pairPaid.n && pairPaid.sum > 0) ? `<span style="font-weight:800; font-size:13.5px; color:var(--sage-dark); white-space:nowrap; margin-right:4px;">${formatPrice(pairPaid.sum)}</span>` : ''}
     ${charRows.length ? renderV2RowCharSummary(charRows) : ''}
     ${photoRefs.length ? renderV2RowThumbs(key, photoRefs) : ''}
   </div>`;
@@ -4143,10 +4189,31 @@ function renderV2PairRow(sizeId, categoryId, label){
       `;
       html += `</div>`;
       return html;
-    }    if(catalogMode){
+    }
+    if(catalogMode){
       const catObj = (list.categories || []).find(c => c.id === categoryId);
-      html += `<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>
-      ${commentFieldHtml(categoryId, catObj)}`;
+      let body;
+      if(mainChar){
+        const indiffRow = charRows.find(r => !r.charId);
+        const indiffEntries = entries.filter(({ entry }) => !(entry.charValues && entry.charValues[mainChar.id]));
+        const anyValueHasTarget = mainChar.values.some(v => (Number(v2TargetForValue(sizeId, categoryId, mainChar.id, v.id)) || 0) > 0);
+        const hideIndiff = anyValueHasTarget && (indiffRow.target || 0) === 0 && indiffEntries.length === 0;
+        body = '';
+        if(!hideIndiff) body += renderV2CharGroup(key, 'v2g-' + key + '::' + mainChar.id + '::indiff', indiffRow, indiffEntries, mainChar.id);
+        mainChar.values.forEach(v => {
+          const row = charRows.find(r => r.charId === mainChar.id && r.valueId === v.id);
+          const groupEntries = entries.filter(({ entry }) => entry.charValues && entry.charValues[mainChar.id] === v.id);
+          body += renderV2CharGroup(key, 'v2g-' + key + '::' + mainChar.id + '::' + v.id, row, groupEntries, mainChar.id);
+        });
+      } else {
+        body = entries.length ? entries.map(({lot, entry}) => renderV2EntryRow(lot, entry)).join('') : `<p style="color:var(--muted); font-size:12.5px; margin:0 0 8px;">Aucun achat pour l’instant.</p>`;
+        if(pairPaid.n > 1 && pairPaid.sum > 0) body += `<div class="buy-total"><span>${pairPaid.n} achats</span><span>Total <b>${formatPrice(pairPaid.sum)}</b></span></div>`;
+      }
+      const targetHtml = mainChar ? '' : `<div class="field"><label class="field-label">Objectif</label><input type="number" min="0" data-v2-target="${key}" value="${target}"></div>${reservedBadgeHtml(sizeId, categoryId, null, null)}`;
+      html += `${body}<button type="button" class="add-row-btn" data-v2-catalog-add="${key}">${icon('camera','icon-sm')} Ajouter un achat</button>
+        ${renderV2SettingsFold(key, label, categoryId, catObj, targetHtml)}`;
+      html += `</div>`;
+      return html;
     }
     if(mainChar){
       const indiffRow = charRows.find(r => !r.charId);
@@ -4235,6 +4302,16 @@ function v2EntryCharTags(entry){
 function renderV2EntryRow(lot, entry, excludeCharId){
   const brand = v2BrandLabel(entry.brandId);
   const tags = v2EntryCharTags(entry).filter(t => t.charId !== excludeCharId);
+  if(v2IsCatalog(activeV2List())){
+    const price = Number(lot.price) || 0;
+    const meta = ['Qté ' + entry.qty].concat(tags.map(t => t.label)).join(' · ');
+    return `<div class="buy-card" data-v2-entry-row="${entry.id}">
+      <div class="buy-photo">${(lot.photos && lot.photos[0]) ? `<img data-photo-src="${lot.photos[0]}">` : icon('camera','icon-sm')}</div>
+      <div class="buy-main"><div class="buy-brand ${brand ? '' : 'none'}">${brand ? escapeHtml(brand) : 'Sans marque'}</div><div class="buy-meta">${escapeHtml(meta)}</div></div>
+      <div class="buy-price ${price > 0 ? '' : 'none'}">${price > 0 ? formatPrice(price) : 'Prix ?'}</div>
+      <span class="buy-chev">${icon('chevronRight','icon-sm')}</span>
+    </div>`;
+  }
   return `<div class="unit-row" data-v2-entry-row="${entry.id}">
     <div class="unit-photos">
       ${(lot.photos && lot.photos[0]) ? `
@@ -4358,12 +4435,21 @@ function bindListsV2Events(photoRefs){
     };
   });
 
+  document.querySelectorAll('[data-v2-set-toggle]').forEach(el => {
+    el.onclick = () => {
+      const key = 'v2set-' + el.dataset.v2SetToggle;
+      ui.expandedItems[key] = !ui.expandedItems[key];
+      render();
+    };
+  });
+
   document.querySelectorAll('[data-v2-delete-pair]').forEach(btn => {
     btn.onclick = () => {
       const [sizeId, categoryId] = btn.dataset.v2DeletePair.split('::');
-      openConfirmModal('Supprimer cette catégorie ?', 'L’objectif et les éventuels articles déjà achetés pour cette combinaison seront définitivement supprimés.', () => {
+      const lbl = btn.dataset.v2DeleteLabel;
+      openConfirmModal(lbl ? 'Retirer « ' + lbl + ' » de la liste ?' : 'Supprimer cette catégorie ?', 'L’objectif et les éventuels achats déjà saisis pour cet article seront définitivement supprimés.', () => {
         v2DeletePairGrouping(sizeId, categoryId);
-        save(); closeModal(); render(); showToast('Catégorie supprimée');
+        save(); closeModal(); render(); showToast(lbl ? '« ' + lbl + ' » retiré' : 'Catégorie supprimée');
       });
     };
   });
@@ -4820,6 +4906,19 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   let removedExistingPhotoIds = [];
   let charValues = isNew ? {} : Object.assign({}, existing.entry.charValues);
   const chars = v2CharacteristicsForCategory(categoryId);
+  let brandSel = isNew ? '' : (existing.entry.brandId || '');
+  let newBrandText = '';
+
+  function brandFieldHtml(){
+    const brands = v2SortByLabel(activeV2List().brands || []);
+    return `<label class="field-label">Marque</label>
+      <select id="catalogBrandSelect" style="width:100%;">
+        <option value="">Sans marque</option>
+        ${brands.map(b => `<option value="${b.id}" ${b.id===brandSel?'selected':''}>${escapeHtml(b.label)}</option>`).join('')}
+        <option value="__new__" ${brandSel==='__new__'?'selected':''}>+ Nouvelle marque…</option>
+      </select>
+      ${brandSel === '__new__' ? `<input type="text" id="catalogNewBrand" placeholder="ex. IKEA" value="${escapeAttr(newBrandText)}" style="margin-top:6px;">` : ''}`;
+  }
 
   function charPickersHtml(){
     if(!chars.length) return '';
@@ -4860,6 +4959,7 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
       <label class="field-label">Photo(s)</label>
       <div id="catalogPhotos">${photosHtml()}</div>
     </div>
+    <div class="field" id="catalogBrand">${brandFieldHtml()}</div>
     <div id="catalogChars">${charPickersHtml()}</div>
     <div style="display:flex; gap:10px;">
       <div class="field" style="flex:1;">
@@ -4925,6 +5025,20 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
   }
   bindCharEvents();
 
+  function bindBrandEvents(){
+    const sel = document.getElementById('catalogBrandSelect');
+    if(sel) sel.onchange = () => {
+      brandSel = sel.value;
+      document.getElementById('catalogBrand').innerHTML = brandFieldHtml();
+      bindBrandEvents();
+      const inp = document.getElementById('catalogNewBrand');
+      if(inp) inp.focus();
+    };
+    const inp = document.getElementById('catalogNewBrand');
+    if(inp) inp.oninput = () => { newBrandText = inp.value; };
+  }
+  bindBrandEvents();
+
   const cancelBtn = document.getElementById('mCancel');
   if(cancelBtn) cancelBtn.onclick = closeModal;
 
@@ -4941,15 +5055,29 @@ function openCatalogEntryModal(sizeId, categoryId, existing){
     photos.forEach(p => { if(!p.id) p.id = uploadPhoto(p.src); });
     removedExistingPhotoIds.forEach(deletePhotoRef);
     const photoIds = photos.map(p => p.id);
+    // Marque : retrouvée (sans tenir compte de la casse) ou créée à la volée
+    let chosenBrandId = brandSel;
+    if(brandSel === '__new__'){
+      const label = newBrandText.trim();
+      chosenBrandId = '';
+      if(label){
+        const curList = activeV2List();
+        if(!Array.isArray(curList.brands)) curList.brands = [];
+        let b = curList.brands.find(x => x.label.trim().toLowerCase() === label.toLowerCase());
+        if(!b){ b = { id:newId(), label }; curList.brands.push(b); }
+        chosenBrandId = b.id;
+      }
+    }
     if(isNew){
       if(!Array.isArray(activeV2List().lots)) activeV2List().lots = [];
       activeV2List().lots.push({
         id:newId(), photos:photoIds, hiddenPhotos:[], price:priceVal,
-        entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:'', qty:qtyVal, charValues: Object.assign({}, charValues) }]
+        entries: [{ id:newId(), sizeIds:[sizeId], categoryId, brandId:chosenBrandId, qty:qtyVal, charValues: Object.assign({}, charValues) }]
       });
     } else {
       existing.lot.photos = photoIds;
       existing.lot.price = priceVal;
+      existing.entry.brandId = chosenBrandId;
       existing.entry.qty = qtyVal;
       existing.entry.charValues = Object.assign({}, charValues);
     }
